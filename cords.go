@@ -12,7 +12,10 @@ type Cord struct {
 
 // FromString creates a cord from a Go string.
 func FromString(s string) Cord {
-	r := &cordNode{weight: uint64(len(s))}
+	r := &cordNode{
+		weight:  uint64(len(s)),
+		balance: -1,
+	}
 	leaf := &stringLeaf{
 		index:  uint64(len(s)),
 		parent: r,
@@ -38,6 +41,19 @@ func (cord Cord) String() string {
 		// TODO: what to do? String() should not return an error. Can there be an error?
 	}
 	return bf.String()
+}
+
+// Len returns the length in bytes of a cord.
+func (cord Cord) Len() uint64 {
+	if cord.root == nil {
+		return 0
+	}
+	return cord.root.Weight()
+}
+
+// IsVoid returns true if cord is "".
+func (cord Cord) IsVoid() bool {
+	return cord.root == nil
 }
 
 // Each iterates over all nodes of the cord.
@@ -100,6 +116,11 @@ func index(node CordNode, i uint64) (CordNode, uint64, error) {
 	return nil, i, errIndexOutOfBounds
 }
 
+func (cord Cord) balance() {
+}
+
+// ---------------------------------------------------------------------------
+
 // CordNode is an interface type for nodes of a cord structure / binary tree.
 type CordNode interface {
 	Left() CordNode
@@ -115,6 +136,7 @@ type cordNode struct {
 	left, right CordNode
 	parent      CordNode
 	weight      uint64
+	balance     int
 }
 
 func (node *cordNode) Weight() uint64 {

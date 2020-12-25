@@ -34,3 +34,20 @@ func TestCordIndex(t *testing.T) {
 	}
 	t.Logf("str[%d] = %c", i, node.String()[i])
 }
+
+func TestCordConcat(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.SyntaxTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	c1 := FromString("Hello World")
+	c2 := FromString(", how are you?")
+	c := Concat(c1, c2)
+	if c.IsVoid() {
+		t.Fatalf("concatenation is nil")
+	}
+	t.Logf("c = '%s'", c)
+	t.Logf("c.left = '%s'", c.root.Left().Left())
+	t.Fail()
+}
