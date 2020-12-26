@@ -48,6 +48,8 @@ func TestCordConcat(t *testing.T) {
 		t.Fatalf("concatenation is nil")
 	}
 	t.Logf("c = '%s'", c)
-	t.Logf("c.left = '%s'", c.root.Left().Left())
-	t.Fail()
+	t.Logf("c.left = '%s'", c.root.Left())
+	if c.root.left.String() != "<inner node>" {
+		t.Errorf("cord structure differs from expected")
+	}
 }

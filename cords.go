@@ -7,33 +7,27 @@ import (
 
 // Cord is a type for an enhanced string.
 type Cord struct {
-	root *cordNode
+	root *innerNode
 }
 
 // FromString creates a cord from a Go string.
 func FromString(s string) Cord {
-	r := &cordNode{
-		weight:  uint64(len(s)),
-		balance: -1,
-	}
-	leaf := &stringLeaf{
-		index:  uint64(len(s)),
-		parent: r,
-		str:    s,
-	}
-	r.left = leaf
+	r := makeInnerNode()
+	r.weight = uint64(len(s))
+	r.height = 1
+	leaf := makeStringLeaf(s)
+	leaf.parent = r
+	r.left = &leaf.cordNode
 	return Cord{root: r}
 }
 
 func (cord Cord) String() string {
 	var bf bytes.Buffer
 	var err error
-	err = cord.Each(func(node CordNode) error {
-		if node.Left() == nil && node.Right() == nil {
-			if _, err = bf.WriteString(node.String()); err != nil {
-				T().Errorf(err.Error())
-				return err
-			}
+	err = cord.EachLeaf(func(leaf Leaf) error {
+		if _, err = bf.WriteString(leaf.String()); err != nil {
+			T().Errorf(err.Error())
+			return err
 		}
 		return nil
 	})
@@ -56,18 +50,18 @@ func (cord Cord) IsVoid() bool {
 	return cord.root == nil
 }
 
-// Each iterates over all nodes of the cord.
-func (cord Cord) Each(f func(node CordNode) error) error {
-	err := traverse(cord.root, f)
+// each iterates over all nodes of the cord.
+func (cord Cord) each(f func(node *cordNode) error) error {
+	err := traverse(&cord.root.cordNode, f)
 	return err
 }
 
 // EachLeaf iterates over all leaf nodes of the cord.
-func (cord Cord) EachLeaf(f func(node CordNode) error) error {
+func (cord Cord) EachLeaf(f func(Leaf) error) error {
 	var err error
-	err = traverse(cord.root, func(node CordNode) (e error) {
-		if node.Left() == nil && node.Right() == nil {
-			e = f(node)
+	err = cord.each(func(node *cordNode) (e error) {
+		if node.IsLeaf() {
+			e = f(node.AsLeaf())
 		}
 		return
 	})
@@ -75,8 +69,11 @@ func (cord Cord) EachLeaf(f func(node CordNode) error) error {
 }
 
 // traverse walks a cord in in-order.
-func traverse(node CordNode, f func(CordNode) error) error {
-	if l := node.Left(); l != nil {
+func traverse(node *cordNode, f func(node *cordNode) error) error {
+	if node.IsLeaf() {
+		return f(node)
+	}
+	if l := node.AsNode().left; l != nil {
 		if err := traverse(l, f); err != nil {
 			return err
 		}
@@ -84,7 +81,7 @@ func traverse(node CordNode, f func(CordNode) error) error {
 	if err := f(node); err != nil {
 		return err
 	}
-	if r := node.Right(); r != nil {
+	if r := node.AsNode().right; r != nil {
 		if err := traverse(r, f); err != nil {
 			return err
 		}
@@ -94,16 +91,16 @@ func traverse(node CordNode, f func(CordNode) error) error {
 
 var errIndexOutOfBounds error = errors.New("index out of bounds")
 
-func (cord Cord) index(i uint64) (CordNode, uint64, error) {
+func (cord Cord) index(i uint64) (*cordNode, uint64, error) {
 	if cord.root == nil {
 		return nil, 0, errIndexOutOfBounds
 	}
-	return index(cord.root, i)
+	return index(&cord.root.cordNode, i)
 }
 
 // index finds the leaf node of a cord which contains a given index.
 // Return values are the leaf node, the index within the leaf, and a possible error.
-func index(node CordNode, i uint64) (CordNode, uint64, error) {
+func index(node *cordNode, i uint64) (*cordNode, uint64, error) {
 	if node.Weight() <= i && node.Right() != nil {
 		return index(node.Right(), i-node.Weight())
 	}
@@ -121,11 +118,12 @@ func (cord Cord) balance() {
 
 // ---------------------------------------------------------------------------
 
-// CordNode is an interface type for nodes of a cord structure / binary tree.
-type CordNode interface {
-	Left() CordNode
-	Right() CordNode
-	Parent() CordNode
+// Leaf is an interface type for leafs of a cord structure.
+// Leafs do carry string fragments.
+type Leaf interface {
+	// Left() Leaf
+	// Right() Leaf
+	//Parent() Leaf
 	Weight() uint64
 	String() string
 }
@@ -133,60 +131,119 @@ type CordNode interface {
 // ---------------------------------------------------------------------------
 
 type cordNode struct {
-	left, right CordNode
-	parent      CordNode
+	parent *innerNode
+	self   interface{}
+}
+
+type innerNode struct {
+	cordNode
+	left, right *cordNode
 	weight      uint64
-	balance     int
+	height      int
+}
+
+type leafNode struct {
+	cordNode
+	leaf Leaf
+}
+
+func makeInnerNode() *innerNode {
+	inner := &innerNode{}
+	inner.self = inner
+	return inner
+}
+
+func makeLeafNode() *leafNode {
+	leaf := &leafNode{}
+	leaf.self = leaf
+	return leaf
+}
+
+func (node *cordNode) AsNode() *innerNode {
+	return node.self.(*innerNode)
+}
+
+func (node *cordNode) AsLeaf() *leafNode {
+	return node.self.(*leafNode)
+}
+
+func (node *cordNode) IsLeaf() bool {
+	if node.self == nil {
+		panic("node has no self, inconsistency")
+	}
+	_, ok := node.self.(*leafNode)
+	return ok
 }
 
 func (node *cordNode) Weight() uint64 {
-	return node.weight
+	if node.IsLeaf() {
+		return node.AsLeaf().Weight()
+	}
+	n := node.AsNode()
+	return n.weight
 }
 
-func (node *cordNode) Left() CordNode {
-	return node.left
+func (node *cordNode) Left() *cordNode {
+	if node.IsLeaf() {
+		return nil
+	}
+	n := node.AsNode()
+	return n.left
 }
 
-func (node *cordNode) Right() CordNode {
-	return node.right
-}
-
-func (node *cordNode) Parent() CordNode {
-	return node.parent
+func (node *cordNode) Right() *cordNode {
+	if node.IsLeaf() {
+		return nil
+	}
+	n := node.AsNode()
+	return n.right
 }
 
 func (node *cordNode) String() string {
-	return ""
+	if node.IsLeaf() {
+		return node.AsLeaf().String()
+	}
+	return "<inner node>"
 }
 
-var _ CordNode = &cordNode{}
+func (leaf *leafNode) Weight() uint64 {
+	return leaf.leaf.Weight()
+}
+
+func (leaf *leafNode) String() string {
+	return leaf.leaf.String()
+}
+
+var _ Leaf = &leafNode{}
 
 // ---------------------------------------------------------------------------
 
-type stringLeaf struct {
-	index  uint64
-	parent CordNode
-	str    string
+type leafString string
+
+func makeStringLeaf(s string) *leafNode {
+	leaf := makeLeafNode()
+	leaf.leaf = leafString(s)
+	return leaf
 }
 
-func (leaf stringLeaf) Weight() uint64 {
-	return leaf.index
+func (lstr leafString) Weight() uint64 {
+	return uint64(len(lstr))
 }
 
-func (leaf stringLeaf) Left() CordNode {
-	return nil
+func (lstr leafString) String() string {
+	return string(lstr)
 }
 
-func (leaf stringLeaf) Right() CordNode {
-	return nil
-}
+var _ Leaf = leafString("")
 
-func (leaf stringLeaf) Parent() CordNode {
-	return leaf.parent
-}
+// func (leaf stringLeaf) Left() Leaf {
+// 	return nil
+// }
 
-func (leaf stringLeaf) String() string {
-	return leaf.str
-}
+// func (leaf stringLeaf) Right() Leaf {
+// 	return nil
+// }
 
-var _ CordNode = &stringLeaf{}
+// func (leaf stringLeaf) Parent() Leaf {
+// 	return leaf.parent
+// }
