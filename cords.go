@@ -14,7 +14,7 @@ type Cord struct {
 func FromString(s string) Cord {
 	r := makeInnerNode()
 	r.weight = uint64(len(s))
-	r.height = 1
+	r.height = 2 // leaf + inner node
 	leaf := makeStringLeaf(s)
 	leaf.parent = r
 	r.left = &leaf.cordNode
@@ -51,15 +51,15 @@ func (cord Cord) IsVoid() bool {
 }
 
 // each iterates over all nodes of the cord.
-func (cord Cord) each(f func(node *cordNode) error) error {
-	err := traverse(&cord.root.cordNode, f)
+func (cord Cord) each(f func(node *cordNode, depth int) error) error {
+	err := traverse(&cord.root.cordNode, 0, f)
 	return err
 }
 
 // EachLeaf iterates over all leaf nodes of the cord.
 func (cord Cord) EachLeaf(f func(Leaf) error) error {
 	var err error
-	err = cord.each(func(node *cordNode) (e error) {
+	err = cord.each(func(node *cordNode, depth int) (e error) {
 		if node.IsLeaf() {
 			e = f(node.AsLeaf())
 		}
@@ -68,21 +68,29 @@ func (cord Cord) EachLeaf(f func(Leaf) error) error {
 	return err
 }
 
+// index locates the leaf containing index i.
+func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
+	if cord.root == nil {
+		return nil, 0, errIndexOutOfBounds
+	}
+	return index(&cord.root.cordNode, i)
+}
+
 // traverse walks a cord in in-order.
-func traverse(node *cordNode, f func(node *cordNode) error) error {
+func traverse(node *cordNode, d int, f func(node *cordNode, depth int) error) error {
 	if node.IsLeaf() {
-		return f(node)
+		return f(node, d)
 	}
 	if l := node.AsNode().left; l != nil {
-		if err := traverse(l, f); err != nil {
+		if err := traverse(l, d+1, f); err != nil {
 			return err
 		}
 	}
-	if err := f(node); err != nil {
+	if err := f(node, d); err != nil {
 		return err
 	}
 	if r := node.AsNode().right; r != nil {
-		if err := traverse(r, f); err != nil {
+		if err := traverse(r, d+1, f); err != nil {
 			return err
 		}
 	}
@@ -91,16 +99,9 @@ func traverse(node *cordNode, f func(node *cordNode) error) error {
 
 var errIndexOutOfBounds error = errors.New("index out of bounds")
 
-func (cord Cord) index(i uint64) (*cordNode, uint64, error) {
-	if cord.root == nil {
-		return nil, 0, errIndexOutOfBounds
-	}
-	return index(&cord.root.cordNode, i)
-}
-
 // index finds the leaf node of a cord which contains a given index.
 // Return values are the leaf node, the index within the leaf, and a possible error.
-func index(node *cordNode, i uint64) (*cordNode, uint64, error) {
+func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
 	if node.Weight() <= i && node.Right() != nil {
 		return index(node.Right(), i-node.Weight())
 	}
@@ -108,12 +109,12 @@ func index(node *cordNode, i uint64) (*cordNode, uint64, error) {
 		return index(node.Left(), i)
 	}
 	if i < uint64(node.Weight()) {
-		return node, i, nil
+		if node.IsLeaf() {
+			return node.AsLeaf(), i, nil
+		}
+		panic("index node is not a leaf")
 	}
 	return nil, i, errIndexOutOfBounds
-}
-
-func (cord Cord) balance() {
 }
 
 // ---------------------------------------------------------------------------
@@ -121,9 +122,6 @@ func (cord Cord) balance() {
 // Leaf is an interface type for leafs of a cord structure.
 // Leafs do carry string fragments.
 type Leaf interface {
-	// Left() Leaf
-	// Right() Leaf
-	//Parent() Leaf
 	Weight() uint64
 	String() string
 }
@@ -183,6 +181,14 @@ func (node *cordNode) Weight() uint64 {
 	return n.weight
 }
 
+func (node *cordNode) Height() int {
+	if node.IsLeaf() {
+		return 1
+	}
+	n := node.AsNode()
+	return n.height
+}
+
 func (node *cordNode) Left() *cordNode {
 	if node.IsLeaf() {
 		return nil
@@ -204,6 +210,30 @@ func (node *cordNode) String() string {
 		return node.AsLeaf().String()
 	}
 	return "<inner node>"
+}
+func (inner *innerNode) attachLeft(child *cordNode) {
+	inner.left = child
+	child.parent = inner
+	inner.adjustHeight()
+}
+
+func (inner *innerNode) attachRight(child *cordNode) {
+	inner.right = child
+	child.parent = inner
+	inner.adjustHeight()
+}
+
+func (inner *innerNode) adjustHeight() int {
+	mx := 0
+	if inner.left != nil {
+		mx = inner.Left().Height()
+	}
+	if inner.right != nil {
+		h := inner.Right().Height()
+		mx = max(h, mx)
+	}
+	inner.height = mx + 1
+	return mx + 1
 }
 
 func (leaf *leafNode) Weight() uint64 {
@@ -236,14 +266,26 @@ func (lstr leafString) String() string {
 
 var _ Leaf = leafString("")
 
-// func (leaf stringLeaf) Left() Leaf {
-// 	return nil
-// }
+// ---------------------------------------------------------------------------
 
-// func (leaf stringLeaf) Right() Leaf {
-// 	return nil
-// }
+func dump(node *cordNode) {
+	traverse(node, 0, func(node *cordNode, depth int) error {
+		if node.IsLeaf() {
+			l := node.AsLeaf()
+			T().Debugf("%sL = %v", indent(depth), l)
+			return nil
+		}
+		n := node.AsNode()
+		T().Debugf("%sN = %v, h = %d", indent(depth), n, n.height)
+		return nil
+	})
+}
 
-// func (leaf stringLeaf) Parent() Leaf {
-// 	return leaf.parent
-// }
+func indent(d int) string {
+	ind := ""
+	for d > 0 {
+		ind = ind + "  "
+		d--
+	}
+	return ind
+}
