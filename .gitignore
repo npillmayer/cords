@@ -4,6 +4,9 @@
 *.dll
 *.so
 *.dylib
+*.code-workspace
+*.dot
+*.svg
 
 # Test binary, built with `go test -c`
 *.test
