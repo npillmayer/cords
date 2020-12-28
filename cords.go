@@ -3,11 +3,28 @@ package cords
 import (
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 // Cord is a type for an enhanced string.
 type Cord struct {
 	root *innerNode
+}
+
+func makeCord(node *cordNode) Cord {
+	if node.IsLeaf() {
+		r := makeInnerNode()
+		r.attachLeft(node)
+		return Cord{root: r}
+	}
+	// node is inner node
+	inner := node.AsNode()
+	if inner.right != nil {
+		return Cord{root: inner}
+	}
+	r := makeInnerNode()
+	r.attachLeft(&inner.cordNode)
+	return Cord{root: r}
 }
 
 // FromString creates a cord from a Go string.
@@ -124,6 +141,7 @@ func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
 type Leaf interface {
 	Weight() uint64
 	String() string
+	Split(uint64) (Leaf, Leaf)
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +227,7 @@ func (node *cordNode) String() string {
 	if node.IsLeaf() {
 		return node.AsLeaf().String()
 	}
-	return "<inner node>"
+	return fmt.Sprintf("<inner node |%d|, left=%v, right=%v>", node.Height(), node.Left(), node.Right())
 }
 func (inner *innerNode) attachLeft(child *cordNode) {
 	inner.left = child
@@ -226,13 +244,16 @@ func (inner *innerNode) attachRight(child *cordNode) {
 func (inner *innerNode) adjustHeight() int {
 	mx := 0
 	if inner.left != nil {
-		mx = inner.Left().Height()
+		mx = inner.left.Height()
+		T().Debugf("|left| = %d", mx)
 	}
 	if inner.right != nil {
-		h := inner.Right().Height()
+		h := inner.right.Height()
+		T().Debugf("|right| = %d", h)
 		mx = max(h, mx)
 	}
 	inner.height = mx + 1
+	T().Debugf("setting height %d to %d", inner.height, mx+1)
 	return mx + 1
 }
 
@@ -242,6 +263,11 @@ func (leaf *leafNode) Weight() uint64 {
 
 func (leaf *leafNode) String() string {
 	return leaf.leaf.String()
+}
+
+func (leaf *leafNode) Split(i uint64) (Leaf, Leaf) {
+	l1, l2 := leaf.leaf.Split(i)
+	return l1, l2
 }
 
 var _ Leaf = &leafNode{}
@@ -264,6 +290,12 @@ func (lstr leafString) String() string {
 	return string(lstr)
 }
 
+func (lstr leafString) Split(i uint64) (Leaf, Leaf) {
+	left := lstr[:i]
+	right := lstr[i:]
+	return left, right
+}
+
 var _ Leaf = leafString("")
 
 // ---------------------------------------------------------------------------
@@ -276,7 +308,7 @@ func dump(node *cordNode) {
 			return nil
 		}
 		n := node.AsNode()
-		T().Debugf("%sN = %v, h = %d", indent(depth), n, n.height)
+		T().Debugf("%sN = %v", indent(depth), n)
 		return nil
 	})
 }
