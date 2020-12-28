@@ -33,7 +33,7 @@ func FromString(s string) Cord {
 	r.weight = uint64(len(s))
 	r.height = 2 // leaf + inner node
 	leaf := makeStringLeaf(s)
-	leaf.parent = r
+	//leaf.parent = r
 	r.left = &leaf.cordNode
 	return Cord{root: r}
 }
@@ -78,7 +78,7 @@ func (cord Cord) EachLeaf(f func(Leaf) error) error {
 	var err error
 	err = cord.each(func(node *cordNode, depth int) (e error) {
 		if node.IsLeaf() {
-			e = f(node.AsLeaf())
+			e = f(node.AsLeaf().leaf)
 		}
 		return
 	})
@@ -147,8 +147,8 @@ type Leaf interface {
 // ---------------------------------------------------------------------------
 
 type cordNode struct {
-	parent *innerNode
-	self   interface{}
+	//parent *innerNode
+	self interface{}
 }
 
 type innerNode struct {
@@ -229,15 +229,32 @@ func (node *cordNode) String() string {
 	}
 	return fmt.Sprintf("<inner node |%d|, left=%v, right=%v>", node.Height(), node.Left(), node.Right())
 }
+
+func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
+	if node.IsLeaf() { // node must be an inner node
+		panic("parent node is not of type inner node")
+	}
+	cln := cloneNode(child)
+	inner := node.AsNode()
+	if inner.left == child {
+		inner.left = cln
+	} else if inner.right == child {
+		inner.right = cln
+	} else {
+		panic("node to clone is not a child of this parent")
+	}
+	return cln
+}
+
 func (inner *innerNode) attachLeft(child *cordNode) {
 	inner.left = child
-	child.parent = inner
+	//child.parent = inner
 	inner.adjustHeight()
 }
 
 func (inner *innerNode) attachRight(child *cordNode) {
 	inner.right = child
-	child.parent = inner
+	//child.parent = inner
 	inner.adjustHeight()
 }
 
@@ -245,15 +262,15 @@ func (inner *innerNode) adjustHeight() int {
 	mx := 0
 	if inner.left != nil {
 		mx = inner.left.Height()
-		T().Debugf("|left| = %d", mx)
+		//T().Debugf("|left| = %d", mx)
 	}
 	if inner.right != nil {
 		h := inner.right.Height()
-		T().Debugf("|right| = %d", h)
+		//T().Debugf("|right| = %d", h)
 		mx = max(h, mx)
 	}
 	inner.height = mx + 1
-	T().Debugf("setting height %d to %d", inner.height, mx+1)
+	//T().Debugf("setting height %d to %d", inner.height, mx+1)
 	return mx + 1
 }
 
@@ -265,12 +282,16 @@ func (leaf *leafNode) String() string {
 	return leaf.leaf.String()
 }
 
-func (leaf *leafNode) Split(i uint64) (Leaf, Leaf) {
+func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 	l1, l2 := leaf.leaf.Split(i)
-	return l1, l2
+	ln1 := makeLeafNode()
+	ln1.leaf = l1
+	ln2 := makeLeafNode()
+	ln2.leaf = l2
+	return ln1, ln2
 }
 
-var _ Leaf = &leafNode{}
+//var _ Leaf = &leafNode{}
 
 // ---------------------------------------------------------------------------
 

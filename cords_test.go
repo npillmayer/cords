@@ -26,10 +26,10 @@ func TestNewStringCord(t *testing.T) {
 	if !leaf.IsLeaf() {
 		t.Errorf("expected leaf at height 1, is not")
 	}
-	t.Logf("parent=%v", leaf.parent)
-	if leaf.parent.left != leaf || leaf.parent.right != nil {
-		t.Errorf("root node not constructed as expected")
-	}
+	// t.Logf("parent=%v", leaf.parent)
+	// if leaf.parent.left != leaf || leaf.parent.right != nil {
+	// 	t.Errorf("root node not constructed as expected")
+	// }
 }
 
 func TestCordIndex1(t *testing.T) {
@@ -67,13 +67,13 @@ func TestCordConcat(t *testing.T) {
 	if c.root.height != 3 {
 		t.Errorf("expected height(c) to be 3, is %d", c.root.Height())
 	}
-	mid := c.root.left.AsNode()
-	t.Logf("mid = %v", mid)
-	if mid.left.parent != mid || mid.right.parent != mid {
-		t.Logf("mid.left.parent  = %v", mid.left.parent)
-		t.Logf("mid.right.parent = %v", mid.right.parent)
-		t.Errorf("cord structure not as expected")
-	}
+	// mid := c.root.left.AsNode()
+	// t.Logf("mid = %v", mid)
+	// if mid.left.parent != mid || mid.right.parent != mid {
+	// 	t.Logf("mid.left.parent  = %v", mid.left.parent)
+	// 	t.Logf("mid.right.parent = %v", mid.right.parent)
+	// 	t.Errorf("cord structure not as expected")
+	// }
 	if &c1.root.cordNode == c.root.left {
 		t.Errorf("copy on write did not work for c1.root")
 	}
@@ -120,29 +120,29 @@ func TestBalance1(t *testing.T) {
 	}
 }
 
-func TestUnzip(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
-	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	c1 := FromString("Hello ")
-	c2 := FromString("World")
-	c := Concat(c1, c2)
-	leaf, i, err := c.index(7)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Logf("str[%d] = %c", i, leaf.String()[i])
-	top := unzip(&leaf.cordNode, c.root)
-	if top == nil {
-		t.Fatal("top is nil, should be clone of c.root")
-	}
-	dump(&top.cordNode)
-	if top == c.root {
-		t.Fatal("top = c.root, should be clone of c.root")
-	}
-}
+// func TestUnzip(t *testing.T) {
+// 	gtrace.CoreTracer = gotestingadapter.New()
+// 	teardown := gotestingadapter.RedirectTracing(t)
+// 	defer teardown()
+// 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+// 	//
+// 	c1 := FromString("Hello ")
+// 	c2 := FromString("World")
+// 	c := Concat(c1, c2)
+// 	leaf, i, err := c.index(7)
+// 	if err != nil {
+// 		t.Fatal(err.Error())
+// 	}
+// 	t.Logf("str[%d] = %c", i, leaf.String()[i])
+// 	top := unzip(&leaf.cordNode, c.root)
+// 	if top == nil {
+// 		t.Fatal("top is nil, should be clone of c.root")
+// 	}
+// 	dump(&top.cordNode)
+// 	if top == c.root {
+// 		t.Fatal("top = c.root, should be clone of c.root")
+// 	}
+// }
 
 func TestCordSplit1(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
@@ -161,5 +161,7 @@ func TestCordSplit1(t *testing.T) {
 	dump(&cl.root.cordNode)
 	t.Logf("----------------------")
 	dump(&cr.root.cordNode)
+	t.Logf("======================")
+	dump(&c.root.cordNode)
 	t.Fail()
 }
