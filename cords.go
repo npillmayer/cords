@@ -6,6 +6,16 @@ import (
 )
 
 // Cord is a type for an enhanced string.
+// It references fragments of text, which are considered immutable.
+// Fragments will be shared between cords. Cords change in a concurrency-safe way,
+// as every modifying operation on a cord will create a copy of changed parts of the cord.
+//
+// A cord created by
+//
+//     Cord{}
+//
+// is a valid object and behaves like the empty string.
+//
 type Cord struct {
 	root *innerNode
 }
@@ -36,7 +46,16 @@ func FromString(s string) Cord {
 	return Cord{root: r}
 }
 
+// String returns the cord as a Go string. This may be an expensive operation,
+// as it will allocate a buffer for all the bytes of the cord and collect all
+// fragments to a single continuous string. When working with large amounts of
+// text, clients should probably avoid to call this.
+// Instead they should jump to a position within the cord and report a
+// substring or use an iterator.
 func (cord Cord) String() string {
+	if cord.IsVoid() {
+		return ""
+	}
 	var bf bytes.Buffer
 	var err error
 	err = cord.EachLeaf(func(leaf Leaf) error {
@@ -69,7 +88,7 @@ func (cord Cord) Len() uint64 {
 
 // IsVoid returns true if cord is "".
 func (cord Cord) IsVoid() bool {
-	return cord.root == nil || cord.root.Left() == nil
+	return cord.root == nil || cord.root.Left() == nil || cord.Len() == 0
 }
 
 // each iterates over all nodes of the cord.
@@ -93,7 +112,7 @@ func (cord Cord) EachLeaf(f func(Leaf) error) error {
 // index locates the leaf containing index i.
 func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
 	if cord.root == nil {
-		return nil, 0, errIndexOutOfBounds
+		return nil, 0, ErrIndexOutOfBounds
 	}
 	return index(&cord.root.cordNode, i)
 }
@@ -101,7 +120,8 @@ func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
 // ---------------------------------------------------------------------------
 
 // Leaf is an interface type for leafs of a cord structure.
-// Leafs do carry string fragments.
+// Leafs do carry fragments of text.
+// The default implementation uses Go strings.
 type Leaf interface {
 	Weight() uint64
 	String() string

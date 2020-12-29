@@ -1,11 +1,10 @@
 package cords
 
 import (
-	"errors"
 	"fmt"
 )
 
-// Concat concatenates two cords and returns a new cord.
+// Concat concatenates cords and returns a new cord.
 //
 func Concat(c1 Cord, others ...Cord) Cord {
 	var nonvoid []Cord
@@ -33,7 +32,7 @@ func Concat(c1 Cord, others ...Cord) Cord {
 	return cord
 }
 
-// Concat appends another cord to this cord.
+// Concat appends another cord to this cord, resulting in a new cord.
 func (cord Cord) Concat(c Cord) Cord {
 	//
 	// we will set c2.root as the right child of clone(c1.root)
@@ -60,12 +59,35 @@ func (cord Cord) Concat(c Cord) Cord {
 	return cord
 }
 
+// Insert inserts a substring-cord into cord at index i, resulting in a
+// new cord. If i is greater than the length of cord, an out-of-bounds error
+// is returned.
+func (cord Cord) Insert(c Cord, i uint64) (Cord, error) {
+	if cord.IsVoid() && i == uint64(0) {
+		return c, nil
+	}
+	if cord.Len() < i {
+		return Cord{}, ErrIndexOutOfBounds
+	}
+	if c.IsVoid() {
+		return cord, nil
+	}
+	if cord.Len() == i { // simply append at end
+		return cord.Concat(c), nil
+	}
+	cl, cr, err := Split(cord, i)
+	if err != nil {
+		return cord, err
+	}
+	return Concat(cl, c, cr), nil
+}
+
 // Split splits a cord into two new (smaller) cords right before position i.
-// Split(C,i) ⇒ split C into C1 and C2, with C1=c0,…,ci-1 and C2=ci,…,cn.
+// Split(C,i) ⇒ split C into C1 and C2, with C1=b0,…,bi-1 and C2=bi,…,bn.
 //
 func Split(c Cord, i uint64) (Cord, Cord, error) {
 	if c.root == nil || c.root.Left() == nil {
-		return c, Cord{}, errIndexOutOfBounds
+		return c, Cord{}, ErrIndexOutOfBounds
 	}
 	root := &clone(c.root).cordNode
 	node := root.Left()
@@ -127,7 +149,7 @@ func cutRight(node *cordNode, i uint64, parent *cordNode, root *cordNode) (*cord
 		}
 		return root, nil // no going deeper
 	}
-	return nil, errIndexOutOfBounds
+	return nil, ErrIndexOutOfBounds
 }
 
 // ---------------------------------------------------------------------------
@@ -153,8 +175,6 @@ func traverse(node *cordNode, d int, f func(node *cordNode, depth int) error) er
 	return nil
 }
 
-var errIndexOutOfBounds error = errors.New("index out of bounds")
-
 // index finds the leaf node of a cord which contains a given index.
 // Return values are the leaf node, the index within the leaf, and a possible error.
 func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
@@ -170,7 +190,7 @@ func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
 		}
 		panic("index node is not a leaf")
 	}
-	return nil, i, errIndexOutOfBounds
+	return nil, i, ErrIndexOutOfBounds
 }
 
 func concat(n1, n2 *cordNode) *cordNode {

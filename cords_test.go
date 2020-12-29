@@ -186,3 +186,30 @@ func TestCordSplit1(t *testing.T) {
 		t.Fatalf("copy on write did not work as expected")
 	}
 }
+
+func TestCordInsert(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	c1 := FromString("Hello ")
+	c2 := FromString("World")
+	c := Concat(c1, c2) // Hello World
+	x, err := c.Insert(FromString(","), 5)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Logf("x = '%s'", x.String())
+	if x.Len() != 12 {
+		t.Errorf("Expected result to be of length 12, is %d", x.Len())
+	}
+	x, err = x.Insert(FromString("!"), 12)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Logf("x = '%s'", x.String())
+	if x.String() != "Hello, World!" {
+		t.Errorf("Double insert resulted in inexpected string: %s", x)
+	}
+}
