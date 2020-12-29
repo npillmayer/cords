@@ -1,30 +1,68 @@
 package cords
 
-// Concat concatenates two cords to a new one.
-// The cord tree is balanced afterwards.
-func Concat(c1, c2 Cord) Cord {
-	if c1.IsVoid() {
-		return c2
+import (
+	"errors"
+	"fmt"
+)
+
+// Concat concatenates two cords and returns a new cord.
+//
+func Concat(c1 Cord, others ...Cord) Cord {
+	var nonvoid []Cord
+	if !c1.IsVoid() {
+		nonvoid = append(nonvoid, c1)
 	}
-	if c2.IsVoid() {
+	for _, c := range others {
+		if !c.IsVoid() {
+			nonvoid = append(nonvoid, c)
+		}
+	}
+	if len(nonvoid) == 0 {
 		return c1
 	}
-	// we will set c2.root as the right child of clone(c1.root)
-	c1root := clone(c1.root) // c1.root will change; copy on write
-	root := makeInnerNode()  // root of new cord
-	root.weight = c1.Len() + c2.Len()
-	node := cloneNode(c2.root.left)
-	c1root.attachRight(node)
-	root.attachLeft(&c1root.cordNode)
-	//root.height = max(c1.root.height, c2.root.height) + 1 // done by attach…(…)
-	//
-	cord := Cord{root: root} // new cord with new root to return
-	if unbalanced(cord.root) {
-		cord.root = balance(cord.root)
+	if len(nonvoid) == 1 {
+		return nonvoid[0]
+	}
+	cord := nonvoid[0]
+	for _, c := range nonvoid[1:] {
+		if c.Len() != c.root.Len() {
+			panic(fmt.Sprintf("structural inconsistency, %d ≠ %d", c.Len(), c.root.Len()))
+		}
+		cord = cord.Concat(c)
 	}
 	return cord
 }
 
+// Concat appends another cord to this cord.
+func (cord Cord) Concat(c Cord) Cord {
+	//
+	// we will set c2.root as the right child of clone(c1.root)
+	c1root := clone(cord.root) // c1.root will change; copy on write
+	root := makeInnerNode()    // root of new cord
+	//root.weight = c1.Len() + c2.Len()
+	node := cloneNode(c.root.left)
+	c1root.attachRight(node)
+	//dump(&c1root.cordNode)
+	root.attachLeft(&c1root.cordNode)
+	//
+	cord = Cord{root: root} // new cord with new root to return
+	if cord.Len() != cord.root.Len() {
+		panic("structural inconsistency after concatentation")
+	}
+	if !cord.IsVoid() && unbalanced(cord.root.Left()) {
+		b := balance(cord.root.Left().AsInner())
+		cord.root.attachLeft(&b.cordNode)
+	}
+	if cord.Len() != cord.root.Len() {
+		T().Debugf("cord.len=%d, cord.root.len=%d", cord.Len(), cord.root.Len())
+		panic("structural inconsistency after re-balance")
+	}
+	return cord
+}
+
+// Split splits a cord into two new (smaller) cords right before position i.
+// Split(C,i) ⇒ split C into C1 and C2, with C1=c0,…,ci-1 and C2=ci,…,cn.
+//
 func Split(c Cord, i uint64) (Cord, Cord, error) {
 	if c.root == nil || c.root.Left() == nil {
 		return c, Cord{}, errIndexOutOfBounds
@@ -35,15 +73,11 @@ func Split(c Cord, i uint64) (Cord, Cord, error) {
 	if err != nil || root2 == nil {
 		return c, Cord{}, err
 	}
-	return Cord{root: root.AsNode()}, makeCord(root2), nil
+	return Cord{root: root.AsInner()}, makeCord(root2), nil
 }
 
-// TODO: If right child is cut off, check if parent's parent has a right child.
-// If not, move parent upwards (unify 2 nodes).
 func cutRight(node *cordNode, i uint64, parent *cordNode, root *cordNode) (*cordNode, error) {
 	if node.Weight() <= i && node.Right() != nil { // node is inner node, walk right
-		// node = cloneNode(node)       // copy on write
-		// parent.AsNode().right = node // parent is alredy cloned
 		node = parent.swapNodeClone(node) // copy on write
 		T().Debugf("split: traversing RIGHT")
 		return cutRight(node.Right(), i-node.Weight(), node, root)
@@ -52,16 +86,19 @@ func cutRight(node *cordNode, i uint64, parent *cordNode, root *cordNode) (*cord
 		if node.Weight() == i { // on mark ⇒ remove subtree starting at node.left, and done
 			T().Debugf("split: clean cut of SUBTREE")
 			root = concat(node, root) // cut off whole subtree starting at node
-			// node = cloneNode(node)      // copy on write
-			// parent.AsNode().right = nil // parent is alredy cloned
-			//node = parent.swapNodeClone(node) // copy on write
-			parent.AsNode().right = nil
+			parent.AsInner().right = nil
 			return root, nil // no need to walk further down (left)
 		}
 		node = parent.swapNodeClone(node) // copy on write
 		if node.Right() != nil {          // cut off right child
 			root = concat(node.Right(), root)
-			node.AsNode().right = nil
+			node.AsInner().right = nil
+		}
+		if parent.Right() == nil { // collapse node and parent (have identical metric)
+			parent.AsInner().left = node.AsInner().left
+			node = parent
+			node.AsInner().height = node.Height() - 1
+			T().Debugf("collapsing node with parent, height=%d", node.Height())
 		}
 		T().Debugf("split: traversing LEFT") // walk further down to the left
 		return cutRight(node.Left(), i, node, root)
@@ -72,93 +109,69 @@ func cutRight(node *cordNode, i uint64, parent *cordNode, root *cordNode) (*cord
 			panic("index node is not a leaf")
 		}
 		if i == 0 { // we must be in a right-side leaf
-			root = concat(node, root)
-			parent.AsNode().right = nil
-		} else { // either left or right leaf, have to split it
+			root = concat(node, root)    // collect whole leaf
+			parent.AsInner().right = nil // cut off whole leaf
+		} else { // either left or right leaf, have to split it; leave parent intact
 			l1, l2 := node.AsLeaf().split(i)
-			if parent.Left() == node {
-				// cut off l2
-				// leave parent intact
+			if parent.Left() == node { // cut off l2 from left child
 				// right sibling of leaf already cut off
-				parent.AsNode().left = &l1.cordNode
-				root = concat(&l2.cordNode, root)
-			} else {
-				// cut off l2
-				parent.AsNode().right = &l1.cordNode
-				root = concat(&l2.cordNode, root)
+				//parent.AsInner().left = &l1.cordNode
+				T().Debugf("attaching left child with w=%d, parent.w=%d", l1.Weight(), parent.Weight())
+				parent.AsInner().attachLeft(&l1.cordNode)
+				T().Debugf("attaching left child with w=%d, parent.w=%d", l1.Weight(), parent.Weight())
+			} else { // cut off l2 from right child
+				//parent.AsInner().right = &l1.cordNode
+				parent.AsInner().attachRight(&l1.cordNode)
 			}
+			root = concat(&l2.cordNode, root) // collect right part of split leaf
 		}
-		return root, nil
+		return root, nil // no going deeper
 	}
 	return nil, errIndexOutOfBounds
 }
 
-// func XSplit(c Cord, i uint64) (Cord, Cord, error) {
-// 	// TODO case i == 0 or i == len(cord)
-// 	dump(&c.root.cordNode)
-// 	T().Debugf("----Split----------")
-// 	leaf, inx, err := c.index(i)
-// 	if err != nil {
-// 		return c, Cord{}, err
-// 	}
-// 	dump(&c.root.cordNode)
-// 	parent := leaf.parent
-// 	x := parent
-// 	T().Debugf("before split, parent = %v", parent)
-// 	//var sibling *leafNode
-// 	//if inx < leaf.Weight()-1 { // split mid-string
-// 	if inx > 0 { // split mid-string
-// 		p := split(leaf, inx)        // p is parent of new leaf and its left sibling
-// 		p.parent = parent            // hook it up to orig leaf's parent
-// 		parent = p                   // now call p the new leaf's parent
-// 		leaf = parent.right.AsLeaf() // and call new leaf the leaf
-// 		//sibling = parent.left.AsLeaf() // must have a left sibling
-// 	}
-// 	// else if lft := parent.Left(); lft != nil {
-// 	// 	if sibling = lft.AsLeaf(); sibling == leaf {
-// 	// 		sibling = nil
-// 	// 	}
-// 	// }
-// 	//
-// 	T().Debugf("after split, parent = %v", parent)
-// 	T().Debugf("after split,      x = %v", x)
-// 	// leaf and parent may not be connected
-// 	// now leaf and parent are set ⇒ split it before leaf
-// 	//root1 := unzip(leaf, c.root)   // produce a copy of all upward nodes until new left root
-// 	root1 := unzip(&parent.cordNode, c.root) // produce a copy of all upward nodes until new left root
-// 	dump(&root1.cordNode)
-// 	panic("worked?")
-// 	var root2 *cordNode
-// 	// leaf may be left or right child of parent
-// 	n := &leaf.cordNode
-// 	// search upwards until n is right child of its parent => split point
-// 	for n != &root1.cordNode { // walk upwards upto root
-// 		if n.parent.right == n { // yes, n is right child
-// 			break // stop walking
-// 		}
-// 		n = &n.parent.cordNode
-// 	}
-// 	p := n.parent
-// 	p.right = nil  // split off n
-// 	n.parent = nil // split off n
-// 	root2 = n      // build up root2, starting with n
-// 	weight := n.Weight()
-// 	for p != nil { // walk upwards again, searching for right children
-// 		p.weight -= weight
-// 		if p.right != nil {
-// 			weight += length(p.right)
-// 			rt := clone(p.right.AsNode())
-// 			rt.parent = nil
-// 			p.right = nil
-// 			root2 = concat(root2, &rt.cordNode)
-// 		}
-// 		p = p.parent
-// 	}
-// 	// TODO correctly pack roots into Cords
-// 	return Cord{root: root1}, makeCord(root2), nil
-// }
-
 // ---------------------------------------------------------------------------
+
+// traverse walks a cord in in-order.
+func traverse(node *cordNode, d int, f func(node *cordNode, depth int) error) error {
+	if node.IsLeaf() {
+		return f(node, d)
+	}
+	if l := node.AsInner().left; l != nil {
+		if err := traverse(l, d+1, f); err != nil {
+			return err
+		}
+	}
+	if err := f(node, d); err != nil {
+		return err
+	}
+	if r := node.AsInner().right; r != nil {
+		if err := traverse(r, d+1, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var errIndexOutOfBounds error = errors.New("index out of bounds")
+
+// index finds the leaf node of a cord which contains a given index.
+// Return values are the leaf node, the index within the leaf, and a possible error.
+func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
+	if node.Weight() <= i && node.Right() != nil {
+		return index(node.Right(), i-node.Weight())
+	}
+	if node.Left() != nil {
+		return index(node.Left(), i)
+	}
+	if i < uint64(node.Weight()) {
+		if node.IsLeaf() {
+			return node.AsLeaf(), i, nil
+		}
+		panic("index node is not a leaf")
+	}
+	return nil, i, errIndexOutOfBounds
+}
 
 func concat(n1, n2 *cordNode) *cordNode {
 	if n1 == nil {
@@ -181,32 +194,6 @@ func length(node *cordNode) uint64 {
 	return l
 }
 
-// func unzip(node *cordNode, stopper *innerNode) *innerNode {
-// 	if node == nil {
-// 		return nil
-// 	}
-// 	var inner *innerNode
-// 	if node.IsLeaf() {
-// 		node = &cloneLeaf(node.AsLeaf()).cordNode
-// 		inner = node.parent
-// 	} else {
-// 		inner = node.AsNode()
-// 	}
-// 	T().Debugf("unzip start = %v", inner)
-// 	for inner != nil && inner != stopper {
-// 		inner = clone(inner)
-// 		inner.adjustHeight()
-// 		T().Debugf("unzip node = %v/%d", inner, inner.height)
-// 		if inner.parent == nil || inner == stopper {
-// 			T().Debugf("stopping with %v", inner)
-// 			T().Debugf("   ⇒ parent is %v", inner.parent)
-// 			break
-// 		}
-// 		inner = inner.parent
-// 	}
-// 	return inner
-// }
-
 func split(leaf *leafNode, i uint64) *innerNode {
 	str := leaf.String()
 	lstr := str[:i]
@@ -224,14 +211,14 @@ func balance(inner *innerNode) *innerNode {
 		return inner
 	}
 	if inner.left == nil {
-		if inner.right.Height() > 1 {
+		if inner.right.Height() > 2 {
 			inner = rotateLeft(inner)
 		} else {
 			return inner
 		}
 	}
 	if inner.right == nil {
-		if inner.left.Height() > 1 {
+		if inner.left.Height() > 2 {
 			inner = rotateRight(inner)
 		} else {
 			return inner
@@ -252,37 +239,37 @@ func balance(inner *innerNode) *innerNode {
 
 func rotateLeft(inner *innerNode) *innerNode {
 	T().Debugf("rotate left")
-	pivot := clone(inner.right.AsNode()) // clone pivot and inner; copy on write
-	inner = clone(inner)
-	inner.right = pivot.Left()
-	inner.height = inner.Right().Height() + 1
-	//pivot.Left().parent = inner
-	pivot.left = &inner.cordNode
-	//inner.parent = pivot
-	//pivot.parent = nil
-	inner.adjustHeight()
-	pivot.adjustHeight() // sequence matters
+	pivot := clone(inner.right.AsInner()) // clone pivot
+	inner = clone(inner)                  // and inner: copy on write
+	inner.attachRight(pivot.Left())       // inner.right = pivot.Left()
+	pivot.attachLeft(&inner.cordNode)     // pivot.left = &inner.cordNode
+	// inner.adjustHeight()
+	// pivot.adjustHeight() // sequence matters
 	return pivot
 }
 
 func rotateRight(inner *innerNode) *innerNode {
 	T().Debugf("rotate right")
-	pivot := clone(inner.left.AsNode()) // clone pivot and inner; copy on write
-	inner = clone(inner)
-	inner.left = pivot.Right()
-	//pivot.Right().parent = inner
-	pivot.right = &inner.cordNode
-	//inner.parent = pivot
-	//pivot.parent = nil
-	inner.adjustHeight()
-	pivot.adjustHeight() // sequence matters
-	//dump(&pivot.cordNode)
+	dump(&inner.cordNode)
+	pivot := clone(inner.left.AsInner()) // clone pivot
+	inner = clone(inner)                 // and inner: copy on write
+	inner.attachLeft(pivot.Right())      // inner.left = pivot.Right()
+	pivot.attachRight(&inner.cordNode)   // pivot.right = &inner.cordNode
+	T().Debugf("-----")
+	dump(&pivot.cordNode)
+	// inner.adjustHeight()
+	// pivot.adjustHeight() // sequence matters
+	T().Debugf("=====")
 	return pivot
 }
 
-const balanceThres int = 3
+const balanceThres int = 1
 
-func unbalanced(inner *innerNode) bool {
+func unbalanced(node *cordNode) bool {
+	if node.IsLeaf() {
+		return false
+	}
+	inner := node.AsInner()
 	if inner.left == nil && inner.right == nil {
 		return false
 	}
@@ -301,14 +288,12 @@ func clone(inner *innerNode) *innerNode {
 	n.weight = inner.weight
 	n.left = inner.left
 	n.right = inner.right
-	//n.parent = inner.parent
 	return n
 }
 
 func cloneLeaf(leaf *leafNode) *leafNode {
 	l := makeLeafNode()
 	l.leaf = leaf.leaf
-	//l.parent = leaf.parent
 	return l
 }
 
@@ -319,7 +304,7 @@ func cloneNode(node *cordNode) *cordNode {
 	if node.IsLeaf() {
 		return &cloneLeaf(node.AsLeaf()).cordNode
 	}
-	return &clone(node.AsNode()).cordNode
+	return &clone(node.AsInner()).cordNode
 }
 
 // --- Helpers ---------------------------------------------------------------

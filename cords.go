@@ -2,7 +2,6 @@ package cords
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 )
 
@@ -18,8 +17,8 @@ func makeCord(node *cordNode) Cord {
 		return Cord{root: r}
 	}
 	// node is inner node
-	inner := node.AsNode()
-	if inner.right != nil {
+	inner := node.AsInner()
+	if inner.right == nil {
 		return Cord{root: inner}
 	}
 	r := makeInnerNode()
@@ -33,7 +32,6 @@ func FromString(s string) Cord {
 	r.weight = uint64(len(s))
 	r.height = 2 // leaf + inner node
 	leaf := makeStringLeaf(s)
-	//leaf.parent = r
 	r.left = &leaf.cordNode
 	return Cord{root: r}
 }
@@ -54,6 +52,13 @@ func (cord Cord) String() string {
 	return bf.String()
 }
 
+func (cord Cord) height() int {
+	if cord.IsVoid() {
+		return 0
+	}
+	return cord.root.Height()
+}
+
 // Len returns the length in bytes of a cord.
 func (cord Cord) Len() uint64 {
 	if cord.root == nil {
@@ -64,7 +69,7 @@ func (cord Cord) Len() uint64 {
 
 // IsVoid returns true if cord is "".
 func (cord Cord) IsVoid() bool {
-	return cord.root == nil
+	return cord.root == nil || cord.root.Left() == nil
 }
 
 // each iterates over all nodes of the cord.
@@ -93,47 +98,6 @@ func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
 	return index(&cord.root.cordNode, i)
 }
 
-// traverse walks a cord in in-order.
-func traverse(node *cordNode, d int, f func(node *cordNode, depth int) error) error {
-	if node.IsLeaf() {
-		return f(node, d)
-	}
-	if l := node.AsNode().left; l != nil {
-		if err := traverse(l, d+1, f); err != nil {
-			return err
-		}
-	}
-	if err := f(node, d); err != nil {
-		return err
-	}
-	if r := node.AsNode().right; r != nil {
-		if err := traverse(r, d+1, f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-var errIndexOutOfBounds error = errors.New("index out of bounds")
-
-// index finds the leaf node of a cord which contains a given index.
-// Return values are the leaf node, the index within the leaf, and a possible error.
-func index(node *cordNode, i uint64) (*leafNode, uint64, error) {
-	if node.Weight() <= i && node.Right() != nil {
-		return index(node.Right(), i-node.Weight())
-	}
-	if node.Left() != nil {
-		return index(node.Left(), i)
-	}
-	if i < uint64(node.Weight()) {
-		if node.IsLeaf() {
-			return node.AsLeaf(), i, nil
-		}
-		panic("index node is not a leaf")
-	}
-	return nil, i, errIndexOutOfBounds
-}
-
 // ---------------------------------------------------------------------------
 
 // Leaf is an interface type for leafs of a cord structure.
@@ -147,7 +111,6 @@ type Leaf interface {
 // ---------------------------------------------------------------------------
 
 type cordNode struct {
-	//parent *innerNode
 	self interface{}
 }
 
@@ -175,7 +138,7 @@ func makeLeafNode() *leafNode {
 	return leaf
 }
 
-func (node *cordNode) AsNode() *innerNode {
+func (node *cordNode) AsInner() *innerNode {
 	return node.self.(*innerNode)
 }
 
@@ -195,7 +158,7 @@ func (node *cordNode) Weight() uint64 {
 	if node.IsLeaf() {
 		return node.AsLeaf().Weight()
 	}
-	n := node.AsNode()
+	n := node.AsInner()
 	return n.weight
 }
 
@@ -203,15 +166,31 @@ func (node *cordNode) Height() int {
 	if node.IsLeaf() {
 		return 1
 	}
-	n := node.AsNode()
+	n := node.AsInner()
 	return n.height
+}
+
+func (node *cordNode) Len() uint64 {
+	if node.IsLeaf() {
+		return node.Weight()
+	}
+	inner := node.AsInner()
+	l := uint64(inner.Weight())
+	for inner.right != nil {
+		l += inner.right.Weight()
+		if inner.right.IsLeaf() {
+			break
+		}
+		inner = inner.right.AsInner()
+	}
+	return l
 }
 
 func (node *cordNode) Left() *cordNode {
 	if node.IsLeaf() {
 		return nil
 	}
-	n := node.AsNode()
+	n := node.AsInner()
 	return n.left
 }
 
@@ -219,7 +198,7 @@ func (node *cordNode) Right() *cordNode {
 	if node.IsLeaf() {
 		return nil
 	}
-	n := node.AsNode()
+	n := node.AsInner()
 	return n.right
 }
 
@@ -227,7 +206,7 @@ func (node *cordNode) String() string {
 	if node.IsLeaf() {
 		return node.AsLeaf().String()
 	}
-	return fmt.Sprintf("<inner node |%d|, left=%v, right=%v>", node.Height(), node.Left(), node.Right())
+	return fmt.Sprintf("<inner %d|%d|, L=%v, R=%v>", node.Weight(), node.Height(), node.Left(), node.Right())
 }
 
 func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
@@ -235,7 +214,7 @@ func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
 		panic("parent node is not of type inner node")
 	}
 	cln := cloneNode(child)
-	inner := node.AsNode()
+	inner := node.AsInner()
 	if inner.left == child {
 		inner.left = cln
 	} else if inner.right == child {
@@ -248,13 +227,12 @@ func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
 
 func (inner *innerNode) attachLeft(child *cordNode) {
 	inner.left = child
-	//child.parent = inner
 	inner.adjustHeight()
+	inner.weight = child.Len()
 }
 
 func (inner *innerNode) attachRight(child *cordNode) {
 	inner.right = child
-	//child.parent = inner
 	inner.adjustHeight()
 }
 
@@ -291,9 +269,7 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 	return ln1, ln2
 }
 
-//var _ Leaf = &leafNode{}
-
-// ---------------------------------------------------------------------------
+// --- Default Leaf implementation -------------------------------------------
 
 type leafString string
 
@@ -328,7 +304,7 @@ func dump(node *cordNode) {
 			T().Debugf("%sL = %v", indent(depth), l)
 			return nil
 		}
-		n := node.AsNode()
+		n := node.AsInner()
 		T().Debugf("%sN = %v", indent(depth), n)
 		return nil
 	})
