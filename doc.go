@@ -13,7 +13,8 @@ In computer programming, a rope, or cord, is a data structure composed of
 smaller strings that is used to efficiently store and manipulate a very long string.
 For example, a text editing program may use a rope to represent the text being edited,
 so that operations such as insertion, deletion, and random access can be
-done efficiently.
+done efficiently. […] In summary, ropes are preferable when the data is large
+and modified often.
 
 _________________________________________________________________________
 
@@ -50,7 +51,17 @@ on the length of strings. Performance should remain acceptable for long strings.
 4. It should be as easy as possible to treat some other representation of
 ‘sequenceof character’ (e.g. a file) as a string. Functions on strings should be maximally reusable.
 
-Strings represented as contiguous arrays of characters, as in C or Pascal, violate most of these.
+Strings represented as contiguous arrays of characters, as in C or Pascal,
+violate most of these.
+
+_________________________________________________________________________
+
+In Go, these points of critique are somewhat mitigated with slices. However,
+slices will carry only so far, and cords add a layer of convenience and
+stable performance characteristics on top of them.
+
+Cords focus on large amounts of text. When dealing with shorter strings which do
+not form an overall text, cords may add a performance penalty.
 
 _________________________________________________________________________
 

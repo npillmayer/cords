@@ -123,9 +123,10 @@ func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
 // Leafs do carry fragments of text.
 // The default implementation uses Go strings.
 type Leaf interface {
-	Weight() uint64
-	String() string
-	Split(uint64) (Leaf, Leaf)
+	Weight() uint64                  // length of the leaf fragment in bytes
+	String() string                  // produce the leaf fragment as a string
+	Substring(uint64, uint64) string // substring [i:j]
+	Split(uint64) (Leaf, Leaf)       // split into 2 leafs at position i
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +227,8 @@ func (node *cordNode) String() string {
 	if node.IsLeaf() {
 		return node.AsLeaf().String()
 	}
-	return fmt.Sprintf("<inner %d|%d|, L=%v, R=%v>", node.Weight(), node.Height(), node.Left(), node.Right())
+	return fmt.Sprintf("<inner %d|%d|>", node.Weight(), node.Height())
+	//return fmt.Sprintf("<inner %d|%d|, L=%v, R=%v>", node.Weight(), node.Height(), node.Left(), node.Right())
 }
 
 func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
@@ -311,6 +313,10 @@ func (lstr leafString) Split(i uint64) (Leaf, Leaf) {
 	left := lstr[:i]
 	right := lstr[i:]
 	return left, right
+}
+
+func (lstr leafString) Substring(i, j uint64) string {
+	return string(lstr)[i:j]
 }
 
 var _ Leaf = leafString("")

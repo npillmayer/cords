@@ -196,7 +196,7 @@ func TestCordInsert(t *testing.T) {
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
 	c := Concat(c1, c2) // Hello World
-	x, err := c.Insert(FromString(","), 5)
+	x, err := Insert(c, FromString(","), 5)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -204,12 +204,53 @@ func TestCordInsert(t *testing.T) {
 	if x.Len() != 12 {
 		t.Errorf("Expected result to be of length 12, is %d", x.Len())
 	}
-	x, err = x.Insert(FromString("!"), 12)
+	x, err = Insert(x, FromString("!"), 12)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("x = '%s'", x.String())
 	if x.String() != "Hello, World!" {
 		t.Errorf("Double insert resulted in inexpected string: %s", x)
+	}
+}
+
+func TestCordDelete(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	c1 := FromString("Hello ")
+	c2 := FromString("World")
+	c := Concat(c1, c2)       // Hello World
+	x, err := Delete(c, 4, 4) // => Hellrld
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if x.String() != "Hellrld" {
+		t.Errorf("Expected delete-result to be 'Hellrld', is '%s'", x)
+	}
+}
+
+func TestCordReport(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	c := FromString("Hello_")
+	c = Concat(c, FromString("my_"))
+	c = Concat(c, FromString("na"))
+	c = Concat(c, FromString("me_i"))
+	c = Concat(c, FromString("s"))
+	c = Concat(c, FromString("_Simon"))
+	t.Logf("cord='%s'", c)
+	s, err := c.Report(8, 5)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Logf("s='%s'", s)
+	if s != "_name" {
+		t.Errorf("Expected resulting string to be '_name', is '%s'", s)
 	}
 }

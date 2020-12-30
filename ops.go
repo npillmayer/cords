@@ -1,15 +1,16 @@
 package cords
 
 import (
+	"bytes"
 	"fmt"
 )
 
 // Concat concatenates cords and returns a new cord.
 //
-func Concat(c1 Cord, others ...Cord) Cord {
+func Concat(cord Cord, others ...Cord) Cord {
 	var nonvoid []Cord
-	if !c1.IsVoid() {
-		nonvoid = append(nonvoid, c1)
+	if !cord.IsVoid() {
+		nonvoid = append(nonvoid, cord)
 	}
 	for _, c := range others {
 		if !c.IsVoid() {
@@ -17,24 +18,118 @@ func Concat(c1 Cord, others ...Cord) Cord {
 		}
 	}
 	if len(nonvoid) == 0 {
-		return c1
+		return cord
 	}
 	if len(nonvoid) == 1 {
 		return nonvoid[0]
 	}
-	cord := nonvoid[0]
+	cord = nonvoid[0]
 	for _, c := range nonvoid[1:] {
 		if c.Len() != c.root.Len() {
 			panic(fmt.Sprintf("structural inconsistency, %d ≠ %d", c.Len(), c.root.Len()))
 		}
-		cord = cord.Concat(c)
+		cord = cord.concat2(c)
 	}
 	return cord
 }
 
-// Concat appends another cord to this cord, resulting in a new cord.
-func (cord Cord) Concat(c Cord) Cord {
-	//
+// Insert inserts a substring-cord c into cord at index i, resulting in a
+// new cord. If i is greater than the length of cord, an out-of-bounds error
+// is returned.
+func Insert(cord Cord, c Cord, i uint64) (Cord, error) {
+	if cord.IsVoid() && i == uint64(0) {
+		return c, nil
+	}
+	if cord.Len() < i {
+		return Cord{}, ErrIndexOutOfBounds
+	}
+	if c.IsVoid() {
+		return cord, nil
+	}
+	if cord.Len() == i { // simply append at end
+		return cord.concat2(c), nil
+	}
+	cl, cr, err := Split(cord, i)
+	if err != nil {
+		return cord, err
+	}
+	return Concat(cl, c, cr), nil
+}
+
+// Split splits a cord into two new (smaller) cords right before position i.
+// Split(C,i) ⇒ split C into C1 and C2, with C1=b0,…,bi-1 and C2=bi,…,bn.
+//
+func Split(cord Cord, i uint64) (Cord, Cord, error) {
+	if i == 0 {
+		return Cord{}, cord, nil
+	} else if i == cord.Len() {
+		return cord, Cord{}, nil
+	}
+	if i > cord.Len() {
+		return cord, Cord{}, ErrIndexOutOfBounds
+	}
+	if cord.root == nil || cord.root.Left() == nil {
+		return cord, Cord{}, ErrIndexOutOfBounds
+	}
+	root := &clone(cord.root).cordNode
+	node := root.Left()
+	root2, err := cutRight(node, i, root, nil)
+	if err != nil || root2 == nil {
+		return cord, Cord{}, err
+	}
+	return Cord{root: root.AsInner()}, makeCord(root2), nil
+}
+
+// Delete removes a substring [i…i+l) from a cord, returning a new cord or an error.
+// If j==0, cord is unchanged.
+func Delete(cord Cord, i, l uint64) (Cord, error) {
+	if l == 0 {
+		return cord, nil
+	}
+	if cord.Len() < i || cord.Len() < i+l {
+		return Cord{}, ErrIndexOutOfBounds
+	}
+	var c1, c2 Cord
+	var err error
+	if i > 0 {
+		c1, c2, err = Split(cord, i)
+		if err != nil {
+			return cord, err
+		}
+	} else {
+		c2 = cord
+	}
+	if i+l < cord.Len() {
+		_, c2, err = Split(c2, l)
+		if err != nil {
+			return cord, err
+		}
+	}
+	return Concat(c1, c2), nil
+}
+
+// Report outputs a substring: Report(i,l) ⇒ output the string bi,…,bi+l−1.
+func (cord Cord) Report(i, l uint64) (string, error) {
+	if l == 0 {
+		return "", nil
+	}
+	if cord.Len() < i || cord.Len() < i+l {
+		return "", ErrIndexOutOfBounds
+	}
+	var buf bytes.Buffer
+	buf = substr(&cord.root.cordNode, i, i+l, buf)
+	return buf.String(), nil
+}
+
+// ---------------------------------------------------------------------------
+
+// concat2 appends another cord to this cord, resulting in a new cord.
+func (cord Cord) concat2(c Cord) Cord {
+	if cord.IsVoid() {
+		return c
+	} else if c.IsVoid() {
+		return cord
+	}
 	// we will set c2.root as the right child of clone(c1.root)
 	c1root := clone(cord.root) // c1.root will change; copy on write
 	root := makeInnerNode()    // root of new cord
@@ -59,43 +154,25 @@ func (cord Cord) Concat(c Cord) Cord {
 	return cord
 }
 
-// Insert inserts a substring-cord into cord at index i, resulting in a
-// new cord. If i is greater than the length of cord, an out-of-bounds error
-// is returned.
-func (cord Cord) Insert(c Cord, i uint64) (Cord, error) {
-	if cord.IsVoid() && i == uint64(0) {
-		return c, nil
+func substr(node *cordNode, i, j uint64, buf bytes.Buffer) bytes.Buffer {
+	T().Debugf("called substr([%d], %d, %d)", node.Weight(), i, j)
+	if node.IsLeaf() {
+		leaf := node.AsLeaf()
+		T().Debugf("substr(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
+		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
+		buf.WriteString(s)
+		return buf
 	}
-	if cord.Len() < i {
-		return Cord{}, ErrIndexOutOfBounds
+	if i < node.Weight() && node.Left() != nil {
+		buf = substr(node.Left(), i, j, buf)
 	}
-	if c.IsVoid() {
-		return cord, nil
+	if node.Right() != nil && j > node.Weight() {
+		w := node.Weight()
+		buf = substr(node.Right(), i-umin(w, i), j-w, buf)
 	}
-	if cord.Len() == i { // simply append at end
-		return cord.Concat(c), nil
-	}
-	cl, cr, err := Split(cord, i)
-	if err != nil {
-		return cord, err
-	}
-	return Concat(cl, c, cr), nil
-}
-
-// Split splits a cord into two new (smaller) cords right before position i.
-// Split(C,i) ⇒ split C into C1 and C2, with C1=b0,…,bi-1 and C2=bi,…,bn.
-//
-func Split(c Cord, i uint64) (Cord, Cord, error) {
-	if c.root == nil || c.root.Left() == nil {
-		return c, Cord{}, ErrIndexOutOfBounds
-	}
-	root := &clone(c.root).cordNode
-	node := root.Left()
-	root2, err := cutRight(node, i, root, nil)
-	if err != nil || root2 == nil {
-		return c, Cord{}, err
-	}
-	return Cord{root: root.AsInner()}, makeCord(root2), nil
+	//T().Debugf("node=%v", node)
+	T().Debugf("dropping out of substr([%d], %d, %d)", node.Weight(), i, j)
+	return buf
 }
 
 func cutRight(node *cordNode, i uint64, parent *cordNode, root *cordNode) (*cordNode, error) {
@@ -335,6 +412,14 @@ func abs(a int) int {
 	}
 	return a
 }
+
+func umin(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func umax(a, b uint64) uint64 {
 	if a < b {
 		return b
