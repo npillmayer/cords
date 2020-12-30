@@ -250,7 +250,9 @@ func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
 func (inner *innerNode) attachLeft(child *cordNode) {
 	inner.left = child
 	inner.adjustHeight()
-	inner.weight = child.Len()
+	if child != nil {
+		inner.weight = child.Len()
+	}
 }
 
 func (inner *innerNode) attachRight(child *cordNode) {
@@ -272,6 +274,20 @@ func (inner *innerNode) adjustHeight() int {
 	inner.height = mx + 1
 	//T().Debugf("setting height %d to %d", inner.height, mx+1)
 	return mx + 1
+}
+
+func (inner *innerNode) leftHeight() int {
+	if inner.left == nil {
+		return 0
+	}
+	return inner.left.Height()
+}
+
+func (inner *innerNode) rightHeight() int {
+	if inner.right == nil {
+		return 0
+	}
+	return inner.right.Height()
 }
 
 func (leaf *leafNode) Weight() uint64 {

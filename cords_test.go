@@ -145,12 +145,18 @@ func TestBalance1(t *testing.T) {
 	c := Concat(c1, c2)
 	c = Concat(c, c3)
 	c = Concat(c, c4)
-	b := !unbalanced(c.root.left)
-	t.Logf("balance of c = %v", b)
+	ub := unbalanced(c.root.left)
+	t.Logf("balance of c = %v", !ub)
 	t.Logf("height of left = %d", c.root.Left().Height())
-	if !b || c.root.Left().Height() != 3 {
+	if ub {
 		dump(&c.root.cordNode)
-		t.Fail()
+		t.Error("cord tree not balanced after multiple concatenations")
+	}
+	if c.root.leftHeight() != 3 {
+		dump(&c.root.cordNode)
+		t.Error("cord tree too high after multiple concatenations")
+		top := c.root.left.AsInner()
+		t.Logf("top=%v, l.h=%d, r.h=%d", top, top.leftHeight(), top.rightHeight())
 	}
 }
 
@@ -214,7 +220,38 @@ func TestCordInsert(t *testing.T) {
 	}
 }
 
-func TestCordDelete(t *testing.T) {
+func TestCordSplit2(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	// Build example cord from Wikipedia
+	c3 := Concat(FromString("s"), FromString("_Simon"))
+	c2 := Concat(FromString("na"), FromString("me_i"))
+	c1 := Concat(FromString("Hello_"), FromString("my_"))
+	c := Concat(c2, c3)
+	c = Concat(c1, c)
+	t.Logf("cord='%s'", c)
+	dump(&c.root.cordNode)
+	//
+	c1, c2, err := Split(c, 11)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if c1.String() != "Hello_my_na" || c1.Len() != 11 {
+		dump(&c.root.cordNode)
+		t.Logf("--------------------")
+		dump(&c1.root.cordNode)
+		t.Errorf("expected left cord to be 11 bytes, is: %s|%d", c1, c1.Len())
+	}
+	if c2.String() != "me_is_Simon" || c2.Len() != 11 {
+		dump(&c2.root.cordNode)
+		t.Errorf("expected right cord to be 11 bytes, is: %s|%d", c2, c2.Len())
+	}
+}
+
+func TestCordCut(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
@@ -223,12 +260,15 @@ func TestCordDelete(t *testing.T) {
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
 	c := Concat(c1, c2)       // Hello World
-	x, err := Delete(c, 4, 4) // => Hellrld
+	x, y, err := Cut(c, 4, 4) // => Hellrld
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	if x.String() != "Hellrld" {
-		t.Errorf("Expected delete-result to be 'Hellrld', is '%s'", x)
+		t.Errorf("Expected cut-result to be 'Hellrld', is '%s'", x)
+	}
+	if y.String() != "o Wo" {
+		t.Errorf("Expected cut-out segment to be 'o Wo', is '%s'", y)
 	}
 }
 
@@ -261,12 +301,12 @@ func TestCordSubstr(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	c := FromString("Hello_")
-	c = Concat(c, FromString("my_"))
-	c = Concat(c, FromString("na"))
-	c = Concat(c, FromString("me_i"))
-	c = Concat(c, FromString("s"))
-	c = Concat(c, FromString("_Simon"))
+	// Build example cord from Wikipedia
+	c3 := Concat(FromString("s"), FromString("_Simon"))
+	c2 := Concat(FromString("na"), FromString("me_i"))
+	c1 := Concat(FromString("Hello_"), FromString("my_"))
+	c := Concat(c2, c3)
+	c = Concat(c1, c)
 	t.Logf("cord='%s'", c)
 	x, err := Substr(c, 8, 5)
 	if err != nil {
