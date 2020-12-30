@@ -1,5 +1,5 @@
 /*
-Package cords offers a versatile string enhancement, to ease handling of texts.
+Package cords offers a versatile string enhancement to ease handling of texts.
 
 Cords
 
