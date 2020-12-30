@@ -111,6 +111,6 @@ func T() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
-// ErrIndexOutOfBounds is flagged whenever a cord position is either < 0 or
+// ErrIndexOutOfBounds is flagged whenever a cord position is
 // greater than the length of the cord.
 var ErrIndexOutOfBounds error = errors.New("index out of bounds")

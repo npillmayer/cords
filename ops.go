@@ -121,6 +121,23 @@ func (cord Cord) Report(i, l uint64) (string, error) {
 	return buf.String(), nil
 }
 
+// Substr creates a new cord from a subset of cord, with:
+// Substr(C,i,l) ⇒ Cord C2=bi,…,bi+l−1.
+func Substr(cord Cord, i, l uint64) (Cord, error) {
+	if l == 0 {
+		return Cord{}, nil
+	}
+	if cord.Len() < i || cord.Len() < i+l {
+		return cord, ErrIndexOutOfBounds
+	}
+	_, c, err := Split(cord, i)
+	if i+l == cord.Len() {
+		return c, err
+	}
+	c, _, err = Split(c, l)
+	return c, err
+}
+
 // ---------------------------------------------------------------------------
 
 // concat2 appends another cord to this cord, resulting in a new cord.

@@ -254,3 +254,33 @@ func TestCordReport(t *testing.T) {
 		t.Errorf("Expected resulting string to be '_name', is '%s'", s)
 	}
 }
+
+func TestCordSubstr(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	c := FromString("Hello_")
+	c = Concat(c, FromString("my_"))
+	c = Concat(c, FromString("na"))
+	c = Concat(c, FromString("me_i"))
+	c = Concat(c, FromString("s"))
+	c = Concat(c, FromString("_Simon"))
+	t.Logf("cord='%s'", c)
+	x, err := Substr(c, 8, 5)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	dump(&x.root.cordNode)
+	t.Logf("x='%s'", x)
+	if x.String() != "_name" {
+		t.Errorf("Expected resulting string to be '_name', is '%s'", x)
+	}
+	if x.root.Weight() != 5 {
+		t.Errorf("Expected weight of root node to be |_name|=5, is %d", x.root.Weight())
+	}
+	if x.root.Height() != 4 {
+		t.Errorf("Expected height of root node to be 4, is %d", x.root.Height())
+	}
+}
