@@ -67,7 +67,7 @@ _________________________________________________________________________
 
 BSD 3-Clause License
 
-Copyright (c) 2020, Norbert Pillmayer
+Copyright (c) 2020–21, Norbert Pillmayer
 
 All rights reserved.
 

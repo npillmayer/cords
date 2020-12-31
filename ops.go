@@ -1,5 +1,38 @@
 package cords
 
+/*
+BSD 3-Clause License
+
+Copyright (c) 2020–21, Norbert Pillmayer
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 import (
 	"bytes"
 	"fmt"
@@ -333,6 +366,9 @@ func concat(n1, n2 *cordNode) *cordNode {
 	return &inner.cordNode
 }
 
+// length calculates the string length of a subtree by adding the weight of
+// the node, plus the weight of the right child, its child, its child etc.
+// down to the rightmost leaf.
 func length(node *cordNode) uint64 {
 	l := uint64(0)
 	for node != nil {
@@ -342,6 +378,8 @@ func length(node *cordNode) uint64 {
 	return l
 }
 
+// split splits a leaf node at i, creates a new inner node and attaches the
+// new leaves to it.
 func split(leaf *leafNode, i uint64) *innerNode {
 	str := leaf.String()
 	lstr := str[:i]
@@ -349,11 +387,11 @@ func split(leaf *leafNode, i uint64) *innerNode {
 	inner := makeInnerNode()
 	inner.attachLeft(&makeStringLeaf(lstr).cordNode)
 	inner.attachRight(&makeStringLeaf(rstr).cordNode)
-	T().Debugf("after split, height of inner node = %d", inner.height)
-	dump(&inner.cordNode)
+	//dump(&inner.cordNode)
 	return inner
 }
 
+// balance recursively balances unbalanced subtrees, using right- and left-rotations.
 func balance(inner *innerNode) *innerNode {
 	if inner.left == nil && inner.right == nil {
 		return inner
@@ -385,6 +423,8 @@ func balanceRoot(c Cord) Cord {
 	return c
 }
 
+// rotatedLeft performs a left rotation on an inner tree node.
+// Wikipedia has a good article on tree rotation.
 func rotateLeft(inner *innerNode) *innerNode {
 	T().Debugf("rotate left")
 	pivot := clone(inner.right.AsInner()) // clone pivot
@@ -394,6 +434,8 @@ func rotateLeft(inner *innerNode) *innerNode {
 	return pivot
 }
 
+// rotatedLeft performs a right rotation on an inner tree node.
+// Wikipedia has a good article on tree rotation.
 func rotateRight(inner *innerNode) *innerNode {
 	T().Debugf("rotate right")
 	pivot := clone(inner.left.AsInner()) // clone pivot
@@ -403,6 +445,8 @@ func rotateRight(inner *innerNode) *innerNode {
 	return pivot
 }
 
+// we balance a subtree whenever the height-diff between left and right child
+// is greater than this threshold.
 const balanceThres int = 1
 
 func unbalanced(node *cordNode) bool {
