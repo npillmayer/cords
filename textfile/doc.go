@@ -44,7 +44,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T traces to global the core-tracer.
-func T() tracing.Trace {
+// t traces to global the core-tracer.
+func t() tracing.Trace {
 	return gtrace.CoreTracer
 }
