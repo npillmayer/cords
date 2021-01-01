@@ -63,12 +63,12 @@ type fileLeaf struct {
 }
 
 // ext must be an atomic value to protect concurrent access during load
-func (leaf *fileLeaf) Ext() leafExt {
-	return leaf.ext.Load().(leafExt)
+func (leaf *fileLeaf) Ext() *leafExt {
+	return leaf.ext.Load().(*leafExt)
 }
 
 // ext must be an atomic value to protect concurrent access during load
-func (leaf *fileLeaf) setExt(ext leafExt) {
+func (leaf *fileLeaf) setExt(ext *leafExt) {
 	leaf.ext.Store(ext)
 }
 
@@ -80,17 +80,24 @@ func (leaf *fileLeaf) setExt(ext leafExt) {
 // The ``string´´ should be considered rather a read-only byte slice.
 func (leaf *fileLeaf) String() string {
 	ext := leaf.Ext()
-	if ext.isString() {
-		return ext.asString()
+	if ext.loadExt == nil {
+		return ext.content
 	}
-	m := ext.duringLoad().mx
+	// if ext.isString() {
+	// 	return ext.asString()
+	// }
+	m := ext.loadExt.mx
 	m.Lock() // wait until string fragment is loaded
 	defer m.Unlock()
 	ext = leaf.Ext() // should be swapped by loading goroutine by now
-	if !ext.isString() {
+	if ext.loadExt == nil {
 		panic("string fragment of leaf not available after waiting for load")
 	}
-	return ext.asString()
+	// if !ext.isString() {
+	// 	panic("string fragment of leaf not available after waiting for load")
+	// }
+	// return ext.asString()
+	return ext.content
 }
 
 // Weight returns the length of the text fragment (string). This call will return
@@ -103,48 +110,50 @@ func (leaf *fileLeaf) Weight() uint64 {
 // a conditional type (union), which will finally hold the string fragment of this
 // leaf. Before and during load, however, we will hold administrative information
 // necessary for the load. This `ext` information will be wrapped as an atomic.Value.
-type leafExt interface {
-	isString() bool
-	asString() string
-	duringLoad() *loadingLeafExt
+type leafExt struct {
+	content string
+	loadExt *loadingInfo
+	// isString() bool
+	// asString() string
+	// duringLoad() *loadingInfo
 }
 
-type stringLeafExt string
+// type stringLeafExt string
 
-func (ext stringLeafExt) isString() bool {
-	return true
-}
+// func (ext stringLeafExt) isString() bool {
+// 	return true
+// }
 
-func (ext stringLeafExt) asString() string {
-	return string(ext)
-}
+// func (ext stringLeafExt) asString() string {
+// 	return string(ext)
+// }
 
-func (ext stringLeafExt) duringLoad() *loadingLeafExt {
-	return nil
-}
+// func (ext stringLeafExt) duringLoad() *loadingInfo {
+// 	return nil
+// }
 
-var _ leafExt = stringLeafExt("")
+//var _ leafExt = stringLeafExt("")
 
-type loadingLeafExt struct {
+type loadingInfo struct {
 	pos  int64       // initial start position of this fragment within the file
 	next *fileLeaf   // textfile leafs are initially chained, later this is dropped
 	tf   *textFile   // reference to the file this segment is from, later this is dropped
 	mx   *sync.Mutex // mutex guards access to string content until it is loaded
 }
 
-func (ext *loadingLeafExt) isString() bool {
-	return false
-}
+// func (ext *loadingInfo) isString() bool {
+// 	return false
+// }
 
-func (ext *loadingLeafExt) asString() string {
-	return ""
-}
+// func (ext *loadingInfo) asString() string {
+// 	return ""
+// }
 
-func (ext *loadingLeafExt) duringLoad() *loadingLeafExt {
-	return ext
-}
+// func (ext *loadingInfo) duringLoad() *loadingInfo {
+// 	return ext
+// }
 
-var _ leafExt = &loadingLeafExt{}
+// var _ leafExt = &loadingInfo{}
 
 // --- Open and read a textfile ----------------------------------------------
 
@@ -166,12 +175,12 @@ type textFile struct {
 // the client. The cord can be used right away and synchronisation will happen
 // correctly in the background. Opening of the file is always done synchronously.
 //
-func Load(name string, initialPos int64, fragSize int64) (cords.Cord, error) {
-	//
+func Load(name string, initialPos int64, fragSize int64, wg *sync.WaitGroup) (cords.Cord, error) {
 	tf, err := openFile(name)
 	if err != nil {
 		return cords.Cord{}, err
 	}
+	T().Infof("opened file %s", tf.info.Name())
 	if initialPos > tf.info.Size() || initialPos < 0 {
 		initialPos = tf.info.Size()
 	}
@@ -181,7 +190,7 @@ func Load(name string, initialPos int64, fragSize int64) (cords.Cord, error) {
 		} else if tf.info.Size() < 1024 {
 			fragSize = 64
 		} else if tf.info.Size() < tenKb {
-			fragSize = 256
+			fragSize = 1024 // 256 TODO TEST
 		} else if tf.info.Size() < hundredKb {
 			fragSize = 512
 		} else if tf.info.Size() < oneMb {
@@ -190,7 +199,7 @@ func Load(name string, initialPos int64, fragSize int64) (cords.Cord, error) {
 			fragSize = sixKb
 		}
 	}
-	cord := startLoadingFile(tf, initialPos, fragSize)
+	cord := startLoadingFile(tf, initialPos, fragSize, wg)
 	return cord, nil
 }
 
@@ -216,8 +225,7 @@ func openFile(name string) (*textFile, error) {
 	return tf, nil
 }
 
-func startLoadingFile(tf *textFile, initialPos int64, fragSize int64) cords.Cord {
-	//
+func startLoadingFile(tf *textFile, initialPos int64, fragSize int64, wg *sync.WaitGroup) cords.Cord {
 	if initialPos > tf.info.Size() || fragSize > tf.info.Size() {
 		panic("inconsistent setting of text file paramenters")
 	}
@@ -230,20 +238,25 @@ func startLoadingFile(tf *textFile, initialPos int64, fragSize int64) cords.Cord
 	if rightmost == size && size > 0 {
 		rightmost -= fragSize
 	}
+	T().Debugf("fragment.size=%d, rightmost=%d", fragSize, rightmost)
 	// create an (initially empty) fileLeaf for every to-be fragment
-	var leaf, last, start *fileLeaf             // last leaf shall point to first leaf
+	var leaf, last, start *fileLeaf // last leaf shall point to first leaf
+	T().Debugf("creating leafs for %s (%d bytes)", tf.info.Name(), tf.info.Size())
 	for k := rightmost; k >= 0; k -= fragSize { // iterate backwards
 		leaf = &fileLeaf{
 			length: min(fragSize, size-k), // negative value signals leaf not loaded yet
 		}
-		atomicExt := &loadingLeafExt{
+		linfo := &loadingInfo{
 			next: next,
 			tf:   tf,
 			pos:  k,
 			mx:   &sync.Mutex{}, // must be a pointer to avoid later copying
 		}
-		atomicExt.mx.Lock() // lock leaf's String() method until loaded
-		leaf.ext.Store(atomicExt)
+		linfo.mx.Lock() // lock leaf's String() method until loaded
+		ext := &leafExt{loadExt: linfo}
+		leaf.setExt(ext)
+		//leaf.ext.Store(atomicExt)
+		T().Debugf("created leaf for fragment %d…%d", k, k+leaf.length)
 		if last == nil { // we want leafs to be linked to a cycle
 			last = leaf
 		}
@@ -251,11 +264,13 @@ func startLoadingFile(tf *textFile, initialPos int64, fragSize int64) cords.Cord
 			start = leaf // start leaf contains initial position
 		}
 		next = leaf // predecessor leaf will set this leaf as successor (*next)
+		// TODO build up a cord structure
 	}
 	lastExt := last.Ext()
-	lastExt.duringLoad().next = leaf // make it a cycle of leafs
+	lastExt.loadExt.next = leaf // make it a cycle of leafs
 	last.setExt(lastExt)
-	loadAllFragmentsAsync(tf, start)
+	loadAllFragmentsAsync(tf, start, wg)
+	T().Debugf("start.len=%d", start.length)
 	return cord
 }
 
@@ -266,51 +281,69 @@ type msg struct {
 	content []byte
 }
 
-func loadAllFragmentsAsync(tf *textFile, startLeaf *fileLeaf) {
+func loadAllFragmentsAsync(tf *textFile, startLeaf *fileLeaf, wg *sync.WaitGroup) {
 	if startLeaf == nil {
 		panic("load-fragments may not be called for a void cord")
 	}
 	//
-	var fragChan chan msg // communication channel between one loader thread and many leafs
-	leaf := startLeaf     // leaf-links have to form a cycle
+	fragChan := make(chan msg) // communication channel between one loader thread and many leafs
+	leaf := startLeaf          // leaf-links have to form a cycle
 	// start subscriber goroutines, one per leaf
 	for { // let every leaf listen to the frag channel
+		leafNext := leaf.Ext().loadExt.next // remember the link to next leaf
 		go func(leaf *fileLeaf, cast *caster.Caster) {
-			ext := leaf.Ext().duringLoad()
-			defer ext.mx.Unlock()     // locking has already been done during leaf creation
-			ch, _ := cast.Sub(nil, 1) // subscribe to broadcast messages
-			for loaded := range ch {  // wait for signals for loaded leafs
+			ext := leaf.Ext()
+			T().Debugf("leaf listener @ %d", ext.loadExt.pos)
+			defer ext.loadExt.mx.Unlock() // locking has already been done during leaf creation
+			ch, ok := cast.Sub(nil, 1)    // subscribe to broadcast messages
+			if !ok {
+				T().Errorf("broadcaster already closed")
+			}
+			for loaded := range ch { // wait for signals for loaded leafs
 				if loaded.(msg).leaf == leaf { // yes, it's our turn
+					T().Debugf("received loaded-message %d…%d", ext.loadExt.pos, leaf.length)
 					s := string(loaded.(msg).content) // re-alloc loaded.content as string
-					leaf.ext.Store(stringLeafExt(s))  // swap loading-ext for string-ext
+					ext.content = s                   // put it into leaf's ext
+					ext.loadExt = nil                 // drop loading management info
+					leaf.ext.Store(ext)               // swap loading-ext for string-ext
 					cast.Unsub(ch)                    // we do not want to listen any further
 					break                             // this will unlock the leaf's mutex
 				}
 			} // ignore all other leaf messages
 		}(leaf, tf.cast)
-		if leaf.Ext().duringLoad().next == startLeaf {
+		//if leaf.Ext().duringLoad().next == startLeaf {
+		if leafNext == startLeaf {
 			break // when iterated over cycle of leafs, stop
 		}
-		leaf = leaf.Ext().duringLoad().next // continue iteration
+		//leaf = leaf.Ext().duringLoad().next // continue iteration
+		leaf = leafNext // continue iteration
 	}
 	// start publisher goroutine
 	go func(ch <-chan msg) {
+		T().Debugf("started message publisher")
 		// start a broadcaster to wait for loaded fragments and publish their ids
 		defer tf.cast.Close()
 		// publish loaded fragments to all waiting leafs
+		T().Debugf("channel=%v", ch)
 		for m := range ch {
+			T().Debugf("publisher received message")
 			tf.cast.Pub(m)
 		}
+		T().Debugf("stopped message publisher")
 	}(fragChan)
-	startFileLoader(tf, startLeaf, fragChan)
+	startFileLoader(tf, startLeaf, fragChan, wg)
 }
 
-func startFileLoader(tf *textFile, startLeaf *fileLeaf, ch chan<- msg) {
-	go func(ch chan<- msg) {
+func startFileLoader(tf *textFile, startLeaf *fileLeaf, ch chan<- msg, wg *sync.WaitGroup) {
+	if wg != nil {
+		wg.Add(1)
+	}
+	go func(ch chan<- msg, wg *sync.WaitGroup) {
 		// iterate over leafs and load the fragment of text referenced by it
 		leaf := startLeaf // leaf-links have to form a cycle
 		for {
-			ext := leaf.Ext().duringLoad()
+			ext := leaf.Ext().loadExt
+			T().Debugf("reading file fragment %d…%d", ext.pos, leaf.length)
 			buf := make([]byte, leaf.length, leaf.length)
 			cnt, err := tf.file.ReadAt(buf, ext.pos)
 			if err != nil && err != io.EOF {
@@ -323,13 +356,18 @@ func startFileLoader(tf *textFile, startLeaf *fileLeaf, ch chan<- msg) {
 			}
 			m := msg{leaf: leaf, content: buf}
 			next := ext.next // put aside link to next leaf // before channel write !
-			ch <- m          // signal that this leaf is done loading
+			T().Debugf("putting message onto channel: '%.10s…'", buf)
+			T().Debugf("channel=%v", ch)
+			ch <- m // signal that this leaf is done loading
 			if next == startLeaf {
 				break // when iterated over cycle of leafs, stop
 			}
 			leaf = next // continue iteration
 		}
-	}(ch)
+		if wg != nil {
+			wg.Done()
+		}
+	}(ch, wg)
 }
 
 // --- Helpers ---------------------------------------------------------------
