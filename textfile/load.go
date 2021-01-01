@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"sync/atomic"
 
 	"github.com/guiguan/caster"
 	"github.com/npillmayer/cords"
@@ -51,15 +53,97 @@ const (
 	oneMb     = 1048576
 )
 
+// --- Leaf nodes getting content from a file --------------------------------
+
 // fileLeaf is a cord leaf type to hold a fragment of a text-file's content.
 // fileLeaf implements interface cords.Leaf.
 type fileLeaf struct {
-	content string    // content fragment carries by this leaf // TODO []byte ?
-	length  int64     // length of this fragment in bytes
-	pos     int64     // initial start position of this fragment within the file
-	next    *fileLeaf // textfile leafs are initially chained, later this is dropped
-	tf      *textFile // reference to the file this segment is from, later this is dropped
+	ext    atomic.Value // of type leafExt; will later hold the text fragment carried by this leaf
+	length int64        // length of this fragment in bytes
 }
+
+// ext must be an atomic value to protect concurrent access during load
+func (leaf *fileLeaf) Ext() leafExt {
+	return leaf.ext.Load().(leafExt)
+}
+
+// ext must be an atomic value to protect concurrent access during load
+func (leaf *fileLeaf) setExt(ext leafExt) {
+	leaf.ext.Store(ext)
+}
+
+// String returns the text fragment carried by this leaf.
+// If the text fragment has not been loaded yet, the call to `String` will block
+// until the fragment is available.
+func (leaf *fileLeaf) String() string {
+	ext := leaf.Ext()
+	if ext.isString() {
+		return ext.asString()
+	}
+	m := ext.duringLoad().mx
+	m.Lock() // wait until string fragment is loaded
+	defer m.Unlock()
+	ext = leaf.Ext() // should be swapped by loading goroutine by now
+	if !ext.isString() {
+		panic("string fragment of leaf not available after waiting for load")
+	}
+	return ext.asString()
+}
+
+// Weight returns the length of the text fragment (string). This call will return
+// immediately, even if the text fragment is not yet loaded.
+func (leaf *fileLeaf) Weight() uint64 {
+	return uint64(leaf.length)
+}
+
+// To avoid wasting memory per leaf node (there may be lots of them) we simulate
+// a conditional type (union), which will finally hold the string fragment of this
+// leaf. Before and during load, however, we will hold administrative information
+// necessary for the load. This `ext` information will be wrapped as an atomic.Value.
+type leafExt interface {
+	isString() bool
+	asString() string
+	duringLoad() *loadingLeafExt
+}
+
+type stringLeafExt string
+
+func (ext stringLeafExt) isString() bool {
+	return true
+}
+
+func (ext stringLeafExt) asString() string {
+	return string(ext)
+}
+
+func (ext stringLeafExt) duringLoad() *loadingLeafExt {
+	return nil
+}
+
+var _ leafExt = stringLeafExt("")
+
+type loadingLeafExt struct {
+	pos  int64       // initial start position of this fragment within the file
+	next *fileLeaf   // textfile leafs are initially chained, later this is dropped
+	tf   *textFile   // reference to the file this segment is from, later this is dropped
+	mx   *sync.Mutex // guards string content until it is loaded
+}
+
+func (ext *loadingLeafExt) isString() bool {
+	return false
+}
+
+func (ext *loadingLeafExt) asString() string {
+	return ""
+}
+
+func (ext *loadingLeafExt) duringLoad() *loadingLeafExt {
+	return ext
+}
+
+var _ leafExt = &loadingLeafExt{}
+
+// --- Open and read a textfile ----------------------------------------------
 
 // textFile represents a OS file which will be loaded as a cord.
 type textFile struct {
@@ -67,6 +151,7 @@ type textFile struct {
 	info      os.FileInfo    // result from Stat(path)
 	file      *os.File       // file handle
 	cast      *caster.Caster // broadcaster for async file loading
+	cond      *sync.Cond     // sync point after any leaf has been loaded
 	lastError error          // remember last I/O error
 }
 
@@ -125,6 +210,7 @@ func openFile(name string) (*textFile, error) {
 		info: fi,
 		file: file,
 		cast: caster.New(nil), // we will broadcast messages when fragments are loaded
+		cond: sync.NewCond(&sync.Mutex{}),
 	}
 	return tf, nil
 }
@@ -138,83 +224,73 @@ func startLoadingFileAsync(tf *textFile, initialPos int64, fragSize int64) cords
 	size := tf.info.Size()
 	var next *fileLeaf
 	// we do not allocate all the leafs as an array, because this would prevent single
-	// leafs to be garbage collected if the client deletes fragments of text
+	// leafs to be garbage collected as soon as the client deletes fragments of text
 	rightmost := size / fragSize * fragSize
 	if rightmost == size && size > 0 {
 		rightmost -= fragSize
 	}
 	// create an (initially empty) fileLeaf for every to-be fragment
-	var last *fileLeaf                          // last leaf shall point to first leaf
+	var leaf, last *fileLeaf                    // last leaf shall point to first leaf
 	for k := rightmost; k >= 0; k -= fragSize { // iterate backwards
-		leaf := &fileLeaf{
-			length: min(fragSize, size-k),
-			pos:    k,
-			next:   next,
-			tf:     tf,
+		leaf = &fileLeaf{
+			length: min(fragSize, size-k), // negative value signals leaf not loaded yet
 		}
+		atomicExt := &loadingLeafExt{
+			next: next,
+			tf:   tf,
+			pos:  k,
+			mx:   &sync.Mutex{}, // must be a pointer to avoid later copying
+		}
+		leaf.ext.Store(atomicExt)
 		if last == nil { // we want leafs to be linked to a cycle
 			last = leaf
 		}
 		next = leaf
-		last.next = leaf // will be overwritten until leaf = first leaf
 	}
+	lastExt := last.Ext()
+	lastExt.duringLoad().next = leaf
+	last.setExt(lastExt)
 	return cord
 }
 
-// --- fileLeaf methods ------------------------------------------------------
-
-func (fl *fileLeaf) String() string {
-	if fl.isLoaded() {
-		return fl.content
-	}
-	return fl.content
-}
-
-// We flag the load status of a leaf by setting the sign of the length.
-// Negative values indicated the fragment is not loaded yet.
-func (fl *fileLeaf) isLoaded() bool {
-	return fl.length >= 0
-}
-
-func (fl *fileLeaf) load() {
-	if fl.isLoaded() {
-		return
-	}
-	// if loading results in an error (e.g., the file has been modified or removed,
-	// which should not possibly happen, but nevertheless)
-	// fl.Content() should return a sequence of Xs, together with an error message.
-	// if err := fl.load(); err != nil {
-	// 	return "*** ERROR: File has been spuriously modified ***"
-	// }
-	// fl.length = abs(fl.length) // positive length signals segment has been loaded
-}
-
 // --- File loading goroutine ------------------------------------------------
+
+type msg struct {
+	leaf    *fileLeaf
+	content []byte
+}
 
 func loadAllFragments(tf *textFile, startLeaf *fileLeaf) {
 	if startLeaf == nil {
 		panic("load-fragments may not be called for a void cord")
 	}
 	//
-	var fragChan chan *fileLeaf
-	//
+	var fragChan chan msg
 	leaf := startLeaf // leaf-links have to form a cycle
-	for {             // let every leaf listen to the frag channel
-		// TODO hook in leaf as subscriber to fragChan publisher
-		// leaf will reset it's String() and Weight() functions
-		//
-		// first String() and Weight() will run into another channel and wait
-		// (as subscribers), until the leaf is loaded and will iself signal
-		// into the other channel. Resetting the member functions must be
-		// guarded by a mutex. Overall mutex in tf ? Will this lead to a
-		// congestion? Do not want one mtx per leaf.
-		if leaf.next == startLeaf {
+	// start subscriber goroutines, one per leaf
+	// TODO this must be put into the synchronous part during cord construction
+	for { // let every leaf listen to the frag channel
+		go func(leaf *fileLeaf, cast *caster.Caster) {
+			ext := leaf.Ext().duringLoad()
+			ext.mx.Lock() // lock leaf's String() method until loaded
+			defer ext.mx.Unlock()
+			ch, _ := cast.Sub(nil, 1)
+			for loaded := range ch { // wait for signals for loaded leafs
+				if loaded.(msg).leaf == leaf { // yes, it's our turn
+					// TODO re-alloc loaded.content buffer as string
+					// TODO swap ext for string-ext
+					cast.Unsub(ch)
+					break
+				} // ignore all other leaf messages
+			}
+		}(leaf, tf.cast)
+		if leaf.Ext().duringLoad().next == startLeaf {
 			break // when iterated over cycle of leafs, stop
 		}
-		leaf = leaf.next // continue iteration
+		leaf = leaf.Ext().duringLoad().next // continue iteration
 	}
-	//
-	go func(ch <-chan *fileLeaf) {
+	// start publisher goroutine
+	go func(ch <-chan msg) {
 		// start a broadcaster to wait for loaded fragments and publish their ids
 		defer tf.cast.Close()
 		// publish loaded fragments to all waiting leafs
@@ -222,13 +298,17 @@ func loadAllFragments(tf *textFile, startLeaf *fileLeaf) {
 			tf.cast.Pub(m)
 		}
 	}(fragChan)
-	//
-	go func(ch chan<- *fileLeaf) {
+	startFileLoader(tf, startLeaf, fragChan)
+}
+
+func startFileLoader(tf *textFile, startLeaf *fileLeaf, ch chan<- msg) {
+	go func(ch chan<- msg) {
 		// iterate over leafs and load the fragment of text referenced by it
 		leaf := startLeaf // leaf-links have to form a cycle
 		for {
+			ext := leaf.Ext().duringLoad()
 			buf := make([]byte, leaf.length, leaf.length)
-			cnt, err := tf.file.ReadAt(buf, leaf.pos)
+			cnt, err := tf.file.ReadAt(buf, ext.pos)
 			if err != nil && err != io.EOF {
 				tf.lastError = fmt.Errorf("Error loading text fragment: %w", err)
 				// TODO: fill with error pattern:
@@ -237,17 +317,15 @@ func loadAllFragments(tf *textFile, startLeaf *fileLeaf) {
 				tf.lastError = fmt.Errorf("Not all bytes loaded for text fragment")
 				// TODO: fill with error pattern
 			}
-			leaf.content = string(buf) // will re-allocate, unfortuntely no way around this
-			ch <- leaf                 // signal that this leaf is done loading
-			next := leaf.next          // put aside link to next leaf
-			leaf.tf = nil              // drop admin info
-			leaf.next = nil            // drop admin info
+			m := msg{leaf: leaf, content: buf}
+			next := ext.next // put aside link to next leaf // before channel write !
+			ch <- m          // signal that this leaf is done loading
 			if next == startLeaf {
 				break // when iterated over cycle of leafs, stop
 			}
 			leaf = next // continue iteration
 		}
-	}(fragChan)
+	}(ch)
 }
 
 // --- Helpers ---------------------------------------------------------------
