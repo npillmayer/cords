@@ -324,3 +324,24 @@ func TestCordSubstr(t *testing.T) {
 		t.Errorf("Expected height of root node to be 4, is %d", x.root.Height())
 	}
 }
+
+func TestCordBuilder(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	b := NewBuilder()
+	b.Append(StringLeaf("name_is"))
+	b.Prepend(StringLeaf("Hello_my_"))
+	b.Append(StringLeaf("_Simon"))
+	cord := b.Cord()
+	if cord.IsVoid() {
+		t.Fatalf("Expected non-void result cord, is void")
+	}
+	dump(&cord.root.cordNode)
+	t.Logf("builder made cord='%s'", cord)
+	if cord.String() != "Hello_my_name_is_Simon" {
+		t.Errorf("cord string is different from expected string")
+	}
+}

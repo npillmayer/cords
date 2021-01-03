@@ -75,7 +75,7 @@ func FromString(s string) Cord {
 	r := makeInnerNode()
 	r.weight = uint64(len(s))
 	r.height = 2 // leaf + inner node
-	leaf := makeStringLeaf(s)
+	leaf := makeStringLeafNode(s)
 	r.left = &leaf.cordNode
 	return Cord{root: r}
 }
@@ -391,36 +391,38 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 
 // --- Default Leaf implementation -------------------------------------------
 
-//leafString is the default implementation of type Leaf.
-type leafString string
+//StringLeaf is the default implementation of type Leaf.
+type StringLeaf string
 
-// makeStringLeaf creates a leaf node and a leaf from a given string.
-func makeStringLeaf(s string) *leafNode {
+// makeStringLeafNode creates a leaf node and a leaf from a given string.
+func makeStringLeafNode(s string) *leafNode {
 	leaf := makeLeafNode()
-	leaf.leaf = leafString(s)
+	leaf.leaf = StringLeaf(s)
 	return leaf
 }
 
-// The weight of a leaf is its string length in bytes.
-func (lstr leafString) Weight() uint64 {
+// Weight of a leaf is its string length in bytes.
+func (lstr StringLeaf) Weight() uint64 {
 	return uint64(len(lstr))
 }
 
-func (lstr leafString) String() string {
+func (lstr StringLeaf) String() string {
 	return string(lstr)
 }
 
-func (lstr leafString) Split(i uint64) (Leaf, Leaf) {
+// Split splits a leaf at position i, resulting in 2 new leafs.
+func (lstr StringLeaf) Split(i uint64) (Leaf, Leaf) {
 	left := lstr[:i]
 	right := lstr[i:]
 	return left, right
 }
 
-func (lstr leafString) Substring(i, j uint64) string {
+// Substring returns a string segment of the leaf's text fragment.
+func (lstr StringLeaf) Substring(i, j uint64) string {
 	return string(lstr)[i:j]
 }
 
-var _ Leaf = leafString("")
+var _ Leaf = StringLeaf("")
 
 // --- Debugging helper ------------------------------------------------------
 

@@ -192,6 +192,7 @@ func (cord Cord) concat2(c Cord) Cord {
 	//
 	cord = Cord{root: root} // new cord with new root to return
 	if cord.Len() != cord.root.Len() {
+		T().Debugf("cord.len=%d, cord.root.len=%d", cord.Len(), cord.root.Len())
 		panic("structural inconsistency after concatentation")
 	}
 	if !cord.IsVoid() && unbalanced(cord.root.Left()) {
@@ -385,8 +386,8 @@ func split(leaf *leafNode, i uint64) *innerNode {
 	lstr := str[:i]
 	rstr := str[i:]
 	inner := makeInnerNode()
-	inner.attachLeft(&makeStringLeaf(lstr).cordNode)
-	inner.attachRight(&makeStringLeaf(rstr).cordNode)
+	inner.attachLeft(&makeStringLeafNode(lstr).cordNode)
+	inner.attachRight(&makeStringLeafNode(rstr).cordNode)
 	//dump(&inner.cordNode)
 	return inner
 }

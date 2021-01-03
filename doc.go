@@ -100,8 +100,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package cords
 
 import (
-	"errors"
-
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
@@ -111,6 +109,17 @@ func T() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+// CordError is an error type for the cords module
+type CordError string
+
+func (e CordError) Error() string {
+	return string(e)
+}
+
+// ErrCordCompleted signals that a cord builder has already completed a cord and
+// it's illegal to further add fragments.
+const ErrCordCompleted = CordError("forbidden to add fragements; cord has been completed")
+
 // ErrIndexOutOfBounds is flagged whenever a cord position is
 // greater than the length of the cord.
-var ErrIndexOutOfBounds error = errors.New("index out of bounds")
+const ErrIndexOutOfBounds = CordError("index out of bounds")
