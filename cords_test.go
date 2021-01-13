@@ -1,6 +1,7 @@
 package cords
 
 import (
+	"io"
 	"testing"
 
 	"github.com/npillmayer/schuko/gtrace"
@@ -343,5 +344,61 @@ func TestCordBuilder(t *testing.T) {
 	t.Logf("builder made cord='%s'", cord)
 	if cord.String() != "Hello_my_name_is_Simon" {
 		t.Errorf("cord string is different from expected string")
+	}
+}
+
+func TestCordReader(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	// gtrace.CoreTracer = gologadapter.New()
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	b := NewBuilder()
+	b.Append(StringLeaf("name_is"))
+	b.Prepend(StringLeaf("Hello_my_"))
+	b.Append(StringLeaf("_Simon"))
+	cord := b.Cord()
+	if cord.IsVoid() {
+		t.Fatalf("Expected non-void result cord, is void")
+	}
+	dump(&cord.root.cordNode)
+	t.Logf("builder made cord='%s'", cord)
+	reader := cord.Reader()
+	p := make([]byte, 5, 5)
+	n, err := reader.Read(p)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if n != 5 || string(p) != "Hello" {
+		t.Logf("n=%d, p=%s", n, string(p))
+		t.Fatalf("expected Read() to return 'Hello', did not")
+	}
+	n, err = reader.Read(p)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if n != 5 {
+		t.Logf("n=%d, p=%s", n, string(p))
+		t.Fatalf("expected Read() to return 5 bytes, have %d", n)
+	}
+	p = make([]byte, 50, 50)
+	n, err = reader.Read(p)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if n != 12 {
+		t.Logf("n=%d, p=%s", n, string(p))
+		t.Fatalf("expected Read() to return 12 bytes, have %d", n)
+	}
+	n, err = reader.Read(p)
+	if err != io.EOF {
+		if err != nil {
+			t.Errorf(err.Error())
+		} else {
+			t.Errorf("exptected EOF, got no error")
+		}
 	}
 }
