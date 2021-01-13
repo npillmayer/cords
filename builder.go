@@ -18,6 +18,9 @@ func NewBuilder() *CordBuilder {
 // but `Cord` may be called multiple times.
 func (b CordBuilder) Cord() Cord {
 	b.done = true
+	if b.cord.IsVoid() {
+		T().Debugf("cord builder: cord is void")
+	}
 	return b.cord
 }
 
@@ -43,9 +46,13 @@ func (b *CordBuilder) Append(leaf Leaf) error {
 	}
 	lnode := makeLeafNode()
 	lnode.leaf = leaf
+	if b.cord.root.right != nil {
+		panic("inconsistency in cord-builder")
+	}
 	b.cord.root.attachRight(&lnode.cordNode)
 	newroot := makeInnerNode()
-	newroot.attachLeft(b.cord.root.Left())
+	newroot.attachLeft(&b.cord.root.cordNode)
+	b.cord.root = newroot
 	return nil
 }
 
