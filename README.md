@@ -1,6 +1,12 @@
 # Cords
 Cords of text as a versatile string enhancement
 
+## Status
+
+Work in progress, please be patient!
+
+----------
+
 From a paper by Hans-J. Boehm, Russ Atkinson and Michael Plass, 1995:
 
 ### What's wrong with Strings?
