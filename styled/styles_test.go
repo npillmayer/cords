@@ -11,8 +11,9 @@ import (
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+
 	//"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestBasicStyle(t *testing.T) {
@@ -29,7 +30,7 @@ func TestBasicStyle(t *testing.T) {
 	t.Logf("string='%s', length=%d", text, text.Len())
 	// style the text
 	bold := teststyle("bold")
-	runs := Apply(text, bold, 6, text.Len())
+	runs := ApplyStyle(text, bold, 6, text.Len())
 	t.Logf("runs=%s, length=%d", runs.String(), runs.Len())
 	// get formatted text
 	s := bufio.NewScanner(strings.NewReader(text.String()))
@@ -40,6 +41,40 @@ func TestBasicStyle(t *testing.T) {
 	t.Logf(fmtr.String())
 	if fmtr.segcnt != 2 {
 		t.Errorf("expected formatted text to have 2 segments, has %d", fmtr.segcnt)
+	}
+	runs = runs.Style(bold, 0, 1)
+	t.Logf("runs=%s, length=%d", runs.String(), runs.Len())
+	s = bufio.NewScanner(strings.NewReader(text.String()))
+	fmtr = formatter("Test BasicStyle: ")
+	if err := runs.Format(s, fmtr, fmtr.out); err != nil {
+		t.Error(err.Error())
+	}
+	t.Logf(fmtr.String())
+	if fmtr.segcnt != 3 {
+		t.Errorf("expected formatted text to have 3 segments, has %d", fmtr.segcnt)
+	}
+}
+
+func TestTextSimple(t *testing.T) {
+	// gtrace.CoreTracer = gologadapter.New()
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	text := TextFromString("Hello World, how are you?")
+	bold, italic := teststyle("bold"), teststyle("italic")
+	text.Style(bold, 6, 11)
+	text.Style(italic, 8, 16) // erase part of bold run
+	fmtr := formatter("Test TextSimple: ")
+	if err := text.Format(fmtr, fmtr.out); err != nil {
+		t.Error(err.Error())
+	}
+	t.Logf(fmtr.String())
+	if fmtr.segcnt != 4 {
+		t.Errorf("expected formatted text to have 4 segments, has %d", fmtr.segcnt)
 	}
 }
 

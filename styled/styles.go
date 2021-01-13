@@ -9,6 +9,45 @@ import (
 	"github.com/npillmayer/cords"
 )
 
+// --- Styled Text -----------------------------------------------------------
+
+// Text is a styled text. Its text and its styles are automatically synchronized.
+type Text struct {
+	text cords.Cord
+	runs Runs
+}
+
+// TextFromString creates a stylable text from a string.
+func TextFromString(s string) *Text {
+	t := &Text{
+		text: cords.FromString(s),
+		runs: Runs{},
+	}
+	return t
+}
+
+// Style styles a run of text, given the start and end position.
+func (t *Text) Style(sty Format, from, to uint64) *Text {
+	if cords.Cord(t.runs).IsVoid() {
+		t.runs = ApplyStyle(t.text, sty, from, to)
+		return t
+	}
+	t.runs = t.runs.Style(sty, from, to)
+	return t
+}
+
+// Format a styled text. Format applies the previously set style-formats,
+// using a given formatter for output to w.
+//
+// If any argument is nil, no output is written.
+func (t *Text) Format(fmtr Formatter, w io.Writer) error {
+	if fmtr == nil || w == nil {
+		return cords.ErrIllegalArguments
+	}
+	scn := bufio.NewScanner(t.text.Reader())
+	return t.runs.Format(scn, fmtr, w)
+}
+
 // --- Runs of Styles --------------------------------------------------------
 
 // Runs hold information about style-formats which have been applied to a text.
@@ -33,7 +72,7 @@ func (runs Runs) Len() uint64 {
 //
 func (runs Runs) Format(text *bufio.Scanner, fmtr Formatter, w io.Writer) (err error) {
 	if fmtr == nil || text == nil || w == nil {
-		return
+		return cords.ErrIllegalArguments
 	}
 	remain := uint64(0) // remaining fragment from text.Bytes to format/output
 	err = cords.Cord(runs).EachLeaf(func(l cords.Leaf) (leaferr error) {
@@ -86,8 +125,8 @@ func (runs Runs) Format(text *bufio.Scanner, fmtr Formatter, w io.Writer) (err e
 
 // Format represents a styling-format which can be applied to a run of text.
 type Format interface {
-	Equals(Format) bool // does this Format look equal or differently than another one ?
-	String() string     // return some kind of identifying string
+	Equals(other Format) bool // does this Format look equal or differently than another one ?
+	String() string           // return some kind of identifying string
 }
 
 // A Formatter is able to format a run of text according to a style-format.
@@ -97,25 +136,54 @@ type Formatter interface {
 	EndRun(Format, io.Writer) error
 }
 
-// Apply applies a style to a range of characters. Returns a style set.
+// ApplyStyle applies a style to a range [from,to) of characters. Returns a style set.
 // Given range boundaries will silently be restricted to valid text positions without
 // flagging an error. This may result in the style not being applied due to an invalid
 // range.
-func Apply(c cords.Cord, sty Format, from, to uint64) Runs {
-	spn := toSpan(from, to).contained(c)
+func ApplyStyle(text cords.Cord, sty Format, from, to uint64) Runs {
+	spn := toSpan(from, to).contained(text)
 	cb := cords.NewBuilder()
-	if spn.void() || spn.covers(c) {
+	if spn.void() || spn.covers(text) {
 		cb.Append(makeStyleLeaf(sty, spn))
 	} else { // run spans a mid-section of the text
 		if spn.l > 0 {
 			cb.Append(makeStyleLeaf(nil, toSpan(0, spn.l)))
 		}
 		cb.Append(makeStyleLeaf(sty, spn))
-		if spn.r < c.Len() {
-			cb.Append(makeStyleLeaf(nil, toSpan(spn.r, c.Len())))
+		if spn.r < text.Len() {
+			cb.Append(makeStyleLeaf(nil, toSpan(spn.r, text.Len())))
 		}
 	}
 	return Runs(cb.Cord())
+}
+
+// Style adds a style to already existing styles and returns the unified set.
+func (runs Runs) Style(sty Format, from, to uint64) Runs {
+	if cords.Cord(runs).IsVoid() {
+		T().Errorf("styled runs: runs are void, cannot style")
+		return runs
+	}
+	spn := toSpan(from, to).contained(cords.Cord(runs))
+	if spn.void() {
+		T().Errorf("styled runs: illegal span for style, cannot style")
+		return runs
+	}
+	r, _, err := cords.Cut(cords.Cord(runs), spn.l, spn.len())
+	if err != nil {
+		return runs
+	}
+	T().Debugf("r=%s, length=%d", r, r.Len())
+	cb := cords.NewBuilder()
+	cb.Append(makeStyleLeaf(sty, spn))
+	newrun := cb.Cord()
+	T().Debugf("newrun=%s, length=%d", newrun, newrun.Len())
+	r, err = cords.Insert(r, newrun, spn.l)
+	if err != nil {
+		T().Errorf("styled runs: insert operation returned: %s", err.Error())
+	}
+	T().Debugf("r=%s, length=%d", r, r.Len())
+	runs = Runs(r)
+	return runs
 }
 
 // --- Styled Leaf -----------------------------------------------------------
@@ -147,11 +215,11 @@ func (sl styleLeaf) Substring(uint64, uint64) string {
 // split into 2 leafs at position i, resulting in two equal styles with different
 // length < |sl|.
 func (sl styleLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
-	left := styleLeaf{
+	left := &styleLeaf{
 		format: sl.format,
 		length: i,
 	}
-	right := styleLeaf{
+	right := &styleLeaf{
 		format: sl.format,
 		length: sl.length - i,
 	}
@@ -165,7 +233,7 @@ func makeStyleLeaf(sty Format, spn span) *styleLeaf {
 	}
 }
 
-var _ cords.Leaf = styleLeaf{}
+var _ cords.Leaf = &styleLeaf{}
 
 // --- Span ------------------------------------------------------------------
 
@@ -183,6 +251,13 @@ func toSpan(from, to uint64) span {
 
 func (spn span) void() bool {
 	return spn.r <= spn.l
+}
+
+func (spn span) len() uint64 {
+	if spn.void() {
+		return 0
+	}
+	return spn.r - spn.l
 }
 
 func (spn span) covers(c cords.Cord) bool {
