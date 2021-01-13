@@ -152,7 +152,7 @@ func (cord Cord) Report(i, l uint64) (string, error) {
 	if cord.Len() < i || cord.Len() < i+l {
 		return "", ErrIndexOutOfBounds
 	}
-	var buf bytes.Buffer
+	buf := new(bytes.Buffer)
 	buf = substr(&cord.root.cordNode, i, i+l, buf)
 	return buf.String(), nil
 }
@@ -206,7 +206,7 @@ func (cord Cord) concat2(c Cord) Cord {
 	return cord
 }
 
-func substr(node *cordNode, i, j uint64, buf bytes.Buffer) bytes.Buffer {
+func substr(node *cordNode, i, j uint64, buf *bytes.Buffer) *bytes.Buffer {
 	T().Debugf("called substr([%d], %d, %d)", node.Weight(), i, j)
 	if node.IsLeaf() {
 		leaf := node.AsLeaf()
