@@ -123,3 +123,6 @@ const ErrCordCompleted = CordError("forbidden to add fragements; cord has been c
 // ErrIndexOutOfBounds is flagged whenever a cord position is
 // greater than the length of the cord.
 const ErrIndexOutOfBounds = CordError("index out of bounds")
+
+// ErrIllegalArguments is flagged whenever function parameters are invalid.
+const ErrIllegalArguments = CordError("illegal arguments")
