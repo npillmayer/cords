@@ -83,9 +83,6 @@ func (leaf *fileLeaf) String() string {
 	if ext.loadExt == nil {
 		return ext.content
 	}
-	// if ext.isString() {
-	// 	return ext.asString()
-	// }
 	m := ext.loadExt.mx
 	pos := ext.loadExt.pos
 	T().Debugf("content %d…%d not yet loaded, waiting", pos, pos+leaf.length)
@@ -96,10 +93,6 @@ func (leaf *fileLeaf) String() string {
 	if ext.loadExt != nil {
 		panic("string fragment of leaf not available after waiting for load")
 	}
-	// if !ext.isString() {
-	// 	panic("string fragment of leaf not available after waiting for load")
-	// }
-	// return ext.asString()
 	return ext.content
 }
 
@@ -130,26 +123,7 @@ func (leaf *fileLeaf) Substring(i uint64, j uint64) string {
 type leafExt struct {
 	content string
 	loadExt *loadingInfo
-	// isString() bool
-	// asString() string
-	// duringLoad() *loadingInfo
 }
-
-// type stringLeafExt string
-
-// func (ext stringLeafExt) isString() bool {
-// 	return true
-// }
-
-// func (ext stringLeafExt) asString() string {
-// 	return string(ext)
-// }
-
-// func (ext stringLeafExt) duringLoad() *loadingInfo {
-// 	return nil
-// }
-
-//var _ leafExt = stringLeafExt("")
 
 type loadingInfo struct {
 	pos  int64       // initial start position of this fragment within the file
@@ -157,20 +131,6 @@ type loadingInfo struct {
 	tf   *textFile   // reference to the file this segment is from, later this is dropped
 	mx   *sync.Mutex // mutex guards access to string content until it is loaded
 }
-
-// func (ext *loadingInfo) isString() bool {
-// 	return false
-// }
-
-// func (ext *loadingInfo) asString() string {
-// 	return ""
-// }
-
-// func (ext *loadingInfo) duringLoad() *loadingInfo {
-// 	return ext
-// }
-
-// var _ leafExt = &loadingInfo{}
 
 // --- Open and read a textfile ----------------------------------------------
 
@@ -192,10 +152,10 @@ type textFile struct {
 // the client. The cord can be used right away and synchronisation will happen
 // correctly in the background. Opening of the file is always done synchronously.
 //
-func Load(name string, initialPos int64, fragSize int64, wg *sync.WaitGroup) (cords.Cord, *fileLeaf, error) {
+func Load(name string, initialPos, fragSize int64, wg *sync.WaitGroup) (cords.Cord, error) {
 	tf, err := openFile(name)
 	if err != nil {
-		return cords.Cord{}, nil, err
+		return cords.Cord{}, err
 	}
 	T().Infof("opened file %s", tf.info.Name())
 	if initialPos > tf.info.Size() || initialPos < 0 {
@@ -216,8 +176,8 @@ func Load(name string, initialPos int64, fragSize int64, wg *sync.WaitGroup) (co
 			fragSize = sixKb
 		}
 	}
-	cord, start := createLeafsAndStartLoading(tf, initialPos, fragSize, wg)
-	return cord, start, nil
+	cord, _ := createLeafsAndStartLoading(tf, initialPos, fragSize, wg)
+	return cord, nil
 }
 
 // openFile opens an OS file and collect some useful information on it,
@@ -341,11 +301,9 @@ func loadAllFragmentsAsync(tf *textFile, startLeaf *fileLeaf, leafcnt int, setup
 				}
 			} // ignore all other leaf messages
 		}(leaf, tf.cast)
-		//if leaf.Ext().duringLoad().next == startLeaf {
 		if leafNext == startLeaf {
 			break // when iterated over cycle of leafs, stop
 		}
-		//leaf = leaf.Ext().duringLoad().next // continue iteration
 		leaf = leafNext // continue iteration
 	}
 	// start publisher goroutine

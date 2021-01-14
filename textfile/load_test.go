@@ -18,15 +18,13 @@ func TestLoad(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	var wg sync.WaitGroup
-	cord, start, err := Load("lorem/lorem_small.txt", 0, 0, &wg)
+	cord, err := Load("lorem/lorem_small.txt", 0, 0, &wg)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	if cord.IsVoid() {
 		t.Errorf("cord is void, should not be")
 	}
-	ext := start.Ext().loadExt
-	t.Logf("start leaf %d…%d", ext.pos, start.Weight())
 	t.Logf("done waiting -----------------------------------------------------------")
 	// time.Sleep(2 * time.Second)
 	s, err := cord.Report(0, 40)
