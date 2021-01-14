@@ -124,3 +124,8 @@ const ErrIndexOutOfBounds = CordError("index out of bounds")
 
 // ErrIllegalArguments is flagged whenever function parameters are invalid.
 const ErrIllegalArguments = CordError("illegal arguments")
+
+// ErrIllegalDelimiterPattern is flagged if a given delimiter pattern is
+// either not compilable as a valid regular expression or if it accepts
+// the empty string as a match.
+const ErrIllegalDelimiterPattern = CordError("illegal delimiter pattern")

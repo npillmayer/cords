@@ -13,52 +13,111 @@ type Metric interface {
 
 type MetricValue interface {
 	Combine(rightSibling MetricValue, metric Metric) MetricValue
+	Unprocessed() ([]byte, []byte)
+	Len() int
 }
+
+type MetricValueBase struct {
+	length       int
+	openL, openR []byte //
+}
+
+func (mvb MetricValueBase) Len() int {
+	return mvb.length
+}
+
+func (mvb MetricValueBase) Unprocessed() ([]byte, []byte) {
+	return mvb.openL, mvb.openR
+}
+
+func (mvb *MetricValueBase) InitFrom(frag string) {
+	mvb.length = len(frag)
+}
+
+func (mvb *MetricValueBase) Measured(from, to int, frag string) {
+	if from < 0 || from > mvb.length {
+		mvb.openL = []byte(frag)
+		mvb.openR = nil
+		return
+	}
+	mvb.openL = nil
+	mvb.openR = nil
+	if from > to {
+		from, to = to, from
+	}
+	if from > 0 {
+		mvb.openL = []byte(frag)[:from]
+	}
+	if to < mvb.length {
+		mvb.openR = []byte(frag)[to:]
+	}
+}
+
+func (mvb *MetricValueBase) MeasuredNothing(frag string) {
+	mvb.Measured(-1, -1, frag)
+}
+
+func (mvb *MetricValueBase) HasBoundaries() bool {
+	return len(mvb.openL)+len(mvb.openR) < mvb.length
+}
+
+// will change mvb
+func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]byte, bool) {
+	otherL := rightSibling.openL
+	if len(otherL) > 0 {
+		if mvb.HasBoundaries() {
+			mvb.openR = append(mvb.openR, otherL...)
+			return mvb.openR, rightSibling.HasBoundaries()
+		}
+		// else no boundaries in mvb => openR is empty, frag is in openL
+		mvb.openL = append(mvb.openL, otherL...)
+		return mvb.openL, false
+	}
+	return nil, false
+}
+
+func (mvb *MetricValueBase) UnifyWith(rightSibling *MetricValueBase) {
+	mvb.length += rightSibling.length
+	mvb.openR = rightSibling.openR
+}
+
+// --- Delimiter Metric ------------------------------------------------------
 
 type delimiterMetric struct {
 	pattern *regexp.Regexp
 }
 
 type delimiterMetricValue struct {
-	length       int64   //
-	openL, openR []byte  //
-	parts        [][]int // int instead of int64 because of package regexp API
+	MetricValueBase
+	parts [][]int // int instead of int64 because of package regexp API
 }
 
 func makeDelimiterMetric(pattern string) (*delimiterMetric, error) {
 	r, err := regexp.Compile(pattern)
 	if err != nil {
-		T().Debugf("delimiter metric: cannot compile regular expression input")
-		return nil, fmt.Errorf("delimiter metric: illegal delimiter: %w", err)
+		T().Errorf("delimiter metric: cannot compile regular expression input")
+		return nil, fmt.Errorf("illegal delimiter: %w", err)
+	}
+	if r.MatchString("") {
+		T().Errorf("delimiter metric: regular expression matches empty string")
+		return nil, ErrIllegalDelimiterPattern
 	}
 	return &delimiterMetric{pattern: r}, nil
 }
 
 func (dm *delimiterMetric) Apply(frag string) MetricValue {
-	v := delimiterMetricValue{
-		length: int64(len(frag)),
-	}
+	v := delimiterMetricValue{}
+	v.InitFrom(frag)
 	v.parts = delimit(frag, dm.pattern)
 	if len(v.parts) == 0 {
-		v.openL = []byte(frag)
-	}
-	if len(v.parts) > 0 {
-		if v.parts[0][0] > 0 {
-			v.openL = []byte(frag)[:v.parts[0][0]]
-		}
-	}
-	if len(v.parts) > 0 {
-		l := len(v.parts)
-		if v.parts[l-1][1] < int(v.length) {
-			v.openR = []byte(frag)[v.parts[l-1][1]:]
-		}
+		v.MeasuredNothing(frag)
+		// TODO should check if |v.parts|==1 and v.parts.0 @ 0
+		// this could mean a pattern has started in the left sibling
+		// with patterns like 'x+'
+	} else {
+		v.Measured(v.parts[0][0], v.parts[len(v.parts)-1][1], frag)
 	}
 	return &v
-}
-
-func (v *delimiterMetricValue) String() string {
-	return fmt.Sprintf("value{ length=%d, L='%s', R='%s', |P|=%d  }", v.length,
-		string(v.openL), string(v.openR), len(v.parts))
 }
 
 func (v *delimiterMetricValue) Combine(rightSibling MetricValue, metric Metric) MetricValue {
@@ -67,55 +126,19 @@ func (v *delimiterMetricValue) Combine(rightSibling MetricValue, metric Metric) 
 		T().Errorf("metric calculation: type of value is %T", rightSibling)
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
-	T().Debugf("COMBINE %v  +  %v", v, sibling)
-	if v.length == 0 {
-		return sibling
-	}
-	if sibling.length == 0 {
-		return v
-	}
-	vv := delimiterMetricValue{
-		length: v.length + sibling.length,
-		parts:  v.parts,
-	}
-	l := len(v.parts)
-	if l == 0 { // we have a span without boundaries
-		if len(sibling.openL) > 0 {
-			// append sibling.openL to it
-			vv.openL = append(v.openL, sibling.openL...)
-			vv.openR = sibling.openR
-		} else {
-			// we just use v as is
-			vv.openL = v.openL
-			vv.openR = sibling.openR
-		}
-	} else {
-		// we have at least 1 boundary
-		if len(v.openL) > 0 {
-			// we do nothing here, for sibling is to our right
-			vv.openL = v.openL
-		}
-		if len(v.openR) > 0 {
-			// append sibling.openL, if any, and apply metric
-			if len(sibling.openL) > 0 {
-				x := append(v.openL, sibling.openL...)
-				vx := metric.Apply(string(x))
-				vvx := vx.(*delimiterMetricValue)
-				if len(vvx.parts) > 0 {
-					// append newfound boundary
-					vv.parts = append(vv.parts, vvx.parts...)
-					vv.openR = vvx.openR
-				} else {
-					vv.openR = sibling.openR
-				}
-			}
-		} else {
-			// we already have tested v.openR, so we do nothing here
-			vv.openR = sibling.openR
+	if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {
+		if d := metric.Apply(string(unproc)).(*delimiterMetricValue); len(d.parts) > 0 {
+			v.parts = append(v.parts, d.parts...)
 		}
 	}
-	vv.parts = append(vv.parts, sibling.parts...)
-	return &vv
+	v.UnifyWith(&sibling.MetricValueBase)
+	v.parts = append(v.parts, sibling.parts...)
+	return v
+}
+
+func (v *delimiterMetricValue) String() string {
+	return fmt.Sprintf("value{ length=%d, L='%s', R='%s', |P|=%d  }", v.length,
+		string(v.openL), string(v.openR), len(v.parts))
 }
 
 func delimit(frag string, pattern *regexp.Regexp) (parts [][]int) {
@@ -123,14 +146,10 @@ func delimit(frag string, pattern *regexp.Regexp) (parts [][]int) {
 	if len(parts) == 0 {
 		parts = [][]int{} // no boundary in fragment
 	}
-	// parts := make([]int64, len(m), len(m))
-	// for i, pos := range m {
-	// 	parts[i] = int64(pos[0])
-	// }
 	return
 }
 
-func applyMetric(node *cordNode, i, j uint64, metric Metric, value MetricValue) MetricValue {
+func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 	T().Debugf("called applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	if node.IsLeaf() {
 		leaf := node.AsLeaf()
@@ -142,23 +161,28 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric, value MetricValue) 
 	}
 	var v, vl, vr MetricValue
 	if i < node.Weight() && node.Left() != nil {
-		vl = applyMetric(node.Left(), i, j, metric, value)
+		vl = applyMetric(node.Left(), i, j, metric)
 		T().Debugf("left metric value = %v", vl)
 	}
 	if node.Right() != nil && j > node.Weight() {
 		w := node.Weight()
-		vr = applyMetric(node.Right(), i-umin(w, i), j-w, metric, value)
+		vr = applyMetric(node.Right(), i-umin(w, i), j-w, metric)
 		T().Debugf("right metric value = %v", vr)
 	}
-	if vl != nil && vr != nil {
+	if !isnull(vl) && !isnull(vr) {
+		T().Debugf("COMBINE %v  +  %v", vl, vr)
 		v = vl.Combine(vr, metric) // TODO we should copy/clone
-	} else if vl != nil {
+	} else if !isnull(vl) {
 		v = vl
-	} else if vr != nil {
+	} else if !isnull(vr) {
 		v = vr
 	}
 	T().Debugf("combined metric value = %v", v)
 	T().Debugf("node=%v", node)
 	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	return v
+}
+
+func isnull(v MetricValue) bool {
+	return v == nil || v.Len() == 0
 }

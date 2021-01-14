@@ -39,17 +39,24 @@ func TestRegexAllIndex(t *testing.T) {
 	} else {
 		t.Logf("no match")
 	}
-	t.Fail()
+	//t.Fail()
 }
 
 func TestDelimit(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
 	content := "Londonderry"
 	pattern := `o.`
 	t.Logf("delimit '%s' by /%s/", content, pattern)
 	re := regexp.MustCompile(`o.`)
 	m := delimit(content, re)
 	t.Logf("m=%v", m)
-	t.Fail()
+	if len(m) != 2 {
+		t.Errorf("expected to find 2 pattern occurences, found %d", len(m))
+	}
 }
 
 func TestMetricBasic(t *testing.T) {
@@ -73,10 +80,12 @@ func TestMetricBasic(t *testing.T) {
 	t.Logf("builder made cord='%s'", cord)
 	metric, err := makeDelimiterMetric("_")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
-	value := &delimiterMetricValue{length: 0}
-	v := applyMetric(&cord.root.cordNode, 0, cord.Len(), metric, value)
+	v := applyMetric(&cord.root.cordNode, 0, cord.Len(), metric)
 	t.Logf("delimiter value = %v", v)
-	t.Fail()
+	u := v.(*delimiterMetricValue).parts
+	if len(u) != 4 {
+		t.Errorf("expected to find 4 underscores, found %d", len(u))
+	}
 }
