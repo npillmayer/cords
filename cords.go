@@ -58,7 +58,8 @@ import (
 // Cord is a type for an enhanced string.
 // It references fragments of text, which are considered immutable.
 // Fragments will be shared between cords. Cords change in a concurrency-safe way,
-// as every modifying operation on a cord will create a copy of changed parts of the cord.
+// as every modifying operation on a cord will create a copy of changed parts of the cord,
+// thus cords are persistent data structures.
 //
 // A cord created by
 //

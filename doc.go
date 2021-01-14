@@ -58,10 +58,8 @@ _________________________________________________________________________
 
 In Go, these points of critique are somewhat mitigated with slices. However,
 slices will carry only so far, and cords add a layer of convenience and
-stable performance characteristics on top of them.
-
-Cords focus on large amounts of text. When dealing with shorter strings which do
-not form an overall text, cords may add a performance penalty.
+stable performance characteristics on top of them. You can think of cords
+as fancy slices for text, with some additional functionality.
 
 _________________________________________________________________________
 

@@ -46,5 +46,8 @@ Xerox PARC, 3333 Coyote Hill Rd., Palo Alto, CA 94304, U.S.A. (email:boehm@parc.
 
 ## Other / similar Solutions
 
-Raph Levien implemented a “Ropes” data type for his Xi editor in Rust:
-[Blog entry on Raph's blog](https://raphlinus.github.io/xi/2020/06/27/xi-retrospective.html)
+   * Raph Levien implemented a “Ropes” data type for his Xi editor in Rust:
+     [Blog entry on Raph's blog](https://raphlinus.github.io/xi/2020/06/27/xi-retrospective.html)
+
+   * Oracle Labs created ropes as strings for Oracle's Ruby variant, TruffleRuby:
+     [Specializing Ropes for Ruby](https://chrisseaton.com/truffleruby/ropes-manlang.pdf)
