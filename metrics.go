@@ -50,8 +50,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // by the calculation driver, therefore it is illegal to hold unguarded global state
 // in a metric.
 //
+// Combine requires the Metric to calculate a metric value “sum” from two
+// metric values. This way the metric will bubble up metric values to the root
+// of the cord tree and therewith result in a single overall metric value for
+// a text.
+//
 type Metric interface {
 	Apply(frag string) MetricValue
+	Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue
 }
 
 // MetricValue is a type returned by applying a metric to text fragments (see
@@ -95,7 +101,6 @@ type Metric interface {
 type MetricValue interface {
 	Len() int                      // added length of text fragments
 	Unprocessed() ([]byte, []byte) // unprocessed bytes at either end
-	Combine(rightSibling MetricValue, metric Metric) MetricValue
 }
 
 // MetricValueBase is a helper type for metric application and for combining
@@ -115,15 +120,15 @@ type MetricValue interface {
 //     v.Measured(from, to, frag)      // leave it to MetricValueBase to remember unprocessed bytes
 //     return &v
 //
-// In MetricValue.Combine(…):
+// In Metric.Combine(…):
 //
-//     // v is myCoolMetricValue
-//     if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {    // step (b)
-//         // yes, we have to re-apply our metric to `unproc`                  //
-//         x := metric.Apply(string(unproc)).(*delimiterMetricValue)           //
-//         // do something with sub-value x                                    //
+//     unproc, ok := leftSibling.ConcatUnprocessed(&rightSibling.MetricValueBase)  // step (b)
+//     if ok {                                                                     //
+//         // yes, we have to re-apply our metric to `unproc`                      //
+//         x := metric.Apply(string(unproc)).(*delimiterMetricValue)               //
+//         // do something with sub-value x                                        //
 //     }
-//     v.UnifyWith(&sibling.MetricValueBase)                                   // step (c)
+//     leftSibling.UnifyWith(&rightSibling.MetricValueBase)                        // step (c)
 //
 // Which spans of text fragments can be processed and how intermediate metric values
 // are calculated and stored is up to the client's `Metric` and `MetricValue`.
@@ -162,7 +167,7 @@ func (mvb *MetricValueBase) InitFrom(frag string) {
 //
 func (mvb *MetricValueBase) Measured(from, to int, frag string) {
 	// TODO this should be updatable and incremental span should be
-	// added up, i.e. boundary bytes should change
+	// added up, i.e. boundary bytes should change with multiple calls to Measured
 	if from < 0 || from > mvb.length {
 		mvb.openL = []byte(frag)
 		mvb.openR = nil
@@ -199,14 +204,14 @@ func (mvb *MetricValueBase) HasBoundaries() bool {
 }
 
 // ConcatUnprocessed is a helper function to provide access to
-// unprocessed bytes in between two string fragments.
-// As described with MetricValues, refer to the step (b) where unprocessed
+// unprocessed bytes in between two text fragments.
+// As described with MetricValues, refer to step (b) where unprocessed
 // boundary bytes are subject to re-application of the metric.
 //
 //    (b)  |-----========    ------    ==============|     reprocess 6 bytes in between
 //
-// ConcatUnprocessed will return the 6 bytes in between and a boolean flag if
-// the metric should reprocess the bytes. It is the responsibility of the client's
+// ConcatUnprocessed will return the 6 bytes in between and a boolean flag to indicate
+// if the metric should reprocess the bytes. It is the responsibility of the client's
 // metric to initiate the reprocessing.
 //
 func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]byte, bool) {
@@ -230,6 +235,10 @@ func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]
 // Referring to the example for MetricValue, UnifyWith will help with step (c):
 //
 //    (c)  |-----============================|              combined intermediate fragment
+//
+// The “meat” of the metric has to be calculated by the client metric type. Clients must
+// implement their own data structure to support metric calculation and propagation.
+// MetricValueBase just shields clients from the details of fragment handling.
 //
 func (mvb *MetricValueBase) UnifyWith(rightSibling *MetricValueBase) {
 	mvb.length += rightSibling.length
@@ -273,7 +282,7 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 	}
 	if !isnull(vl) && !isnull(vr) {
 		T().Debugf("COMBINE %v  +  %v", vl, vr)
-		v = vl.Combine(vr, metric) // TODO we should copy/clone
+		v = metric.Combine(vl, vr, metric)
 	} else if !isnull(vl) {
 		v = vl
 	} else if !isnull(vr) {

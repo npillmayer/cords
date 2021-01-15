@@ -39,15 +39,15 @@ type linesCounted struct {
 }
 
 // TODO do something smart with newline at end of text
-func (lc *linesCounted) Combine(rightSibling cords.MetricValue,
+func (cnt *lineCount) Combine(leftSibling, rightSibling cords.MetricValue,
 	metric cords.Metric) cords.MetricValue {
 	//
-	sibling := rightSibling.(*linesCounted)
-	if unproc, ok := lc.ConcatUnprocessed(&sibling.MetricValueBase); ok {
+	l, r := leftSibling.(*linesCounted), rightSibling.(*linesCounted)
+	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
 		metric.Apply(string(unproc)) // we will not have unprocessed boundary bytes
 	}
-	lc.UnifyWith(&sibling.MetricValueBase)
-	return lc
+	l.UnifyWith(&r.MetricValueBase)
+	return l
 }
 
 func (lc linesCounted) Count() int {
@@ -123,22 +123,27 @@ func (dm *delimiterMetric) Apply(frag string) cords.MetricValue {
 	return &v
 }
 
-func (v *delimiterMetricValue) Combine(rightSibling cords.MetricValue,
+func (dm *delimiterMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 	metric cords.Metric) cords.MetricValue {
 	//
-	sibling, ok := rightSibling.(*delimiterMetricValue)
+	l, ok := leftSibling.(*delimiterMetricValue)
+	if !ok {
+		T().Errorf("metric calculation: type of value is %T", leftSibling)
+		panic("cords.Metric combine: type inconsistency in metric calculation")
+	}
+	r, ok := rightSibling.(*delimiterMetricValue)
 	if !ok {
 		T().Errorf("metric calculation: type of value is %T", rightSibling)
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
-	if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {
+	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
 		if d := metric.Apply(string(unproc)).(*delimiterMetricValue); len(d.parts) > 0 {
-			v.parts = append(v.parts, d.parts...)
+			l.parts = append(l.parts, d.parts...)
 		}
 	}
-	v.UnifyWith(&sibling.MetricValueBase)
-	v.parts = append(v.parts, sibling.parts...)
-	return v
+	l.UnifyWith(&r.MetricValueBase)
+	l.parts = append(l.parts, r.parts...)
+	return l
 }
 
 func (v *delimiterMetricValue) String() string {

@@ -43,13 +43,13 @@ type testvalue struct {
 	MetricValueBase
 }
 
-func (v *testvalue) Combine(rightSibling MetricValue, metric Metric) MetricValue {
-	sibling := rightSibling.(*testvalue)
-	if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {
+func (m *testmetric) Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue {
+	l, r := leftSibling.(*testvalue), rightSibling.(*testvalue)
+	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
 		metric.Apply(string(unproc)) // we will not have unprocessed boundary bytes
 	}
-	v.UnifyWith(&sibling.MetricValueBase)
-	return v
+	l.UnifyWith(&r.MetricValueBase)
+	return l
 }
 
 func (m *testmetric) Apply(frag string) MetricValue {
