@@ -59,7 +59,7 @@ _________________________________________________________________________
 In Go, these points of critique are somewhat mitigated with slices. However,
 slices will carry only so far, and cords add a layer of convenience and
 stable performance characteristics on top of them. You can think of cords
-as fancy slices for text, with some additional functionality.
+as fancy slices of text, with some additional functionality.
 
 _________________________________________________________________________
 
