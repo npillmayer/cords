@@ -1,40 +1,168 @@
 package cords
 
-import (
-	"fmt"
-	"regexp"
-)
+/*
+BSD 3-Clause License
 
+Copyright (c) 2020–21, Norbert Pillmayer
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+// Metric is a metric to calculate on a cord. Sometimes it's helpful to find
+// information about a (large) text by collecting metrics from fragments and
+// assembling them. Cords naturally break up texts into smaller fragments,
+// letting us calculate metrics by applying them to (a subset of) fragments and
+// propagate them upwards the nodes of the cord tree.
+//
+// An example of a (very simplistic) metric would be to count the number of
+// bytes in a text. The total count is calculated by counting the bytes in every
+// fragment and adding up intermediate sums while travelling upwards through the
+// cord's tree.
+//
+// Metric is a simple interface whith a metric function that will be applied
+// to portions of text. Clients will have no control over size or boundaries of
+// the fragment. Applying metrics to different fragments may be done concurrently
+// by the calculation driver, therefore it is illegal to hold unguarded global state
+// in a metric.
+//
 type Metric interface {
-	//Leafs(leftMetric Metric) []Leaf
 	Apply(frag string) MetricValue
-	//Value() MetricValue
 }
 
+// MetricValue is a type returned by applying a metric to text fragments (see
+// interface Metric). It holds information about the added length of the text
+// fragments which this value has been calulated for, and slices of bytes
+// at either end of the accumulated fragments which have to be reprocessed.
+//
+// Fragments of text are presented to the metric function as slices of bytes,
+// without regard to rune-, grapheme- or line-boundaries. If we want to
+// calculate information about, say, the maximum line length in a text, we'd
+// have to count the graphemes of fragments. Graphemes will consist, however,
+// of an unknown number of bytes and code points, which may only be identified
+// by reading them at the grapheme start character. If a fragment is cut in
+// the middle of a grapheme, the metric at the first bytes of a fragment cannot
+// reliably calculated. Therefore metrics will be calculated on substrings of
+// fragments where conditions allow a metric application, and any unprocessed
+// bytes at the left and right boundary will be marked for reprocessing.
+//
+// When propagating metric values up the tree nodes, metric value of the left
+// and right child node of a cord tree node will have to be combined.
+// The combination must be able to reprocess any unprocessed bytes.
+//
+//       --- denotes unprocessed bytes
+//       === denotes bytes already processed by the metric
+//
+//    (a)  |-----========--|   &   |----==============|     combine two sibling fragments
+//
+//    (b)  |-----========    ------     ==============|     reprocess 6 bytes in between
+//
+//    (c)  |-----============================|              combined intermediate fragment
+//
+// For an in-depth discussion please refer to Raph Levien's “Rope Science” series
+// (https://xi-editor.io/docs/rope_science_01.html).
+//
+// Calculating metric values is a topic where implementation characteristics of cords
+// get somewhat visible for clients of the API. This is unfortunate, but may be
+// mitigated by helper types provided by this package. Clients usually will either create
+// metrics on top of pre-defined basic metrics or they may embed the MetricValueBase
+// helper type in their MetricValues.
+//
 type MetricValue interface {
+	Len() int                      // added length of text fragments
+	Unprocessed() ([]byte, []byte) // unprocessed bytes at either end
 	Combine(rightSibling MetricValue, metric Metric) MetricValue
-	Unprocessed() ([]byte, []byte)
-	Len() int
 }
 
+// MetricValueBase is a helper type for metric application and for combining
+// metric values on text fragments. Clients who want to use it should embed a
+// MetricValueBase into their type definition for metric types.
+//
+// MetricValueBase will implement `Len` and `Unprocessed` of interface
+// MetricValue. To implement `Combine` clients should interact with
+// MetricValueBase in a way that lets MetricValueBase handle the tricky parts
+// of fragment boundary bytes.
+//
+// In Metric.Apply(…):
+//
+//     v := &myCoolMetricValue{ … }    // create a MetricValue which embeds MetricValueBase
+//     v.InitFrom(frag)                // call this helper first
+//     from, to := …                   // do some metric calculations and possibly have boundaries
+//     v.Measured(from, to, frag)      // leave it to MetricValueBase to remember unprocessed bytes
+//     return &v
+//
+// In MetricValue.Combine(…):
+//
+//     // v is myCoolMetricValue
+//     if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {    // step (b)
+//         // yes, we have to re-apply our metric to `unproc`                  //
+//         x := metric.Apply(string(unproc)).(*delimiterMetricValue)           //
+//         // do something with sub-value x                                    //
+//     }
+//     v.UnifyWith(&sibling.MetricValueBase)                                   // step (c)
+//
+// Which spans of text fragments can be processed and how intermediate metric values
+// are calculated and stored is up to the client's `Metric` and `MetricValue`.
+//
 type MetricValueBase struct {
 	length       int
 	openL, openR []byte //
 }
 
+// Len is part of interface MetricValue.
 func (mvb MetricValueBase) Len() int {
 	return mvb.length
 }
 
+// Unprocessed is part of interface MetricValue.
 func (mvb MetricValueBase) Unprocessed() ([]byte, []byte) {
 	return mvb.openL, mvb.openR
 }
 
+// InitFrom should be called from the enclosing client metric type at the
+// beginning of `Combine`. It will set up information about fragment length
+// and possibly other administrative information.
+//
+// This will usually be called from Metric.Apply(…).
+//
 func (mvb *MetricValueBase) InitFrom(frag string) {
 	mvb.length = len(frag)
 }
 
+// Measured is a signal to an embedded MetricValueBase
+// that a range of bytes has already been considered for metric calculation.
+// The MetricValueBase will derive information about unprocessed boundary
+// bytes from this.
+//
+// This will usually be called from Metric.Apply(…).
+//
 func (mvb *MetricValueBase) Measured(from, to int, frag string) {
+	// TODO this should be updatable and incremental span should be
+	// added up, i.e. boundary bytes should change
 	if from < 0 || from > mvb.length {
 		mvb.openL = []byte(frag)
 		mvb.openR = nil
@@ -53,15 +181,34 @@ func (mvb *MetricValueBase) Measured(from, to int, frag string) {
 	}
 }
 
+// MeasuredNothing is a signal to an embedded MetricValueBase that no metric value
+// could be calculated for a given text fragment. This will tell the
+// metric calculation driver to reconsider the complete fragment when
+// combining it with a sibling node.
+//
+// This will usually be called from Metric.Apply(…).
+//
 func (mvb *MetricValueBase) MeasuredNothing(frag string) {
 	mvb.Measured(-1, -1, frag)
 }
 
+// HasBoundaries returns true if the metric value has unprocessed boundary bytes.
+// Clients normally will not have to consult this.
 func (mvb *MetricValueBase) HasBoundaries() bool {
 	return len(mvb.openL)+len(mvb.openR) < mvb.length
 }
 
-// will change mvb
+// ConcatUnprocessed is a helper function to provide access to
+// unprocessed bytes in between two string fragments.
+// As described with MetricValues, refer to the step (b) where unprocessed
+// boundary bytes are subject to re-application of the metric.
+//
+//    (b)  |-----========    ------    ==============|     reprocess 6 bytes in between
+//
+// ConcatUnprocessed will return the 6 bytes in between and a boolean flag if
+// the metric should reprocess the bytes. It is the responsibility of the client's
+// metric to initiate the reprocessing.
+//
 func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]byte, bool) {
 	otherL := rightSibling.openL
 	if len(otherL) > 0 {
@@ -76,77 +223,32 @@ func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]
 	return nil, false
 }
 
+// UnifyWith creates a combined metric value from two sibling values.
+// Recalculation of unprocessed bytes must already have been done, i.e.
+// ConcatUnprocessed must already have been called.
+//
+// Referring to the example for MetricValue, UnifyWith will help with step (c):
+//
+//    (c)  |-----============================|              combined intermediate fragment
+//
 func (mvb *MetricValueBase) UnifyWith(rightSibling *MetricValueBase) {
 	mvb.length += rightSibling.length
 	mvb.openR = rightSibling.openR
 }
 
-// --- Delimiter Metric ------------------------------------------------------
+// --- Apply a metric to a cord ----------------------------------------------
 
-type delimiterMetric struct {
-	pattern *regexp.Regexp
-}
-
-type delimiterMetricValue struct {
-	MetricValueBase
-	parts [][]int // int instead of int64 because of package regexp API
-}
-
-func makeDelimiterMetric(pattern string) (*delimiterMetric, error) {
-	r, err := regexp.Compile(pattern)
-	if err != nil {
-		T().Errorf("delimiter metric: cannot compile regular expression input")
-		return nil, fmt.Errorf("illegal delimiter: %w", err)
+// ApplyMetric applies a metric calculation on a (section of a) text.
+// i and j are text positions with Go slice semantics.
+//
+func ApplyMetric(cord Cord, i, j uint64, metric Metric) (MetricValue, error) {
+	if cord.IsVoid() {
+		return nil, nil
 	}
-	if r.MatchString("") {
-		T().Errorf("delimiter metric: regular expression matches empty string")
-		return nil, ErrIllegalDelimiterPattern
+	if i > cord.Len() || j > cord.Len() || j < i {
+		return nil, ErrIndexOutOfBounds
 	}
-	return &delimiterMetric{pattern: r}, nil
-}
-
-func (dm *delimiterMetric) Apply(frag string) MetricValue {
-	v := delimiterMetricValue{}
-	v.InitFrom(frag)
-	v.parts = delimit(frag, dm.pattern)
-	if len(v.parts) == 0 {
-		v.MeasuredNothing(frag)
-		// TODO should check if |v.parts|==1 and v.parts.0 @ 0
-		// this could mean a pattern has started in the left sibling
-		// with patterns like 'x+'
-	} else {
-		v.Measured(v.parts[0][0], v.parts[len(v.parts)-1][1], frag)
-	}
-	return &v
-}
-
-func (v *delimiterMetricValue) Combine(rightSibling MetricValue, metric Metric) MetricValue {
-	sibling, ok := rightSibling.(*delimiterMetricValue)
-	if !ok {
-		T().Errorf("metric calculation: type of value is %T", rightSibling)
-		panic("cords.Metric combine: type inconsistency in metric calculation")
-	}
-	if unproc, ok := v.ConcatUnprocessed(&sibling.MetricValueBase); ok {
-		if d := metric.Apply(string(unproc)).(*delimiterMetricValue); len(d.parts) > 0 {
-			v.parts = append(v.parts, d.parts...)
-		}
-	}
-	v.UnifyWith(&sibling.MetricValueBase)
-	v.parts = append(v.parts, sibling.parts...)
-	return v
-}
-
-func (v *delimiterMetricValue) String() string {
-	return fmt.Sprintf("value{ length=%d, L='%s', R='%s', |P|=%d  }", v.length,
-		string(v.openL), string(v.openR), len(v.parts))
-}
-
-func delimit(frag string, pattern *regexp.Regexp) (parts [][]int) {
-	parts = pattern.FindAllStringIndex(frag, -1)
-	if len(parts) == 0 {
-		parts = [][]int{} // no boundary in fragment
-	}
-	return
+	return applyMetric(&cord.root.cordNode, i, j, metric), nil
 }
 
 func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
