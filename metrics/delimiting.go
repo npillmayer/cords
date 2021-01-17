@@ -9,71 +9,104 @@ import (
 
 // --- Line count metric -----------------------------------------------------
 
-// lineCount is a cords.Metric that counts the lines of a text, delimited by newline
-// characters.
-type lineCount struct {
-	delimiterMetric
-}
-
-// LineCount is a cords.Metric that counts the lines of a text, delimited by newline
-// characters. Multiple consecutive newlines will be counted as multiple empty lines.
+// LineCount creates a CountingMetrc to be applied to a cord.
+// It counts the lines of a text, delimited by newline characters.
+// Multiple consecutive newlines will be counted as multiple empty lines.
 // Clients who have a need for interpreting consecutive newlines in a different way
-// may use a ParagraphCount metric first.
-func LineCount() cords.Metric {
+// may use a ParagraphCount metric first. If the text does not end with a newline,
+// the trailing text fragment is *not* counted as a (incomplete) line.
+func LineCount() CountingMetric {
 	m, _ := makeDelimiterMetric("\n", 1)
-	return m
+	lcnt := &lineCountMetric{m}
+	return lcnt
 }
 
-// Apply counts the lines in a text fragment.
+// lineCountMetric is a CountingMetric that counts the lines of a text, delimited
+// by newline characters.
+type lineCountMetric struct {
+	*delimiterMetric
+}
+
+// Count returns a line count, previously calculated by application of metric `lcnt`,
+// by decoding v.
+//
+// Count is part of interface CountingMetric
+func (lcnt *lineCountMetric) Count(v cords.MetricValue) int {
+	n, ok := v.(*delimiterMetricValue)
+	if !ok {
+		panic("metric value is not a counting metric value for lines")
+	}
+	return len(n.parts)
+}
+
 // Apply is part of interface cords.Metric.
-func (cnt *lineCount) Apply(frag string) cords.MetricValue {
-	v := &linesCounted{}
-	v.InitFrom(frag)
-	v.Measured(0, len(frag), frag) // matches are of length 1, therefore not unprocessed bytes
-	return v
+func (lcnt *lineCountMetric) Apply(frag []byte) cords.MetricValue {
+	return lcnt.delimiterMetric.Apply(frag)
 }
 
-// linesCounted is a cords.MetricValue
-type linesCounted struct {
-	delimiterMetricValue
-}
-
-// TODO do something smart with newline at end of text
-func (cnt *lineCount) Combine(leftSibling, rightSibling cords.MetricValue,
+// Combine is part of interface cords.Metric.
+func (lcnt *lineCountMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 	metric cords.Metric) cords.MetricValue {
 	//
-	l, r := leftSibling.(*linesCounted), rightSibling.(*linesCounted)
-	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
-		metric.Apply(string(unproc)) // we will not have unprocessed boundary bytes
-	}
-	l.UnifyWith(&r.MetricValueBase)
-	return l
+	return lcnt.delimiterMetric.Combine(leftSibling, rightSibling, metric)
 }
 
-func (lc linesCounted) Count() int {
-	return len(lc.parts) + 1
-}
+// ---------------------------------------------------------------------------
 
-// var _ standardValue = linesCounted{}
-
-// CountOf returns the count value of a given MetricValue, which must have been
-// calculated from one of the metrics from this package (`metrics`).
+// FindLines creates a ScanningMetrc to be applied to a cord.
+// It finds the lines of a text, delimited by newline characters.
+// Multiple consecutive newlines will be counted as multiple empty lines.
+// Clients who have a need for interpreting consecutive newlines in a different way
+// may use a ParagraphCount metric first.
 //
-// A return value of -1 flags that an unknown metrics value type has been given.
+// FindLines returns tuples [position, length] for each line of text, not counting
+// the line-terminating newline characters. If the last text fragment does not contain
+// a final newline, it will be reported as a (fractional) line. Clients who have a
+// need for the last non-terminated line will have to use cord.Report, starting at
+// position+length+1 of the final location from FindLines.
 //
-func CountOf(v cords.MetricValue) int {
-	if d, ok := v.(*delimiterMetricValue); ok {
-		// TODO this is not what we want
-		// we need a layer in between
-		return len(d.parts)
-	}
-	T().Errorf("metrics.CountOf called with unknown metric value type")
-	return -1
+func FindLines() ScanningMetric {
+	m, _ := makeDelimiterMetric("\n", 1)
+	fl := &findLinesMetric{m}
+	return fl
 }
 
-// type standardValue interface {
-// 	Count() int
-// }
+type findLinesMetric struct {
+	*delimiterMetric
+}
+
+// Indexes returns a positions of lines of text, previously calculated by application
+// by decoding a delimiterMetricValue given as a a cords.MetricValue
+//
+// Locations is part of interface ScanningMetric
+func (fl *findLinesMetric) Locations(v cords.MetricValue) [][]int {
+	n, ok := v.(*delimiterMetricValue)
+	if !ok {
+		panic("metric value is not a delimiter metric value for locations of lines")
+	}
+	locs := make([][]int, len(n.parts))
+	pos := 0
+	for i, nl := range n.parts {
+		T().Debugf("pos=%d, nl=%v", pos, nl)
+		locs[i] = make([]int, 2)
+		locs[i][0] = pos
+		locs[i][1] = nl[0] - pos
+		pos = nl[1]
+	}
+	return locs
+}
+
+// Apply is part of interface cords.Metric.
+func (fl *findLinesMetric) Apply(frag []byte) cords.MetricValue {
+	return fl.delimiterMetric.Apply(frag)
+}
+
+// Combine is part of interface cords.Metric.
+func (fl *findLinesMetric) Combine(leftSibling, rightSibling cords.MetricValue,
+	metric cords.Metric) cords.MetricValue {
+	//
+	return fl.delimiterMetric.Combine(leftSibling, rightSibling, metric)
+}
 
 // --- Delimiter Metric ------------------------------------------------------
 
@@ -105,7 +138,7 @@ func makeDelimiterMetric(pattern string, maxlen int) (*delimiterMetric, error) {
 	return &delimiterMetric{pattern: r, maxMatchLen: maxlen}, nil
 }
 
-func (dm *delimiterMetric) Apply(frag string) cords.MetricValue {
+func (dm *delimiterMetric) Apply(frag []byte) cords.MetricValue {
 	v := delimiterMetricValue{}
 	v.InitFrom(frag)
 	v.parts = delimit(frag, dm.pattern)
@@ -137,12 +170,13 @@ func (dm *delimiterMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
 	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
-		if d := metric.Apply(string(unproc)).(*delimiterMetricValue); len(d.parts) > 0 {
+		if d := metric.Apply(unproc).(*delimiterMetricValue); len(d.parts) > 0 {
 			l.parts = append(l.parts, d.parts...)
 		}
 	}
+	offset := l.Len()
 	l.UnifyWith(&r.MetricValueBase)
-	l.parts = append(l.parts, r.parts...)
+	l.parts = combine(l.parts, r.parts, offset)
 	return l
 }
 
@@ -152,10 +186,20 @@ func (v *delimiterMetricValue) String() string {
 		string(openL), string(openR), len(v.parts))
 }
 
-func delimit(frag string, pattern *regexp.Regexp) (parts [][]int) {
-	parts = pattern.FindAllStringIndex(frag, -1)
+func delimit(frag []byte, pattern *regexp.Regexp) (parts [][]int) {
+	parts = pattern.FindAllIndex(frag, -1)
 	if len(parts) == 0 {
 		parts = [][]int{} // no boundary in fragment
 	}
 	return
+}
+
+func combine(l, r [][]int, offset int) [][]int {
+	T().Debugf("range %v ++ %v , offset=%d", l, r, offset)
+	for _, p := range r {
+		p[0], p[1] = offset+p[0], offset+p[1]
+		l = append(l, p)
+	}
+	T().Debugf("combined index ranges = %v", l)
+	return l
 }

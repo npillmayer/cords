@@ -193,7 +193,7 @@ func (cord Cord) index(i uint64) (*leafNode, uint64, error) {
 type Leaf interface {
 	Weight() uint64                  // length of the leaf fragment in bytes
 	String() string                  // produce the leaf fragment as a string
-	Substring(uint64, uint64) string // substring [i:j]
+	Substring(uint64, uint64) []byte // substring [i:j]
 	Split(uint64) (Leaf, Leaf)       // split into 2 leafs at position i
 }
 
@@ -419,8 +419,8 @@ func (lstr StringLeaf) Split(i uint64) (Leaf, Leaf) {
 }
 
 // Substring returns a string segment of the leaf's text fragment.
-func (lstr StringLeaf) Substring(i, j uint64) string {
-	return string(lstr)[i:j]
+func (lstr StringLeaf) Substring(i, j uint64) []byte {
+	return []byte(lstr)[i:j]
 }
 
 var _ Leaf = StringLeaf("")

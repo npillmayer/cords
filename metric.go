@@ -56,8 +56,26 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // a text.
 //
 type Metric interface {
-	Apply(frag string) MetricValue
+	Apply(frag []byte) MetricValue
 	Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue
+}
+
+// MaterializedMetric is a type for metrics (please refer to interface Metric)
+// that build a concrete cord tree for a text-cord.
+//
+// A materialized metric does metric calculations exactly as a simple metric.
+// However, it additionally supports building up a tree from atomic leafs
+// containing metric values.
+//
+// There are (at least) two ways to go about building a metric tree: one to
+// preserve a homomorph of the text fragments, essentially materializing a
+// catamorphism, or we can re-align the leaf boundaries with the
+// continuity-boundaries of the metric. We'll go with the latter and build up
+// a tree which will the be somewhat decoupled from the text cord.
+//
+type MaterializedMetric interface {
+	Metric
+	Leafs(MetricValue) []Leaf
 }
 
 // MetricValue is a type returned by applying a metric to text fragments (see
@@ -89,8 +107,9 @@ type Metric interface {
 //
 //    (c)  |-----============================|              combined intermediate fragment
 //
-// For an in-depth discussion please refer to Raph Levien's “Rope Science” series
-// (https://xi-editor.io/docs/rope_science_01.html).
+// For an approachable discussion please refer to Raph Levien's “Rope Science” series
+// (https://xi-editor.io/docs/rope_science_01.html), or—less approachable—read up
+// on catamorphism.
 //
 // Calculating metric values is a topic where implementation characteristics of cords
 // get somewhat visible for clients of the API. This is unfortunate, but may be
@@ -99,7 +118,7 @@ type Metric interface {
 // helper type in their MetricValues.
 //
 type MetricValue interface {
-	Len() int                      // added length of text fragments
+	Len() int                      // summed up length of text fragments
 	Unprocessed() ([]byte, []byte) // unprocessed bytes at either end
 }
 
@@ -130,8 +149,9 @@ type MetricValue interface {
 //     }
 //     leftSibling.UnifyWith(&rightSibling.MetricValueBase)                        // step (c)
 //
-// Which spans of text fragments can be processed and how intermediate metric values
-// are calculated and stored is up to the client's `Metric` and `MetricValue`.
+// It is up to the client's `Metric` and `MetricValue` to decide which spans of
+// text fragments can be processed and how intermediate metric values are calculated
+// and stored.
 //
 type MetricValueBase struct {
 	length       int
@@ -154,7 +174,7 @@ func (mvb MetricValueBase) Unprocessed() ([]byte, []byte) {
 //
 // This will usually be called from Metric.Apply(…).
 //
-func (mvb *MetricValueBase) InitFrom(frag string) {
+func (mvb *MetricValueBase) InitFrom(frag []byte) {
 	mvb.length = len(frag)
 }
 
@@ -165,7 +185,9 @@ func (mvb *MetricValueBase) InitFrom(frag string) {
 //
 // This will usually be called from Metric.Apply(…).
 //
-func (mvb *MetricValueBase) Measured(from, to int, frag string) {
+// from and to are allowed to be identical, signalling a split.
+//
+func (mvb *MetricValueBase) Measured(from, to int, frag []byte) {
 	// TODO this should be updatable and incremental span should be
 	// added up, i.e. boundary bytes should change with multiple calls to Measured
 	if from < 0 || from > mvb.length {
@@ -193,14 +215,14 @@ func (mvb *MetricValueBase) Measured(from, to int, frag string) {
 //
 // This will usually be called from Metric.Apply(…).
 //
-func (mvb *MetricValueBase) MeasuredNothing(frag string) {
+func (mvb *MetricValueBase) MeasuredNothing(frag []byte) {
 	mvb.Measured(-1, -1, frag)
 }
 
 // HasBoundaries returns true if the metric value has unprocessed boundary bytes.
 // Clients normally will not have to consult this.
 func (mvb *MetricValueBase) HasBoundaries() bool {
-	return len(mvb.openL)+len(mvb.openR) < mvb.length
+	return len(mvb.openL)+len(mvb.openR) < mvb.length || len(mvb.openR) > 0
 }
 
 // ConcatUnprocessed is a helper function to provide access to
@@ -243,6 +265,30 @@ func (mvb *MetricValueBase) ConcatUnprocessed(rightSibling *MetricValueBase) ([]
 func (mvb *MetricValueBase) UnifyWith(rightSibling *MetricValueBase) {
 	mvb.length += rightSibling.length
 	mvb.openR = rightSibling.openR
+}
+
+func (mvb *MetricValueBase) Chunk() []byte {
+	b := mvb.HasBoundaries()
+	if b {
+		return []byte("")
+	}
+	return mvb.openL
+}
+
+func (mvb *MetricValueBase) Suffix() []byte {
+	b := mvb.HasBoundaries()
+	if !b {
+		return []byte("")
+	}
+	return mvb.openL
+}
+
+func (mvb *MetricValueBase) Prefix() []byte {
+	b := mvb.HasBoundaries()
+	if !b {
+		return []byte("")
+	}
+	return mvb.openR
 }
 
 // --- Apply a metric to a cord ----------------------------------------------
@@ -292,6 +338,70 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 	T().Debugf("node=%v", node)
 	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	return v
+}
+
+func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) (MetricValue, error) {
+	if cord.IsVoid() {
+		return nil, nil
+	}
+	if i > cord.Len() || j > cord.Len() || j < i {
+		return nil, ErrIndexOutOfBounds
+	}
+	v, _ := applyMaterializedMetric(&cord.root.cordNode, i, j, metric)
+	return v, nil
+}
+
+func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMetric) (MetricValue, Cord) {
+	T().Debugf("called applyMaterializedMetric([%d], %d, %d)", node.Weight(), i, j)
+	var c Cord
+	if node.IsLeaf() {
+		leaf := node.AsLeaf()
+		T().Debugf("M-METRIC(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
+		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
+		v := metric.Apply(s)
+		c = buildFragmentCord(metric.Leafs(v))
+		T().Debugf("leaf metric value = %v         -------------------", v)
+		dump(&c.root.cordNode)
+		return v, c
+	}
+	var v, vl, vr MetricValue
+	if i < node.Weight() && node.Left() != nil {
+		vl, c = applyMaterializedMetric(node.Left(), i, j, metric)
+		T().Debugf("left metric value = %v", vl)
+	}
+	if node.Right() != nil && j > node.Weight() {
+		w := node.Weight()
+		vr, c = applyMaterializedMetric(node.Right(), i-umin(w, i), j-w, metric)
+		T().Debugf("right metric value = %v", vr)
+	}
+	if !isnull(vl) && !isnull(vr) {
+		T().Debugf("COMBINE %v  +  %v", vl, vr)
+		v = metric.Combine(vl, vr, metric)
+		// TODO concat result cords
+	} else if !isnull(vl) {
+		v = vl
+	} else if !isnull(vr) {
+		v = vr
+	}
+	T().Debugf("combined metric value = %v", v)
+	T().Debugf("node=%v", node)
+	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
+	return v, Cord{}
+}
+
+func buildFragmentCord(leafs []Leaf) Cord {
+	if len(leafs) == 0 {
+		return Cord{}
+	}
+	var cord Cord
+	for _, leaf := range leafs {
+		//
+		lnode := makeLeafNode()
+		lnode.leaf = leaf
+		c := makeCord(&lnode.cordNode)
+		cord = cord.concat2(c)
+	}
+	return cord
 }
 
 func isnull(v MetricValue) bool {

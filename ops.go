@@ -212,7 +212,7 @@ func substr(node *cordNode, i, j uint64, buf *bytes.Buffer) *bytes.Buffer {
 		leaf := node.AsLeaf()
 		T().Debugf("substr(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
 		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
-		buf.WriteString(s)
+		buf.Write(s)
 		return buf
 	}
 	if i < node.Weight() && node.Left() != nil {
