@@ -116,7 +116,7 @@ type delimiterMetric struct {
 }
 
 type delimiterMetricValue struct {
-	cords.MetricValueBase
+	MetricValueBase
 	parts [][]int // int instead of int64 because of package regexp API
 }
 

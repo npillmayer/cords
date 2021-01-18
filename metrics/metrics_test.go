@@ -68,6 +68,32 @@ func TestDelimit(t *testing.T) {
 	}
 }
 
+func TestMetricBasic(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	b := cords.NewBuilder()
+	b.Append(cords.StringLeaf("name_is"))
+	b.Prepend(cords.StringLeaf("Hello_my_"))
+	b.Append(cords.StringLeaf("_Simon"))
+	cord := b.Cord()
+	if cord.IsVoid() {
+		t.Fatalf("Expected non-void result cord, is void")
+	}
+	t.Logf("builder made cord='%s'", cord)
+	metric := &testmetric{}
+	v, err := cords.ApplyMetric(cord, 0, cord.Len(), metric)
+	if err != nil {
+		t.Fatalf("application of test metric returned error: %v", err.Error())
+	}
+	t.Logf("metric value = %v", v)
+	if v.Len() != 22 {
+		t.Errorf("expected metric value of 22, have %d", v.Len())
+	}
+}
+
 func TestMetricLines(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
@@ -212,4 +238,30 @@ func dotty(text cords.Cord, t *testing.T) *os.File {
 		t.Error(err.Error())
 	}
 	return tmpfile
+}
+
+// --- Test helpers ----------------------------------------------------------
+
+type testmetric struct{}
+
+type testvalue struct {
+	MetricValueBase
+}
+
+func (m *testmetric) Combine(leftSibling, rightSibling cords.MetricValue,
+	metric cords.Metric) cords.MetricValue {
+	//
+	l, r := leftSibling.(*testvalue), rightSibling.(*testvalue)
+	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
+		metric.Apply(unproc) // we will not have unprocessed boundary bytes
+	}
+	l.UnifyWith(&r.MetricValueBase)
+	return l
+}
+
+func (m *testmetric) Apply(frag []byte) cords.MetricValue {
+	v := &testvalue{}
+	v.InitFrom(frag)
+	v.Measured(0, len(frag), frag) // test metric simply counts bytes
+	return v
 }

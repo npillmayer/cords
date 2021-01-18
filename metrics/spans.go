@@ -86,7 +86,7 @@ type spanningMetric struct {
 }
 
 type spanningMetricValue struct {
-	cords.MetricValueBase
+	MetricValueBase
 	spans   [][]int // (pos,len); int instead of int64 because of package regexp API
 	split   int     // signals that no span has been recognized, but a metric boundary
 	lasterr error   // collect errors and preserve the last one
@@ -161,14 +161,25 @@ func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 	return l
 }
 
-func (sm *spanningMetric) Leafs(value cords.MetricValue) []cords.Leaf {
+func (sm *spanningMetric) Leafs(value cords.MetricValue, getBounds bool) []cords.Leaf {
 	v := value.(*spanningMetricValue)
-	leafs := make([]cords.Leaf, len(v.mid))
-	for i, span := range v.mid {
-		leafs[i] = spanLeaf(span[1])
-		T().Debugf("       create leaf = %v from %d…%d", leafs[i], span[0], span[1])
+	var leafs []cords.Leaf
+	if getBounds {
+		leafs = make([]cords.Leaf, 2)
+		if len(v.Suffix()) != 0 {
+			leafs[0] = spanLeaf(len(v.Suffix()))
+		}
+		if len(v.Prefix()) != 0 {
+			leafs[1] = spanLeaf(len(v.Prefix()))
+		}
+	} else {
+		leafs = make([]cords.Leaf, len(v.mid))
+		for i, span := range v.mid {
+			leafs[i] = spanLeaf(span[1])
+			T().Debugf("       create leaf = %v from %d…%d", leafs[i], span[0], span[1])
+		}
+		T().Debugf("metric created leafs = %v", leafs)
 	}
-	T().Debugf("metric created leafs = %v", leafs)
 	return leafs
 }
 
