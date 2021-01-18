@@ -50,10 +50,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // by the calculation driver, therefore it is illegal to hold unguarded global state
 // in a metric.
 //
-// Combine requires the Metric to calculate a metric value “sum” from two
-// metric values. This way the metric will bubble up metric values to the root
+// Combine requires the Metric to calculate a metric value “sum” (monoid) from
+// two metric values. This way the metric will bubble up metric values to the root
 // of the cord tree and therewith result in a single overall metric value for
 // a text.
+// Combine must be a monoid over cords.MetricValue, with a neutral element n
+// of Apply = f("") → n, i.e. the metric value of the empty string.
+//
+// However, for materialized metrics it is a bit
+// different from plain metrics: they resemble a free monoid. This is reflected
+// by the result of materialized metrics, which is a list of spans (organized through
+// a cord-tree).
+// As a corollary, Combine has an additional task for materialized metrics
+// than it has for plain metrics. Combine has to focus on the bytes *between* the
+// already recognized spans of both the left and right sibling, and be able to
+// convert them to cord leafs.
 //
 type Metric interface {
 	Apply(frag []byte) MetricValue
@@ -105,7 +116,7 @@ type MaterializedMetric interface {
 //
 //    (b)  |-----========    ------     ==============|     reprocess 6 bytes in between
 //
-//    (c)  |-----============================|              combined intermediate fragment
+//    (c)  |-----============================|              combined intermediate fragment  or
 //
 // For an approachable discussion please refer to Raph Levien's “Rope Science” series
 // (https://xi-editor.io/docs/rope_science_01.html), or—less approachable—read up
@@ -340,15 +351,17 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 	return v
 }
 
-func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) (MetricValue, error) {
+func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) (MetricValue, Cord, error) {
 	if cord.IsVoid() {
-		return nil, nil
+		return nil, Cord{}, nil
 	}
 	if i > cord.Len() || j > cord.Len() || j < i {
-		return nil, ErrIndexOutOfBounds
+		return nil, Cord{}, ErrIndexOutOfBounds
 	}
-	v, _ := applyMaterializedMetric(&cord.root.cordNode, i, j, metric)
-	return v, nil
+	v, c := applyMaterializedMetric(&cord.root.cordNode, i, j, metric)
+	//sl, sr := v.Unprocessed() // there may be unprocessed bytes at either end
+	// TODO apply metric and build l.leaf and r.leaf
+	return v, c, nil
 }
 
 func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMetric) (MetricValue, Cord) {
@@ -359,8 +372,11 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
 		v := metric.Apply(s)
 		c := buildFragmentCord(metric.Leafs(v))
-		T().Debugf("leaf metric value = %v         -------------------", v)
-		dump(&c.root.cordNode)
+		T().Debugf("leaf metric value = %v ----", v)
+		if !c.IsVoid() {
+			dump(&c.root.cordNode)
+		}
+		T().Debugf("---------------------------")
 		return v, c
 	}
 	var v, vl, vr MetricValue
@@ -377,7 +393,8 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 	if !isnull(vl) && !isnull(vr) {
 		T().Debugf("COMBINE %v  +  %v", vl, vr)
 		v = metric.Combine(vl, vr, metric)
-		c = Concat(cl, cr)
+		mid := buildFragmentCord(metric.Leafs(v))
+		c = Concat(cl, mid, cr)
 	} else if !isnull(vl) {
 		v = vl
 		c = cl
@@ -387,7 +404,9 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 	}
 	T().Debugf("combined metric value = %v", v)
 	T().Debugf("node=%v", node)
-	dump(&c.root.cordNode)
+	if !c.IsVoid() {
+		dump(&c.root.cordNode)
+	}
 	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	return v, c
 }
@@ -404,6 +423,11 @@ func buildFragmentCord(leafs []Leaf) Cord {
 		c := makeCord(&lnode.cordNode)
 		cord = cord.concat2(c)
 	}
+	T().Debugf("buildFragmentCord:")
+	if !cord.IsVoid() {
+		dump(&cord.root.cordNode)
+	}
+	T().Debugf(".......")
 	return cord
 }
 

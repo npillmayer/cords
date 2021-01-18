@@ -87,10 +87,10 @@ type spanningMetric struct {
 
 type spanningMetricValue struct {
 	cords.MetricValueBase
-	spans   [][]int    // (pos,len); int instead of int64 because of package regexp API
-	split   int        // signals that no span has been recognized, but a metric boundary
-	lasterr error      // collect errors and preserve the last one
-	cord    cords.Cord //
+	spans   [][]int // (pos,len); int instead of int64 because of package regexp API
+	split   int     // signals that no span has been recognized, but a metric boundary
+	lasterr error   // collect errors and preserve the last one
+	mid     [][]int // mid section of spans to convert to leafs
 }
 
 func makeSpanningMetric(scnrFactory func([]byte) *bufio.Scanner) (*spanningMetric, error) {
@@ -107,16 +107,20 @@ func (sm *spanningMetric) Apply(frag []byte) cords.MetricValue {
 	T().Debugf("scan of '%s' returned %v", string(frag), v)
 	if v.split > 0 {
 		v.Measured(v.split, v.split, frag)
-	} else if !v.HasBoundaries() {
+		//} else if !v.HasBoundaries() {
+	} else if len(v.spans) == 0 {
 		v.MeasuredNothing(frag)
 	} else {
 		v.Measured(v.spans[0][0], lastpos(v.spans), frag)
+		v.mid = v.spans
 	}
 	return v
 }
 
-// Combine must be a monoid over cords.MetricValue, with a neutral element n
-// of Apply = f("") -> n
+// Combine for materialzed metrics focuses on the unprocessed bytes of
+// left.suffix and right.prefix, and have remember those for converting them
+// to cord leafs.
+//
 func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 	metric cords.Metric) cords.MetricValue {
 	//
@@ -130,9 +134,26 @@ func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 		T().Errorf("metric calculation: type of value is %T", rightSibling)
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
+	l.mid = [][]int{}
 	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
-		if d := metric.Apply(unproc).(*spanningMetricValue); len(d.spans) > 0 {
-			l.spans = append(l.spans, d.spans...)
+		d := metric.Apply(unproc).(*spanningMetricValue)
+		if len(d.Suffix()) > 0 && l.HasBoundaries() {
+			// make span from suffix of d
+			// append span to l
+			span := []int{0, len(d.Suffix())}
+			l.spans = append(l.spans, span)
+			l.mid = append(l.mid, span)
+			T().Debugf("prepended suffix span %v", span)
+		}
+		l.spans = append(l.spans, d.spans...)
+		l.mid = append(l.mid, d.spans...)
+		if len(d.Prefix()) > 0 && r.HasBoundaries() {
+			// make span from prefix of d
+			// append span to l
+			span := []int{len(unproc) - len(d.Prefix()), len(d.Prefix())}
+			l.spans = append(l.spans, span)
+			l.mid = append(l.mid, span)
+			T().Debugf("appended prefix span %v", span)
 		}
 	}
 	l.UnifyWith(&r.MetricValueBase)
@@ -142,8 +163,8 @@ func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 
 func (sm *spanningMetric) Leafs(value cords.MetricValue) []cords.Leaf {
 	v := value.(*spanningMetricValue)
-	leafs := make([]cords.Leaf, len(v.spans))
-	for i, span := range v.spans {
+	leafs := make([]cords.Leaf, len(v.mid))
+	for i, span := range v.mid {
 		leafs[i] = spanLeaf(span[1])
 		T().Debugf("       create leaf = %v from %d…%d", leafs[i], span[0], span[1])
 	}

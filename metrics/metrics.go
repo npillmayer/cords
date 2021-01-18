@@ -43,10 +43,10 @@ func Find(text cords.Cord, i, j uint64, metric ScanningMetric) ([][]int, error) 
 // ---------------------------------------------------------------------------
 
 // Align applies a materialized metric to a text.
-func Align(text cords.Cord, i, j uint64, metric cords.MaterializedMetric) (cords.Cord, error) {
-	_, err := cords.ApplyMaterializedMetric(text, i, j, metric)
+func Align(text cords.Cord, i, j uint64, metric cords.MaterializedMetric) (cords.MetricValue, cords.Cord, error) {
+	v, c, err := cords.ApplyMaterializedMetric(text, i, j, metric)
 	if err != nil {
-		return cords.Cord{}, fmt.Errorf("metrics.Find could not be applied: %w", err)
+		return nil, cords.Cord{}, fmt.Errorf("metrics.Find could not be applied: %w", err)
 	}
-	return cords.Cord{}, nil
+	return v, c, nil
 }

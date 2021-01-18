@@ -2,6 +2,11 @@ package metrics
 
 import (
 	"bufio"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -141,13 +146,16 @@ func TestMetricSpanWord(t *testing.T) {
 	text := cords.FromString("Hello my name is Simon")
 	//
 	metric := Words()
-	cord, err := Align(text, 0, text.Len(), metric)
+	value, cord, err := Align(text, 0, text.Len(), metric)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+	t.Logf("value of materialized metric = %v", value)
 	if cord.IsVoid() {
 		t.Fatalf("resulting aligned cord is void, shouldn't")
 	}
+	tmpfile := dotty(cord, t)
+	defer tmpfile.Close()
 }
 
 func TestMetricWordSpans(t *testing.T) {
@@ -162,7 +170,8 @@ func TestMetricWordSpans(t *testing.T) {
 	b := cords.NewBuilder()
 	b.Append(cords.StringLeaf("Hello "))
 	b.Append(cords.StringLeaf("my "))
-	b.Append(cords.StringLeaf("name i"))
+	b.Append(cords.StringLeaf("na"))
+	b.Append(cords.StringLeaf("me i"))
 	b.Append(cords.StringLeaf("s"))
 	b.Append(cords.StringLeaf(" Simon"))
 	text := b.Cord()
@@ -170,14 +179,37 @@ func TestMetricWordSpans(t *testing.T) {
 		t.Fatalf("Expected non-void result cord, is void")
 	}
 	t.Logf("builder made cord='%s'", text)
+	tmpfile := dotty(text, t)
+	defer tmpfile.Close()
 	//
 	t.Fail()
 	metric := Words()
-	cord, err := Align(text, 0, text.Len(), metric)
+	value, cord, err := Align(text, 0, text.Len(), metric)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+	t.Logf("value of materialized metric = %v", value)
 	if cord.IsVoid() {
 		t.Fatalf("resulting aligned cord is void, shouldn't")
 	}
+}
+
+// --- Helpers ---------------------------------------------------------------
+
+func dotty(text cords.Cord, t *testing.T) *os.File {
+	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//defer os.Remove(tmpfile.Name()) // clean up
+	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
+	cords.Cord2Dot(text, tmpfile)
+	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("writing SVG tree image to tree.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
+	}
+	return tmpfile
 }
