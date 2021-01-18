@@ -75,9 +75,9 @@ func TestMetricBasic(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := cords.NewBuilder()
-	b.Append(cords.StringLeaf("name_is"))
-	b.Prepend(cords.StringLeaf("Hello_my_"))
-	b.Append(cords.StringLeaf("_Simon"))
+	b.Append(stringLeaf("name_is"))
+	b.Prepend(stringLeaf("Hello_my_"))
+	b.Append(stringLeaf("_Simon"))
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
@@ -104,11 +104,11 @@ func TestMetricLines(t *testing.T) {
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := cords.NewBuilder()
-	b.Append(cords.StringLeaf("Hello\n"))
-	b.Append(cords.StringLeaf("my\n"))
-	b.Append(cords.StringLeaf("name\n"))
-	b.Append(cords.StringLeaf("is\n"))
-	b.Append(cords.StringLeaf("Simon"))
+	b.Append(stringLeaf("Hello\n"))
+	b.Append(stringLeaf("my\n"))
+	b.Append(stringLeaf("name\n"))
+	b.Append(stringLeaf("is\n"))
+	b.Append(stringLeaf("Simon"))
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
@@ -194,12 +194,12 @@ func TestMetricWordSpans(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := cords.NewBuilder()
-	b.Append(cords.StringLeaf("Hello "))
-	b.Append(cords.StringLeaf("my "))
-	b.Append(cords.StringLeaf("na"))
-	b.Append(cords.StringLeaf("me i"))
-	b.Append(cords.StringLeaf("s"))
-	b.Append(cords.StringLeaf(" Simon"))
+	b.Append(stringLeaf("Hello "))
+	b.Append(stringLeaf("my "))
+	b.Append(stringLeaf("na"))
+	b.Append(stringLeaf("me i"))
+	b.Append(stringLeaf("s"))
+	b.Append(stringLeaf(" Simon"))
 	text := b.Cord()
 	if text.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
@@ -265,3 +265,30 @@ func (m *testmetric) Apply(frag []byte) cords.MetricValue {
 	v.Measured(0, len(frag), frag) // test metric simply counts bytes
 	return v
 }
+
+// --- Test String Leaf ------------------------------------------------------
+
+type stringLeaf string
+
+// Weight of a leaf is its string length in bytes.
+func (lstr stringLeaf) Weight() uint64 {
+	return uint64(len(lstr))
+}
+
+func (lstr stringLeaf) String() string {
+	return string(lstr)
+}
+
+// Split splits a leaf at position i, resulting in 2 new leafs.
+func (lstr stringLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
+	left := lstr[:i]
+	right := lstr[i:]
+	return left, right
+}
+
+// Substring returns a string segment of the leaf's text fragment.
+func (lstr stringLeaf) Substring(i, j uint64) []byte {
+	return []byte(lstr)[i:j]
+}
+
+var _ cords.Leaf = stringLeaf("")

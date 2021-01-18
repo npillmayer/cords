@@ -144,7 +144,7 @@ func Cut(cord Cord, i, l uint64) (Cord, Cord, error) {
 	return Concat(c1, c3), c2, nil
 }
 
-// Report outputs a substring: Report(i,l) ⇒ output the string bi,…,bi+l−1.
+// Report outputs a substring: Report(i,l) ⇒ outputs the string bi,…,bi+l−1.
 func (cord Cord) Report(i, l uint64) (string, error) {
 	if l == 0 {
 		return "", nil

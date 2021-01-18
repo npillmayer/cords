@@ -335,9 +335,9 @@ func TestCordBuilder(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("name_is"))
-	b.Prepend(StringLeaf("Hello_my_"))
-	b.Append(StringLeaf("_Simon"))
+	b.Append(stringLeaf("name_is"))
+	b.Prepend(stringLeaf("Hello_my_"))
+	b.Append(stringLeaf("_Simon"))
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
@@ -359,9 +359,9 @@ func TestCordReader(t *testing.T) {
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("name_is"))
-	b.Prepend(StringLeaf("Hello_my_"))
-	b.Append(StringLeaf("_Simon"))
+	b.Append(stringLeaf("name_is"))
+	b.Prepend(stringLeaf("Hello_my_"))
+	b.Append(stringLeaf("_Simon"))
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
