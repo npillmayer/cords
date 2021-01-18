@@ -47,12 +47,15 @@ func (b *CordBuilder) Append(leaf Leaf) error {
 	lnode := makeLeafNode()
 	lnode.leaf = leaf
 	if b.cord.root.right != nil {
-		panic("inconsistency in cord-builder")
+		panic("inconsistency in cord-builder, right child of root is not empty")
 	}
 	b.cord.root.attachRight(&lnode.cordNode)
 	newroot := makeInnerNode()
 	newroot.attachLeft(&b.cord.root.cordNode)
 	b.cord.root = newroot
+	if b.cord.root.Left() != nil && !b.cord.root.Left().IsLeaf() {
+		b.cord.root.left = &balance(b.cord.root.Left().AsInner()).cordNode
+	}
 	return nil
 }
 
