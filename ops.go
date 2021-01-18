@@ -397,21 +397,35 @@ func balance(inner *innerNode) *innerNode {
 	if inner.left == nil && inner.right == nil {
 		return inner
 	}
-	if inner.left != nil && !inner.left.IsLeaf() && unbalanced(inner.left) {
-		//T().Debugf("balancing left child")
+	if unbalanced(inner.left) {
 		x := balance(inner.left.AsInner())
 		inner.attachLeft(&x.cordNode)
+		if unbalanced(inner.left) {
+			panic("inner.left is unbalanced after balancing")
+		}
 	}
-	if inner.right != nil && !inner.right.IsLeaf() && unbalanced(inner.right) {
-		//T().Debugf("balancing right child")
+	if unbalanced(inner.right) {
 		x := balance(inner.right.AsInner())
 		inner.attachRight(&x.cordNode)
+		if unbalanced(inner.right) {
+			panic("inner.right is unbalanced after balancing")
+		}
 	}
-	for inner.rightHeight() > inner.leftHeight()+balanceThres {
-		inner = rotateLeft(inner)
-	}
-	for inner.leftHeight() > inner.rightHeight()+balanceThres {
-		inner = rotateRight(inner)
+	cnt := 0
+	for cnt < 10 && unbalanced(&inner.cordNode) {
+		if inner.rightHeight() > inner.leftHeight()+balanceThres {
+			inner = rotateLeft(inner)
+		}
+		if inner.leftHeight() > inner.rightHeight()+balanceThres {
+			inner = rotateRight(inner)
+		}
+		if unbalanced(inner.Left()) {
+			inner.left = &balance(inner.left.AsInner()).cordNode
+		}
+		if unbalanced(inner.Right()) {
+			inner.right = &balance(inner.right.AsInner()).cordNode
+		}
+		cnt++
 	}
 	return inner
 }
@@ -427,7 +441,7 @@ func balanceRoot(c Cord) Cord {
 // rotatedLeft performs a left rotation on an inner tree node.
 // Wikipedia has a good article on tree rotation.
 func rotateLeft(inner *innerNode) *innerNode {
-	T().Debugf("rotate left")
+	//T().Debugf("rotate left")
 	pivot := clone(inner.right.AsInner()) // clone pivot
 	inner = clone(inner)                  // and inner: copy on write
 	inner.attachRight(pivot.Left())       // inner.right = pivot.Left()
@@ -438,7 +452,7 @@ func rotateLeft(inner *innerNode) *innerNode {
 // rotatedLeft performs a right rotation on an inner tree node.
 // Wikipedia has a good article on tree rotation.
 func rotateRight(inner *innerNode) *innerNode {
-	T().Debugf("rotate right")
+	//T().Debugf("rotate right")
 	pivot := clone(inner.left.AsInner()) // clone pivot
 	inner = clone(inner)                 // and inner: copy on write
 	inner.attachLeft(pivot.Right())      // inner.left = pivot.Right()
