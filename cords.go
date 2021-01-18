@@ -410,40 +410,44 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 
 // --- Default Leaf implementation -------------------------------------------
 
-// stringLeaf is the default implementation of type Leaf.
-// Calls to cords.FromStrig(…) will produce a cord with leafs of type
-// stringLeaf.
-type stringLeaf string
+// StringLeaf is the default implementation of type Leaf.
+// Calls to cords.FromString(…) will produce a cord with leafs of type
+// StringLeaf.
+//
+// StringLeaf is made public, because it may be of use for other constructors
+// of cords.
+//
+type StringLeaf string
 
-// makestringLeafNode creates a leaf node and a leaf from a given string.
+// makeStringLeafNode creates a leaf node and a leaf from a given string.
 func makeStringLeafNode(s string) *leafNode {
 	leaf := makeLeafNode()
-	leaf.leaf = stringLeaf(s)
+	leaf.leaf = StringLeaf(s)
 	return leaf
 }
 
 // Weight of a leaf is its string length in bytes.
-func (lstr stringLeaf) Weight() uint64 {
+func (lstr StringLeaf) Weight() uint64 {
 	return uint64(len(lstr))
 }
 
-func (lstr stringLeaf) String() string {
+func (lstr StringLeaf) String() string {
 	return string(lstr)
 }
 
 // Split splits a leaf at position i, resulting in 2 new leafs.
-func (lstr stringLeaf) Split(i uint64) (Leaf, Leaf) {
+func (lstr StringLeaf) Split(i uint64) (Leaf, Leaf) {
 	left := lstr[:i]
 	right := lstr[i:]
 	return left, right
 }
 
 // Substring returns a string segment of the leaf's text fragment.
-func (lstr stringLeaf) Substring(i, j uint64) []byte {
+func (lstr StringLeaf) Substring(i, j uint64) []byte {
 	return []byte(lstr)[i:j]
 }
 
-var _ Leaf = stringLeaf("")
+var _ Leaf = StringLeaf("")
 
 // --- Debugging helper ------------------------------------------------------
 
