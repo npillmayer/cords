@@ -136,7 +136,10 @@ type MetricValue interface {
 // --- Apply a metric to a cord ----------------------------------------------
 
 // ApplyMetric applies a metric calculation on a (section of a) text.
+//
 // i and j are text positions with Go slice semantics.
+// If [i, j) does not specify a valid slice of the text, ErrIndexOutOfBounds will be
+// returned.
 //
 func ApplyMetric(cord Cord, i, j uint64, metric Metric) (MetricValue, error) {
 	if cord.IsVoid() {
@@ -182,9 +185,14 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 	return v
 }
 
-// ApplyMaterializedMetric applies a materialized metric to a cord.
+// ApplyMaterializedMetric applies a materialized metric to a (section of a) text.
 // Returns a metric value and a cord, which manages the spans of the metric
 // on the text.
+//
+// i and j are text positions with Go slice semantics.
+// If [i, j) does not specify a valid slice of the text, ErrIndexOutOfBounds will be
+// returned.
+//
 func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) (MetricValue, Cord, error) {
 	if cord.IsVoid() {
 		return nil, Cord{}, nil
@@ -210,11 +218,9 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
 		v := metric.Apply(s)
 		c := buildFragmentCord(metric.Leafs(v, false))
-		T().Debugf("leaf metric value = %v ----", v)
 		if !c.IsVoid() {
 			dump(&c.root.cordNode)
 		}
-		T().Debugf("---------------------------")
 		return v, c
 	}
 	var v, vl, vr MetricValue

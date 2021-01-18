@@ -56,16 +56,34 @@ import (
 //   * No inner node without at least one child exists.
 
 // Cord is a type for an enhanced string.
-// It references fragments of text, which are considered immutable.
-// Fragments will be shared between cords. Cords change in a concurrency-safe way,
-// as every modifying operation on a cord will create a copy of changed parts of the cord,
-// thus cords are persistent data structures.
+//
+// A cord internally consists of fragments of text, which are considered immutable.
+// Fragments may be shared between cords, or versions of cords. Cords change in
+// a concurrency-safe way, as every modifying operation on a cord will create a
+// copy of changed parts of the cord. Thus cords are persistent data structures.
 //
 // A cord created by
 //
 //     Cord{}
 //
 // is a valid object and behaves like the empty string.
+//
+// Due to their internal structure cords do have performance characteristics
+// differing from Go strings or byte arrays.
+//
+//    Operation     |   Rope          |  String
+//    --------------+-----------------+--------
+//    Index         |   O(log n)      |   O(1)
+//    Split         |   O(log n)      |   O(1)
+//    Iterate       |   O(n)          |   O(n)
+//
+//    Concatenate   |   O(log n)      |   O(n)
+//    Insert        |   O(log n)      |   O(n)
+//    Delete        |   O(log n)      |   O(n)
+//
+// For use cases with many editing operations on large texts, cords have stable performance
+// and space characteristics. It's more appropriate to think of cords as a type for 'text' than
+// as strings (https://mortoray.com/2014/03/17/strings-and-text-are-not-the-same/).
 //
 type Cord struct {
 	root *innerNode
@@ -392,38 +410,40 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 
 // --- Default Leaf implementation -------------------------------------------
 
-//StringLeaf is the default implementation of type Leaf.
-type StringLeaf string
+// stringLeaf is the default implementation of type Leaf.
+// Calls to cords.FromStrig(…) will produce a cord with leafs of type
+// stringLeaf.
+type stringLeaf string
 
-// makeStringLeafNode creates a leaf node and a leaf from a given string.
+// makestringLeafNode creates a leaf node and a leaf from a given string.
 func makeStringLeafNode(s string) *leafNode {
 	leaf := makeLeafNode()
-	leaf.leaf = StringLeaf(s)
+	leaf.leaf = stringLeaf(s)
 	return leaf
 }
 
 // Weight of a leaf is its string length in bytes.
-func (lstr StringLeaf) Weight() uint64 {
+func (lstr stringLeaf) Weight() uint64 {
 	return uint64(len(lstr))
 }
 
-func (lstr StringLeaf) String() string {
+func (lstr stringLeaf) String() string {
 	return string(lstr)
 }
 
 // Split splits a leaf at position i, resulting in 2 new leafs.
-func (lstr StringLeaf) Split(i uint64) (Leaf, Leaf) {
+func (lstr stringLeaf) Split(i uint64) (Leaf, Leaf) {
 	left := lstr[:i]
 	right := lstr[i:]
 	return left, right
 }
 
 // Substring returns a string segment of the leaf's text fragment.
-func (lstr StringLeaf) Substring(i, j uint64) []byte {
+func (lstr stringLeaf) Substring(i, j uint64) []byte {
 	return []byte(lstr)[i:j]
 }
 
-var _ Leaf = StringLeaf("")
+var _ Leaf = stringLeaf("")
 
 // --- Debugging helper ------------------------------------------------------
 

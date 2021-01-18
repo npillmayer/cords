@@ -61,6 +61,13 @@ slices will carry only so far, and cords add a layer of convenience and
 stable performance characteristics on top of them. You can think of cords
 as fancy slices of text, with some additional functionality.
 
+Cords may be constructed from various sources, with the simplest case being
+a call to
+
+    cords.FromString("Hello World")
+
+Other possibilities are cords from text files or from HTML documents.
+
 _________________________________________________________________________
 
 BSD 3-Clause License
