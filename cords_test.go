@@ -324,6 +324,8 @@ func TestCordSubstr(t *testing.T) {
 	if x.root.Height() != 4 {
 		t.Errorf("Expected height of root node to be 4, is %d", x.root.Height())
 	}
+	// tmpfile := dotty(c, t)
+	// defer tmpfile.Close()
 }
 
 func TestCordBuilder(t *testing.T) {

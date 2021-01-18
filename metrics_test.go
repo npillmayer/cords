@@ -1,6 +1,11 @@
 package cords
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/npillmayer/schuko/gtrace"
@@ -35,6 +40,26 @@ func TestMetricBasic(t *testing.T) {
 	}
 }
 
+func TestDotty(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	b := NewBuilder()
+	b.Append(StringLeaf("name_is"))
+	b.Prepend(StringLeaf("Hello_my_"))
+	b.Append(StringLeaf("_Simon"))
+	text := b.Cord()
+	if text.IsVoid() {
+		t.Fatalf("Expected non-void result cord, is void")
+	}
+	dump(&text.root.cordNode)
+	t.Logf("builder made cord='%s'", text)
+	tmpfile := dotty(text, t)
+	defer tmpfile.Close()
+}
+
 // --- Test helpers ----------------------------------------------------------
 
 type testmetric struct{}
@@ -46,15 +71,35 @@ type testvalue struct {
 func (m *testmetric) Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue {
 	l, r := leftSibling.(*testvalue), rightSibling.(*testvalue)
 	if unproc, ok := l.ConcatUnprocessed(&r.MetricValueBase); ok {
-		metric.Apply(string(unproc)) // we will not have unprocessed boundary bytes
+		metric.Apply(unproc) // we will not have unprocessed boundary bytes
 	}
 	l.UnifyWith(&r.MetricValueBase)
 	return l
 }
 
-func (m *testmetric) Apply(frag string) MetricValue {
+func (m *testmetric) Apply(frag []byte) MetricValue {
 	v := &testvalue{}
 	v.InitFrom(frag)
 	v.Measured(0, len(frag), frag) // test metric simply counts bytes
 	return v
+}
+
+// --- dot -------------------------------------------------------------------
+
+func dotty(text Cord, t *testing.T) *os.File {
+	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//defer os.Remove(tmpfile.Name()) // clean up
+	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
+	Cord2Dot(text, tmpfile)
+	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("writing SVG tree image to tree.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
+	}
+	return tmpfile
 }
