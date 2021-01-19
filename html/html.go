@@ -12,7 +12,7 @@ import (
 //
 //      document.getElementById("myNode").innerText
 //
-// in JavaScript (except that FromHTML cannot respect CSS styling suppressing
+// in JavaScript (except that html.InnerText cannot respect CSS styling suppressing
 // the visibility of the node's descendents).
 //
 // The fragment organization of the resulting cord will reflect the hierarchy of
