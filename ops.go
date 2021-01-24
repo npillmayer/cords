@@ -63,6 +63,9 @@ func Concat(cord Cord, others ...Cord) Cord {
 		}
 		cord = cord.concat2(c)
 	}
+	// if !cord.IsVoid() && unbalanced(cord.root.Left()) {
+	// 	panic("concat returns unbalanced cord")
+	// }
 	return cord
 }
 
@@ -86,6 +89,11 @@ func Insert(cord Cord, c Cord, i uint64) (Cord, error) {
 	if err != nil {
 		return cord, err
 	}
+	// ccc := Concat(cl, c, cr)
+	// if ccc.root.Left() != nil && !ccc.root.Left().IsLeaf() {
+	// 	ccc = makeCord(&balance(ccc.root.Left().AsInner()).cordNode)
+	// }
+	//return Concat(ccc), nil
 	return Concat(cl, c, cr), nil
 }
 
@@ -110,7 +118,6 @@ func Split(cord Cord, i uint64) (Cord, Cord, error) {
 	if err != nil || root2 == nil {
 		return cord, Cord{}, err
 	}
-	//tighten(root)
 	c1, c2 := makeCord(tighten(root)), makeCord(root2)
 	return balanceRoot(c1), balanceRoot(c2), nil
 }
@@ -197,12 +204,18 @@ func (cord Cord) concat2(c Cord) Cord {
 	}
 	if !cord.IsVoid() && unbalanced(cord.root.Left()) {
 		b := balance(cord.root.Left().AsInner())
+		// if unbalanced(&b.cordNode) {
+		// 	panic("new root is unbalanced after balancing")
+		// }
 		cord.root.attachLeft(&b.cordNode)
 	}
 	if cord.Len() != cord.root.Len() {
 		T().Debugf("cord.len=%d, cord.root.len=%d", cord.Len(), cord.root.Len())
 		panic("structural inconsistency after re-balance")
 	}
+	// if !cord.IsVoid() && unbalanced(cord.root.Left()) {
+	// 	panic("concat2 returns unbalanced cord")
+	// }
 	return cord
 }
 
@@ -292,7 +305,7 @@ func tighten(node *cordNode) *cordNode {
 		return node
 	}
 	if node.Right() != nil { // keep weight unchanged
-		tighten(node.Right())
+		node.AsInner().right = tighten(node.Right())
 		node.AsInner().adjustHeight()
 		return node
 	}
@@ -302,10 +315,13 @@ func tighten(node *cordNode) *cordNode {
 	}
 	left := node.Left()
 	if left.IsLeaf() {
+		if node.Right() == nil {
+			return left
+		}
 		node.AsInner().weight = left.Weight()
 		return node
 	}
-	tighten(left)
+	node.AsInner().left = tighten(left)
 	if left.Right() == nil { // collapse child with node
 		node.AsInner().attachLeft(left.Left())
 	}
@@ -317,20 +333,25 @@ func tighten(node *cordNode) *cordNode {
 // ---------------------------------------------------------------------------
 
 // traverse walks a cord in in-order.
-func traverse(node *cordNode, d int, f func(node *cordNode, depth int) error) error {
+func traverse(node *cordNode, pos uint64, depth int,
+	f func(node *cordNode, pos uint64, depth int) error) error {
+	//
 	if node.IsLeaf() {
-		return f(node, d)
+		return f(node, pos-node.Weight(), depth)
 	}
-	if l := node.AsInner().left; l != nil {
-		if err := traverse(l, d+1, f); err != nil {
+	inner := node.AsInner()
+	if l := inner.left; l != nil {
+		leftpos := pos - inner.weight + l.Weight()
+		if err := traverse(l, leftpos, depth+1, f); err != nil {
 			return err
 		}
 	}
-	if err := f(node, d); err != nil {
+	if err := f(node, pos, depth); err != nil {
 		return err
 	}
-	if r := node.AsInner().right; r != nil {
-		if err := traverse(r, d+1, f); err != nil {
+	if r := inner.right; r != nil {
+		rightpos := pos + r.Weight()
+		if err := traverse(r, rightpos, depth+1, f); err != nil {
 			return err
 		}
 	}
@@ -397,19 +418,21 @@ func balance(inner *innerNode) *innerNode {
 	if inner.left == nil && inner.right == nil {
 		return inner
 	}
+	//dump(&inner.cordNode)
+	//T().Debugf("-----------")
 	if unbalanced(inner.left) {
 		x := balance(inner.left.AsInner())
 		inner.attachLeft(&x.cordNode)
-		if unbalanced(inner.left) {
-			panic("inner.left is unbalanced after balancing")
-		}
+		// if unbalanced(inner.left) {
+		// 	panic("inner.left is unbalanced after balancing")
+		// }
 	}
 	if unbalanced(inner.right) {
 		x := balance(inner.right.AsInner())
 		inner.attachRight(&x.cordNode)
-		if unbalanced(inner.right) {
-			panic("inner.right is unbalanced after balancing")
-		}
+		// if unbalanced(inner.right) {
+		// 	panic("inner.right is unbalanced after balancing")
+		// }
 	}
 	cnt := 0
 	for cnt < 10 && unbalanced(&inner.cordNode) {
@@ -427,6 +450,10 @@ func balance(inner *innerNode) *innerNode {
 		}
 		cnt++
 	}
+	// if unbalanced(&inner.cordNode) {
+	// 	dump(&inner.cordNode)
+	// 	panic("inner is unbalanced")
+	// }
 	return inner
 }
 
