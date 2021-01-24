@@ -29,8 +29,8 @@ func TestDotty(t *testing.T) {
 	}
 	dump(&text.root.cordNode)
 	t.Logf("builder made cord='%s'", text)
-	tmpfile := dotty(text, t)
-	defer tmpfile.Close()
+	// tmpfile := dotty(text, t)
+	// defer tmpfile.Close()
 }
 
 // --- dot -------------------------------------------------------------------
