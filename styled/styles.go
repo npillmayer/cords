@@ -208,8 +208,8 @@ func (sl styleLeaf) String() string {
 }
 
 // substring [i:j], not applicable
-func (sl styleLeaf) Substring(uint64, uint64) string {
-	return sl.String()
+func (sl styleLeaf) Substring(uint64, uint64) []byte {
+	return []byte(sl.String())
 }
 
 // split into 2 leafs at position i, resulting in two equal styles with different

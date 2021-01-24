@@ -110,10 +110,10 @@ func (leaf *fileLeaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
 	return cords.StringLeaf(left), cords.StringLeaf(right)
 }
 
-// Substring returns a string segment of the leaf's text fragment.
-func (leaf *fileLeaf) Substring(i uint64, j uint64) string {
+// Substring returns a segment of the leaf's text fragment.
+func (leaf *fileLeaf) Substring(i uint64, j uint64) []byte {
 	s := leaf.String() // may block until loaded
-	return s[i:j]
+	return []byte(s)[i:j]
 }
 
 // To avoid wasting memory per leaf node (there may be lots of them) we simulate

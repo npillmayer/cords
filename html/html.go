@@ -39,6 +39,8 @@ func collectText(n *html.Node, b *cords.CordBuilder) {
 	}
 }
 
+// TextFromHTML creates a cords.Cord from the textual content of an HTML fragment.
+// It does not interpretation of layout and styling, but extracts the pure text.
 func TextFromHTML(input io.Reader) (cords.Cord, error) {
 	nodes, err := html.ParseFragment(input, nil)
 	if err != nil {
@@ -50,34 +52,3 @@ func TextFromHTML(input io.Reader) (cords.Cord, error) {
 	}
 	return b.Cord(), nil
 }
-
-// ---------------------------------------------------------------------------
-
-/*
-// Leaf is the leaf type created for cords from calls to html.InnerText(…).
-// It is made public as it may be of use for other implementations of cords.
-type Leaf string
-
-// Weight of a leaf is its string length in bytes.
-func (l Leaf) Weight() uint64 {
-	return uint64(len(l))
-}
-
-func (l Leaf) String() string {
-	return string(l)
-}
-
-// Split splits a leaf at position i, resulting in 2 new leafs.
-func (l Leaf) Split(i uint64) (cords.Leaf, cords.Leaf) {
-	left := l[:i]
-	right := l[i:]
-	return left, right
-}
-
-// Substring returns a string segment of the leaf's text fragment.
-func (l Leaf) Substring(i, j uint64) []byte {
-	return []byte(l)[i:j]
-}
-
-var _ cords.Leaf = Leaf("")
-*/
