@@ -6,6 +6,7 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -219,6 +220,8 @@ func TestCordInsert(t *testing.T) {
 	if x.String() != "Hello, World!" {
 		t.Errorf("Double insert resulted in inexpected string: %s", x)
 	}
+	// f := dotty(FromString(","), t)
+	// defer f.Close()
 }
 
 func TestCordSplit2(t *testing.T) {
@@ -271,6 +274,8 @@ func TestCordCut(t *testing.T) {
 	if y.String() != "o Wo" {
 		t.Errorf("Expected cut-out segment to be 'o Wo', is '%s'", y)
 	}
+	// f := dotty(x, t)
+	// defer f.Close()
 }
 
 func TestCordReport(t *testing.T) {
@@ -347,6 +352,33 @@ func TestCordBuilder(t *testing.T) {
 	if cord.String() != "Hello_my_name_is_Simon" {
 		t.Errorf("cord string is different from expected string")
 	}
+}
+
+func TestCordCutAndInsert(t *testing.T) {
+	gtrace.CoreTracer = gologadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	b := NewBuilder()
+	b.Append(StringLeaf("Hello_"))
+	b.Append(StringLeaf("my_"))
+	b.Append(StringLeaf("name_"))
+	b.Append(StringLeaf("is"))
+	b.Append(StringLeaf("_Simon"))
+	c := b.Cord()
+	x, _, err := Cut(c, 10, 5)
+	//c, _, err := Split(c, 10)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	l := FromString("THIS IS NEW")
+	y, _ := Insert(x, l, 10)
+	if y.IsVoid() {
+		t.Errorf("cord is void after cut and insert")
+	}
+	// f := dotty(y, t)
+	// defer f.Close()
 }
 
 func TestCordReader(t *testing.T) {
