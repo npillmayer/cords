@@ -38,13 +38,13 @@ func Cord2Dot(text Cord, w io.Writer) {
 	io.WriteString(w, "\tnode [fontname=Arial,fontsize=12];\n")
 	ids := newtable()
 	nodelist, edgelist := "", ""
-	err := text.each(func(node *cordNode, depth int) error {
+	err := text.each(func(node *cordNode, pos uint64, depth int) error {
 		ID := ids.alloc(node)
 		styles := nodeDotStyles(node, node.IsLeaf(), false)
 		if node.IsLeaf() {
 			leaf := node.AsLeaf()
 			strstart(leaf)
-			label := fmt.Sprintf("%d\\n“%s”", node.Weight(), strstart(leaf))
+			label := fmt.Sprintf("%d @%d\\n“%s”", node.Weight(), pos, strstart(leaf))
 			nodelist += fmt.Sprintf("\"%d\" [label=\"%s\" %s];\n", ID, label, styles)
 		} else {
 			inner := node.AsInner()
