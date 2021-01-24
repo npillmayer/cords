@@ -140,7 +140,7 @@ func (cord Cord) String() string {
 	}
 	var bf bytes.Buffer
 	var err error
-	err = cord.EachLeaf(func(leaf Leaf) error {
+	err = cord.EachLeaf(func(leaf Leaf, pos uint64) error {
 		if _, err = bf.WriteString(leaf.String()); err != nil {
 			T().Errorf(err.Error())
 			return err
@@ -175,17 +175,20 @@ func (cord Cord) height() int {
 }
 
 // each iterates over all nodes of the cord.
-func (cord Cord) each(f func(node *cordNode, depth int) error) error {
-	err := traverse(&cord.root.cordNode, 0, f)
+func (cord Cord) each(f func(node *cordNode, pos uint64, depth int) error) error {
+	if cord.IsVoid() {
+		return nil
+	}
+	err := traverse(&cord.root.cordNode, cord.root.weight, 0, f)
 	return err
 }
 
 // EachLeaf iterates over all leaf nodes of the cord.
-func (cord Cord) EachLeaf(f func(Leaf) error) error {
+func (cord Cord) EachLeaf(f func(Leaf, uint64) error) error {
 	var err error
-	err = cord.each(func(node *cordNode, depth int) (e error) {
+	err = cord.each(func(node *cordNode, pos uint64, depth int) (e error) {
 		if node.IsLeaf() {
-			e = f(node.AsLeaf().leaf)
+			e = f(node.AsLeaf().leaf, pos)
 		}
 		return
 	})
@@ -452,7 +455,7 @@ var _ Leaf = StringLeaf("")
 // --- Debugging helper ------------------------------------------------------
 
 func dump(node *cordNode) {
-	traverse(node, 0, func(node *cordNode, depth int) error {
+	traverse(node, node.Weight(), 0, func(node *cordNode, pos uint64, depth int) error {
 		if node.IsLeaf() {
 			l := node.AsLeaf()
 			T().Debugf("%sL = %v", indent(depth), strstart(l))
