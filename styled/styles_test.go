@@ -5,6 +5,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -15,6 +19,15 @@ import (
 	//"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
+
+func TestInsert(t *testing.T) {
+	cb := cords.NewBuilder()
+	bold := teststyle("bold")
+	spn := toSpan(1, 5)
+	cb.Append(makeStyleLeaf(bold, spn))
+	_ = cb.Cord()
+	//dotty(newrun, t)
+}
 
 func TestBasicStyle(t *testing.T) {
 	// gtrace.CoreTracer = gologadapter.New()
@@ -139,4 +152,24 @@ func (vf testfmtr) Format(buf []byte, f Format, w io.Writer) error {
 func (vf testfmtr) EndRun(f Format, w io.Writer) error {
 	_, err := w.Write([]byte("|"))
 	return err
+}
+
+// --- dot -------------------------------------------------------------------
+
+func dotty(text cords.Cord, t *testing.T) *os.File {
+	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//defer os.Remove(tmpfile.Name()) // clean up
+	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
+	cords.Cord2Dot(text, tmpfile)
+	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("writing SVG tree image to tree.svg\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
+	}
+	return tmpfile
 }

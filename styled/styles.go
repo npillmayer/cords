@@ -26,6 +26,25 @@ func TextFromString(s string) *Text {
 	return t
 }
 
+// TextFromCord creates a stylable text from a cord.
+func TextFromCord(text cords.Cord) *Text {
+	t := &Text{
+		text: text,
+		runs: Runs{},
+	}
+	return t
+}
+
+// Raw returns a copy of the text without any styles.
+func (t *Text) Raw() cords.Cord {
+	return t.text
+}
+
+// Styles returns a copy of the text's style runs.
+func (t *Text) Styles() Runs {
+	return t.runs
+}
+
 // Style styles a run of text, given the start and end position.
 func (t *Text) Style(sty Format, from, to uint64) *Text {
 	if cords.Cord(t.runs).IsVoid() {
@@ -75,7 +94,7 @@ func (runs Runs) Format(text *bufio.Scanner, fmtr Formatter, w io.Writer) (err e
 		return cords.ErrIllegalArguments
 	}
 	remain := uint64(0) // remaining fragment from text.Bytes to format/output
-	err = cords.Cord(runs).EachLeaf(func(l cords.Leaf) (leaferr error) {
+	err = cords.Cord(runs).EachLeaf(func(l cords.Leaf, pos uint64) (leaferr error) {
 		style := l.(*styleLeaf)
 		if style.Weight() == 0 {
 			return nil
