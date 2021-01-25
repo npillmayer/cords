@@ -14,6 +14,7 @@ import (
 
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 
 	//"github.com/npillmayer/schuko/tracing/gologadapter"
@@ -89,6 +90,23 @@ func TestTextSimple(t *testing.T) {
 	if fmtr.segcnt != 4 {
 		t.Errorf("expected formatted text to have 4 segments, has %d", fmtr.segcnt)
 	}
+}
+
+func TestIterator(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	text := TextFromString("Hello World, how are you?")
+	bold := teststyle("bold")
+	text.Style(bold, 6, 16)
+	//
+	text.EachStyleRun(func(content string, sty Style, pos uint64) error {
+		//
+		t.Logf("%v: (%s)", sty, content)
+		return nil
+	})
+	t.Fail()
 }
 
 // --- Test Helpers ----------------------------------------------------------

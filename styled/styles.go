@@ -71,7 +71,7 @@ func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error)
 		if err != nil {
 			return err
 		}
-		st := leaf.(styleLeaf).style
+		st := leaf.(*styleLeaf).style
 		return f(content, st, i)
 	})
 	return err
