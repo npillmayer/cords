@@ -65,6 +65,6 @@ func (s Style) String() string {
 	return styleString(s)
 }
 
-func (s Style) Equals(other styled.Format) bool {
+func (s Style) Equals(other styled.Style) bool {
 	return false
 }

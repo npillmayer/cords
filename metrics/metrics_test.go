@@ -180,8 +180,8 @@ func TestMetricSpanWord(t *testing.T) {
 	if cord.IsVoid() {
 		t.Fatalf("resulting aligned cord is void, shouldn't")
 	}
-	tmpfile := dotty(cord, t)
-	defer tmpfile.Close()
+	// tmpfile := dotty(cord, t)
+	// defer tmpfile.Close()
 }
 
 func TestMetricWordSpans(t *testing.T) {
@@ -205,10 +205,9 @@ func TestMetricWordSpans(t *testing.T) {
 		t.Fatalf("Expected non-void result cord, is void")
 	}
 	t.Logf("builder made cord='%s'", text)
-	tmpfile := dotty(text, t)
-	defer tmpfile.Close()
+	// tmpfile := dotty(text, t)
+	// defer tmpfile.Close()
 	//
-	t.Fail()
 	metric := Words()
 	value, cord, err := Align(text, 0, text.Len(), metric)
 	if err != nil {

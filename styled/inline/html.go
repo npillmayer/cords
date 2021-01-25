@@ -73,7 +73,7 @@ func (fmtr HTMLFormatter) Writer() io.Writer {
 	return fmtr.out
 }
 
-func (fmtr HTMLFormatter) StartRun(f styled.Format, w io.Writer) error {
+func (fmtr HTMLFormatter) StartRun(f styled.Style, w io.Writer) error {
 	if f == nil {
 		return nil
 	}
@@ -89,12 +89,12 @@ func (fmtr HTMLFormatter) StartRun(f styled.Format, w io.Writer) error {
 	return err
 }
 
-func (fmtr HTMLFormatter) Format(buf []byte, f styled.Format, w io.Writer) error {
+func (fmtr HTMLFormatter) Format(buf []byte, f styled.Style, w io.Writer) error {
 	w.Write(buf)
 	return nil
 }
 
-func (fmtr HTMLFormatter) EndRun(f styled.Format, w io.Writer) error {
+func (fmtr HTMLFormatter) EndRun(f styled.Style, w io.Writer) error {
 	if f == nil {
 		return nil
 	}

@@ -99,7 +99,7 @@ func teststyle(sty string) mystyle {
 	return mystyle{sty}
 }
 
-func (sty mystyle) Equals(other Format) bool {
+func (sty mystyle) Equals(other Style) bool {
 	o := other.(mystyle)
 	if len(sty) != len(o) {
 		return false
@@ -116,7 +116,7 @@ func (sty mystyle) String() string {
 	return fmt.Sprintf("%v", []string(sty))
 }
 
-var _ Format = mystyle{}
+var _ Style = mystyle{}
 
 type testfmtr struct {
 	segcnt int
@@ -133,7 +133,7 @@ func (vf testfmtr) String() string {
 	return vf.out.String()
 }
 
-func (vf *testfmtr) StartRun(f Format, w io.Writer) error {
+func (vf *testfmtr) StartRun(f Style, w io.Writer) error {
 	vf.segcnt++
 	if f == nil {
 		_, err := w.Write([]byte("[plain]"))
@@ -144,12 +144,12 @@ func (vf *testfmtr) StartRun(f Format, w io.Writer) error {
 	return err
 }
 
-func (vf testfmtr) Format(buf []byte, f Format, w io.Writer) error {
+func (vf testfmtr) Format(buf []byte, f Style, w io.Writer) error {
 	w.Write(buf)
 	return nil
 }
 
-func (vf testfmtr) EndRun(f Format, w io.Writer) error {
+func (vf testfmtr) EndRun(f Style, w io.Writer) error {
 	_, err := w.Write([]byte("|"))
 	return err
 }
