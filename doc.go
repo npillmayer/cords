@@ -104,6 +104,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package cords
 
+// TODO
+//
+// It would probably be wise to re-base cords on an external production-ready tree implementation.
+// Possible candidates would be:
+// - https://github.com/google/btree
+// - https://github.com/petar/gollrb
+// Rust's ropes implementation rests on a B-Tree. This makes sense considering the good support
+// of copy-on-write semantics in Vecs, and of course reduces the tree height for the case
+// of a lot of smallish nodes. Currently I am not sure my use cases will ever fall into this
+// category, but if one thinks of an interactive authoring environment, where text modifications
+// arrive in high frequency, it could be the right way to go.
+// On the other hand, I did not take the time to look into those libraries from a "persistent
+// data structure" point of view, which is a hard requirement for me (and should be for clients
+// of cords as well). In Go this kind of thinking does not come natural for authors of general
+// purpose libraries, as obviously most clients of such libraries prefer space-efficient modifications
+// in place. But I hope to have some spare time in the near future to evaluate btree and bollrb
+// in this respect.
+
 import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
