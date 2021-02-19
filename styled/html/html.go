@@ -27,7 +27,7 @@ func InnerText(n *html.Node) (cords.Cord, error) {
 	return b.Cord(), nil
 }
 
-func collectText(n *html.Node, b *cords.CordBuilder) {
+func collectText(n *html.Node, b *cords.Builder) {
 	if n.Type == html.ElementNode {
 		//T().Debugf("<%s>", n.Data)
 	} else if n.Type == html.TextNode {

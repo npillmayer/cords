@@ -6,9 +6,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
-
 	//"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/cords/styled"
 )
 
 func TestTextSimple(t *testing.T) {
@@ -43,6 +41,7 @@ func TestHTMLSimple(t *testing.T) {
 	//t.Fail()
 }
 
+/*
 func TestHTMLFormatter(t *testing.T) {
 	gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
@@ -58,3 +57,4 @@ func TestHTMLFormatter(t *testing.T) {
 	t.Logf(fmtr.String())
 	//t.Fail()
 }
+*/

@@ -1,22 +1,22 @@
 package cords
 
-// CordBuilder is for building cords by adding text fragments (leafs).
+// Builder is for building cords by adding text fragments (leafs).
 // The empty instance is a valid cord builder, but clients may use NewBuilder
 // instead.
-type CordBuilder struct {
+type Builder struct {
 	cord Cord
 	done bool
 }
 
 // NewBuilder creates a new and empty cord builder.
-func NewBuilder() *CordBuilder {
-	return &CordBuilder{}
+func NewBuilder() *Builder {
+	return &Builder{}
 }
 
 // Cord returns the cord which this builder is holding up to now.
 // It is illegal to continue adding fragments after `Cord` has been called,
 // but `Cord` may be called multiple times.
-func (b CordBuilder) Cord() Cord {
+func (b Builder) Cord() Cord {
 	b.done = true
 	if b.cord.IsVoid() {
 		T().Debugf("cord builder: cord is void")
@@ -24,16 +24,16 @@ func (b CordBuilder) Cord() Cord {
 	return b.cord
 }
 
-// Reset drops the cord building currently in progress an prepares the builder
+// Reset drops the cord building currently in progress and prepares the builder
 // for a fresh build.
-func (b *CordBuilder) Reset() {
+func (b *Builder) Reset() {
 	b.cord.root = nil
 	b.done = false
 }
 
 // Append appends a text fragement represented by a cord leaf at the end
 // of the cord to build.
-func (b *CordBuilder) Append(leaf Leaf) error {
+func (b *Builder) Append(leaf Leaf) error {
 	if b.done {
 		return ErrCordCompleted
 	}
@@ -61,7 +61,7 @@ func (b *CordBuilder) Append(leaf Leaf) error {
 
 // Prepend pushes a text fragement represented by a cord leaf at the beginning
 // of the cord to build.
-func (b *CordBuilder) Prepend(leaf Leaf) error {
+func (b *Builder) Prepend(leaf Leaf) error {
 	if b.done {
 		return ErrCordCompleted
 	}
@@ -82,7 +82,7 @@ func (b *CordBuilder) Prepend(leaf Leaf) error {
 	return nil
 }
 
-func (b CordBuilder) balance() {
+func (b Builder) balance() {
 	if b.cord.IsVoid() || b.cord.root.Left().IsLeaf() {
 		panic("builder wants cord balanced, but cord has no inner nodes")
 	}

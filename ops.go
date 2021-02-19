@@ -219,6 +219,18 @@ func (cord Cord) Index(i uint64) (Leaf, uint64, error) {
 	return node.AsLeaf().leaf, j, nil
 }
 
+// FragmentCount returns the number of fragments this cord is internally split into.
+// It is a read-only property, which is provided as it is sometimes helpful in
+// scenarios for special-type cords.
+func (cord Cord) FragmentCount() int {
+	cnt := 0
+	_ = cord.EachLeaf(func(Leaf, uint64) error {
+		cnt++
+		return nil
+	})
+	return cnt
+}
+
 // ---------------------------------------------------------------------------
 
 // concat2 appends another cord to this cord, resulting in a new cord.

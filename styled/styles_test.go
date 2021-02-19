@@ -1,7 +1,6 @@
 package styled
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/npillmayer/cords"
@@ -44,28 +42,17 @@ func TestBasicStyle(t *testing.T) {
 	t.Logf("string='%s', length=%d", text, text.Len())
 	// style the text
 	bold := teststyle("bold")
-	runs := ApplyStyle(text, bold, 6, text.Len())
+	runs := applyStyle(text, bold, 6, text.Len())
 	t.Logf("runs=%s, length=%d", runs.String(), runs.Len())
-	// get formatted text
-	s := bufio.NewScanner(strings.NewReader(text.String()))
-	fmtr := formatter("Test BasicStyle: ")
-	if err := runs.Format(s, fmtr, fmtr.out); err != nil {
-		t.Error(err.Error())
-	}
-	t.Logf(fmtr.String())
-	if fmtr.segcnt != 2 {
-		t.Errorf("expected formatted text to have 2 segments, has %d", fmtr.segcnt)
+	//
+	cnt := cords.Cord(runs).FragmentCount()
+	if cnt != 2 {
+		t.Errorf("expected formatted text to have 2 segments, has %d", cnt)
 	}
 	runs = runs.Style(bold, 0, 1)
-	t.Logf("runs=%s, length=%d", runs.String(), runs.Len())
-	s = bufio.NewScanner(strings.NewReader(text.String()))
-	fmtr = formatter("Test BasicStyle: ")
-	if err := runs.Format(s, fmtr, fmtr.out); err != nil {
-		t.Error(err.Error())
-	}
-	t.Logf(fmtr.String())
-	if fmtr.segcnt != 3 {
-		t.Errorf("expected formatted text to have 3 segments, has %d", fmtr.segcnt)
+	cnt = cords.Cord(runs).FragmentCount()
+	if cnt != 3 {
+		t.Errorf("expected formatted text to have 3 segments, has %d", cnt)
 	}
 }
 
@@ -82,17 +69,13 @@ func TestTextSimple(t *testing.T) {
 	bold, italic := teststyle("bold"), teststyle("italic")
 	text.Style(bold, 6, 11)
 	text.Style(italic, 8, 16) // erase part of bold run
-	fmtr := formatter("Test TextSimple: ")
-	if err := text.Format(fmtr, fmtr.out); err != nil {
-		t.Error(err.Error())
-	}
-	t.Logf(fmtr.String())
-	if fmtr.segcnt != 4 {
-		t.Errorf("expected formatted text to have 4 segments, has %d", fmtr.segcnt)
+	cnt := cords.Cord(text.styles()).FragmentCount()
+	if cnt != 4 {
+		t.Errorf("expected formatted text to have 4 segments, has %d", cnt)
 	}
 }
 
-func TestIterator(t *testing.T) {
+func TestEach(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
@@ -101,12 +84,15 @@ func TestIterator(t *testing.T) {
 	bold := teststyle("bold")
 	text.Style(bold, 6, 16)
 	//
+	cnt := 0
 	text.EachStyleRun(func(content string, sty Style, pos uint64) error {
-		//
+		cnt++
 		t.Logf("%v: (%s)", sty, content)
 		return nil
 	})
-	t.Fail()
+	if cnt != 3 {
+		t.Errorf("expected formatted text to have 3 style runs, has %d", cnt)
+	}
 }
 
 // --- Test Helpers ----------------------------------------------------------

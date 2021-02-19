@@ -1,11 +1,6 @@
 package styled
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
-	"io"
-
 	"github.com/npillmayer/cords"
 )
 
@@ -14,14 +9,14 @@ import (
 // Text is a styled text. Its text and its styles are automatically synchronized.
 type Text struct {
 	text cords.Cord
-	runs Runs
+	runs runs
 }
 
 // TextFromString creates a stylable text from a string.
 func TextFromString(s string) *Text {
 	t := &Text{
 		text: cords.FromString(s),
-		runs: Runs{},
+		runs: runs{},
 	}
 	return t
 }
@@ -30,7 +25,7 @@ func TextFromString(s string) *Text {
 func TextFromCord(text cords.Cord) *Text {
 	t := &Text{
 		text: text,
-		runs: Runs{},
+		runs: runs{},
 	}
 	return t
 }
@@ -41,7 +36,7 @@ func (t *Text) Raw() cords.Cord {
 }
 
 // Styles returns a copy of the text's style runs.
-func (t *Text) Styles() Runs {
+func (t *Text) styles() runs {
 	return t.runs
 }
 
@@ -64,8 +59,12 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 // EachStyleRun applies a function to each run of a single style.
 // pos is the text position of this run of text within the overall
 // styled text.
+//
+// This may be thought of as a “push”-interface to access style runs for a text.
+// For a “pull”-interface please refer to interface `itemized.Iterator`.
+//
 func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error) error {
-	err := cords.Cord(t.Styles()).EachLeaf(func(leaf cords.Leaf, i uint64) error {
+	err := cords.Cord(t.styles()).EachLeaf(func(leaf cords.Leaf, i uint64) error {
 		length := leaf.Weight()
 		content, err := t.Raw().Report(i, length)
 		if err != nil {
@@ -80,98 +79,72 @@ func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error)
 // Style styles a run of text, given the start and end position.
 func (t *Text) Style(sty Style, from, to uint64) *Text {
 	if cords.Cord(t.runs).IsVoid() {
-		t.runs = ApplyStyle(t.text, sty, from, to)
+		t.runs = applyStyle(t.text, sty, from, to)
 		return t
 	}
 	t.runs = t.runs.Style(sty, from, to)
 	return t
 }
 
-// Format a styled text. Format applies the previously set style-formats,
-// using a given formatter for output to w.
+// Section copies a piece of styled text, delimited by parameters from and to.
 //
-// If any argument is nil, no output is written.
-func (t *Text) Format(fmtr Formatter, w io.Writer) error {
-	if fmtr == nil || w == nil {
-		return cords.ErrIllegalArguments
+func Section(t *Text, from, to uint64) (*Text, error) {
+	c, err := cords.Substr(t.Raw(), from, to-from)
+	if err != nil {
+		return nil, err
 	}
-	scn := bufio.NewScanner(t.text.Reader())
-	return t.runs.Format(scn, fmtr, w)
+	section := TextFromCord(c)
+	if cords.Cord(t.styles()).IsVoid() {
+		return section, nil
+	}
+	s, err := cords.Substr(cords.Cord(t.styles()), from, to-from)
+	if err != nil {
+		return nil, err
+	}
+	section.runs = runs(s)
+	return section, nil
+}
+
+// StyleChange holds a style and the text position where the style run starts.
+type StyleChange struct {
+	Style    Style
+	Position uint64
+}
+
+// StyleRuns returns a slice of style runs for a styled text.
+func (t *Text) StyleRuns() []StyleChange {
+	return t.styleRuns(0)
+}
+
+func (t *Text) styleRuns(offset uint64) []StyleChange {
+	count := cords.Cord(t.runs).FragmentCount()
+	slice := make([]StyleChange, count)
+	i := 0
+	_ = cords.Cord(t.runs).EachLeaf(func(leaf cords.Leaf, pos uint64) error {
+		style := leaf.(*styleLeaf).style
+		slice[i].Style = style
+		slice[i].Position = pos
+		i++
+		return nil
+	})
+	return slice
 }
 
 // --- Runs of Styles --------------------------------------------------------
 
 // Runs hold information about style-formats which have been applied to a text.
 // There is not automatic synchronization between the text and the style-formats.
-type Runs cords.Cord
+type runs cords.Cord
 
 // String returns an informational string for these Runs. Clients must not rely
 // on the format of the string.
-func (runs Runs) String() string {
-	return cords.Cord(runs).String()
+func (r runs) String() string {
+	return cords.Cord(r).String()
 }
 
 // Len returns the overall length in bytes for these Runs.
-func (runs Runs) Len() uint64 {
-	return (cords.Cord(runs)).Len()
-}
-
-// Format a text. Format reads text from a scanner and applies style-formats to
-// runs of text, using a given formatter for output to w.
-//
-// If any of the arguments is nil, no output is written.
-//
-func (runs Runs) Format(text *bufio.Scanner, fmtr Formatter, w io.Writer) (err error) {
-	if fmtr == nil || text == nil || w == nil {
-		return cords.ErrIllegalArguments
-	}
-	remain := uint64(0) // remaining fragment from text.Bytes to format/output
-	err = cords.Cord(runs).EachLeaf(func(l cords.Leaf, pos uint64) (leaferr error) {
-		style := l.(*styleLeaf)
-		if style.Weight() == 0 {
-			return nil
-		}
-		T().Debugf("formatting leaf %v with length=%d", style, style.Weight())
-		leaferr = fmtr.StartRun(style.style, w)
-		i := uint64(0) // bytes written for this leaf
-		for leaferr == nil && i < style.length {
-			if remain > 0 { // do not scan new bytes
-				T().Debugf("%d bytes remaining to format", remain)
-			} else if !text.Scan() {
-				T().Errorf("premature end of input text")
-				if leaferr = text.Err(); leaferr == nil {
-					leaferr = errors.New("premature end of input text")
-				} else {
-					leaferr = fmt.Errorf("premature end of input text: %w", leaferr)
-				}
-				break
-			} else {
-				remain = uint64(len(text.Bytes()))
-				T().Debugf("loaded %d new bytes", remain)
-			}
-			// now remain holds the (suffix) length of text.Bytes not formatted/output yet
-			bstart := uint64(len(text.Bytes())) - remain // start within buffer
-			l := style.length - i                        // length of substring which may be output
-			if l < remain {                              // we output rest of leaf, but not complete buffer
-				fmtr.Format(text.Bytes()[bstart:bstart+l], style.style, w)
-				remain -= l
-				i += l
-			} else { // we output a (sub)string of leaf and complete buffer
-				fmtr.Format(text.Bytes()[bstart:], style.style, w)
-				i += remain
-				remain = 0
-			}
-		}
-		if leaferr == nil {
-			leaferr = fmtr.EndRun(style.style, w)
-		}
-		return
-	})
-	if err != nil && remain > 0 {
-		T().Infof("premature end of formatting runs; cannot format rest of input text")
-		err = errors.New("premature end of formatting runs; cannot format rest of input text")
-	}
-	return
+func (r runs) Len() uint64 {
+	return (cords.Cord(r)).Len()
 }
 
 // Style represents a styling-format which can be applied to a run of text.
@@ -180,18 +153,11 @@ type Style interface {
 	String() string          // return some kind of identifying string
 }
 
-// A Formatter is able to format a run of text according to a style-format.
-type Formatter interface {
-	StartRun(Style, io.Writer) error
-	Format([]byte, Style, io.Writer) error
-	EndRun(Style, io.Writer) error
-}
-
-// ApplyStyle applies a style to a range [from,to) of characters. Returns a style set.
+// applyStyle applies a style to a range [from,to) of characters. Returns a style set.
 // Given range boundaries will silently be restricted to valid text positions without
 // flagging an error. This may result in the style not being applied due to an invalid
 // range.
-func ApplyStyle(text cords.Cord, sty Style, from, to uint64) Runs {
+func applyStyle(text cords.Cord, sty Style, from, to uint64) runs {
 	spn := toSpan(from, to).contained(text)
 	cb := cords.NewBuilder()
 	if spn.void() || spn.covers(text) {
@@ -205,37 +171,37 @@ func ApplyStyle(text cords.Cord, sty Style, from, to uint64) Runs {
 			cb.Append(makeStyleLeaf(nil, toSpan(spn.r, text.Len())))
 		}
 	}
-	return Runs(cb.Cord())
+	return runs(cb.Cord())
 }
 
 // Style adds a style to already existing styles and returns the unified set.
-func (runs Runs) Style(sty Style, from, to uint64) Runs {
-	if cords.Cord(runs).IsVoid() {
+func (r runs) Style(sty Style, from, to uint64) runs {
+	if cords.Cord(r).IsVoid() {
 		T().Errorf("styled runs: runs are void, cannot style")
-		return runs
+		return r
 	}
-	spn := toSpan(from, to).contained(cords.Cord(runs))
+	spn := toSpan(from, to).contained(cords.Cord(r))
 	if spn.void() {
 		T().Errorf("styled runs: illegal span for style, cannot style")
-		return runs
+		return r
 	}
 	T().Debugf("====== runs.Style() =========")
-	r, _, err := cords.Cut(cords.Cord(runs), spn.l, spn.len())
+	rc, _, err := cords.Cut(cords.Cord(r), spn.l, spn.len())
 	if err != nil {
-		return runs
+		return r
 	}
-	T().Debugf("r=%s, length=%d", r, r.Len())
+	T().Debugf("r=%s, length=%d", rc, rc.Len())
 	cb := cords.NewBuilder()
 	cb.Append(makeStyleLeaf(sty, spn))
 	newrun := cb.Cord()
 	T().Debugf("newrun=%s, length=%d", newrun, newrun.Len())
-	r, err = cords.Insert(r, newrun, spn.l)
+	rc, err = cords.Insert(rc, newrun, spn.l)
 	if err != nil {
 		T().Errorf("styled runs: insert operation returned: %s", err.Error())
 	}
 	T().Debugf("r=%s, length=%d", r, r.Len())
-	runs = Runs(r)
-	return runs
+	r = runs(rc)
+	return r
 }
 
 // --- Styled Leaf -----------------------------------------------------------

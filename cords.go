@@ -82,8 +82,8 @@ import (
 //    Delete        |   O(log n)      |   O(n)
 //
 // For use cases with many editing operations on large texts, cords have stable performance
-// and space characteristics. It's more appropriate to think of cords as a type for 'text' than
-// as strings (https://mortoray.com/2014/03/17/strings-and-text-are-not-the-same/).
+// and space characteristics. It's more appropriate to think of cords as a type for ‘text’
+// than as strings (https://mortoray.com/2014/03/17/strings-and-text-are-not-the-same/).
 //
 type Cord struct {
 	root *innerNode
