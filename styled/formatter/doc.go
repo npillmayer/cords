@@ -1,5 +1,9 @@
 /*
-Package html creates and handles paragraph text from HTML documents.
+Package formatter formats styled text.
+
+Status
+
+Work in progress.
 
 _________________________________________________________________________
 
@@ -35,7 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
-package html
+package formatter
 
 import (
 	"github.com/npillmayer/schuko/gtrace"

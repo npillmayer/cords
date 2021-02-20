@@ -40,6 +40,26 @@ func styleString(s Style) string {
 // Style is a text style, applicable on runs of characters
 type Style int
 
+// StyleFromHTMLName returns a style from an HTML inline span name, like
+// <strong>, <i>, etc.
+func StyleFromHTMLName(s string) Style {
+	switch s {
+	case "b":
+		return BoldStyle
+	case "i":
+		return ItalicsStyle
+	case "strong":
+		return StrongStyle
+	case "em":
+		return EmStyle
+	case "small":
+		return SmallStyle
+	case "marked":
+		return MarkedStyle
+	}
+	return PlainStyle
+}
+
 func (s Style) Add(other Style) Style {
 	return s | other
 }

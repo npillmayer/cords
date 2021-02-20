@@ -1,111 +1,63 @@
 package inline
 
 import (
-	"bytes"
 	"io"
 
+	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/styled"
+	"golang.org/x/net/html"
 )
 
-var htmlStyleNames map[Style]string = map[Style]string{
-	PlainStyle:   "",
-	BoldStyle:    "b",
-	ItalicsStyle: "i",
-	StrongStyle:  "strong",
-	EmStyle:      "em",
-	SmallStyle:   "small",
-	MarkedStyle:  "marked",
-}
-
-type HTMLStyle struct {
-	Style
-}
-
-func (s HTMLStyle) String() string {
-	return s.tags(false)
-}
-
-func (s HTMLStyle) tags(closing bool) string {
-	if s.Style == 0 {
-		return ""
+// InnerText creates a styled text for the textual content of an HTML element and all
+// its descendents. It resembles the text produced by
+//
+//      document.getElementById("myNode").innerText
+//
+// in JavaScript, except that `InnerText` cannot respect CSS styling (including
+// properties changing the visibility of the node's descendents).
+// Therefore the resulting styled text is limited to inline span elements like
+//    <strong> … </strong>
+//    <i> … </i>
+// etc. Clients should provide a paragraph-like element.
+//
+// The fragment organization of the resulting styled text will reflect the hierarchy of
+// the element node's descendents.
+//
+func InnerText(n *html.Node) (*styled.Text, error) {
+	if n == nil {
+		return nil, cords.ErrIllegalArguments
 	}
-	str := ""
-	if closing {
-		for i := 6; i >= 0; i-- {
-			//T().Debugf("check: %d = %s", 1<<i, styleString(1<<i))
-			if s.Style&(1<<i) > 0 {
-				str = str + "</" + styleString(1<<i) + ">"
-			}
+	b := styled.NewTextBuilder()
+	collectText(n, PlainStyle, b)
+	return b.Text(), nil
+}
+
+func collectText(n *html.Node, style Style, b *styled.TextBuilder) {
+	if n.Type == html.ElementNode {
+		T().Debugf("styled inline text: collect text of <%s>", n.Data)
+		st := StyleFromHTMLName(n.Data)
+		if st != PlainStyle {
+			style = st
 		}
-	} else {
-		for i := 0; i < 7; i++ {
-			//T().Debugf("check: %d = %s", 1<<i, styleString(1<<i))
-			if s.Style&(1<<i) > 0 {
-				str = str + "<" + styleString(1<<i) + ">"
-			}
-		}
+	} else if n.Type == html.TextNode {
+		T().Debugf("styled inline text = %s (%v)", n.Data, style)
+		b.Append(cords.StringLeaf(n.Data), style)
 	}
-	return str // may be empty string
-}
-
-func (s HTMLStyle) Add(sty Style) HTMLStyle {
-	return HTMLStyle{s.Style.Add(sty)}
-}
-
-// HTMLFormatter formats a styled text as HTML
-type HTMLFormatter struct {
-	out    *bytes.Buffer
-	suffix string
-}
-
-func NewHTMLFormatter(prefix, suffix string) *HTMLFormatter {
-	return &HTMLFormatter{
-		out:    bytes.NewBufferString(prefix),
-		suffix: suffix,
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		collectText(c, style, b)
 	}
 }
 
-func (fmtr HTMLFormatter) String() string {
-	return fmtr.out.String() + fmtr.suffix
-}
-
-func (fmtr HTMLFormatter) Writer() io.Writer {
-	return fmtr.out
-}
-
-func (fmtr HTMLFormatter) StartRun(f styled.Style, w io.Writer) error {
-	if f == nil {
-		return nil
+// TextFromHTML creates a styled.Text from the textual content of an HTML fragment.
+// The HTML fragment should reflect the content of a paragraph-like element.
+func TextFromHTML(input io.Reader) (*styled.Text, error) {
+	nodes, err := html.ParseFragment(input, nil)
+	if err != nil {
+		return nil, err
 	}
-	var hsty HTMLStyle
-	if sty, ok := f.(HTMLStyle); ok {
-		hsty = sty
-	} else if sty, ok := f.(Style); ok {
-		hsty = HTMLStyle{sty}
-	} else {
-		return nil
+	b := styled.NewTextBuilder()
+	for _, n := range nodes {
+		collectText(n, PlainStyle, b)
 	}
-	_, err := w.Write([]byte(hsty.String()))
-	return err
-}
-
-func (fmtr HTMLFormatter) Format(buf []byte, f styled.Style, w io.Writer) error {
-	w.Write(buf)
-	return nil
-}
-
-func (fmtr HTMLFormatter) EndRun(f styled.Style, w io.Writer) error {
-	if f == nil {
-		return nil
-	}
-	var hsty HTMLStyle
-	if sty, ok := f.(HTMLStyle); ok {
-		hsty = sty
-	} else if sty, ok := f.(Style); ok {
-		hsty = HTMLStyle{sty}
-	} else {
-		return nil
-	}
-	_, err := w.Write([]byte(hsty.tags(true)))
-	return err
+	return b.Text(), nil
 }

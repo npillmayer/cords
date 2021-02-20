@@ -109,6 +109,7 @@ func Section(t *Text, from, to uint64) (*Text, error) {
 type StyleChange struct {
 	Style    Style
 	Position uint64
+	Length   uint64
 }
 
 // StyleRuns returns a slice of style runs for a styled text.
@@ -124,6 +125,7 @@ func (t *Text) styleRuns(offset uint64) []StyleChange {
 		style := leaf.(*styleLeaf).style
 		slice[i].Style = style
 		slice[i].Position = pos
+		slice[i].Length = leaf.Weight()
 		i++
 		return nil
 	})

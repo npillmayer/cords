@@ -41,7 +41,7 @@ func (b TextBuilder) Text() *Text {
 }
 
 // Append appends a text fragement represented by a cord leaf at the end
-// of the cord to build.
+// of the text to build.
 func (b *TextBuilder) Append(leaf cords.Leaf, style Style) error {
 	if b.done {
 		return cords.ErrCordCompleted
@@ -50,7 +50,8 @@ func (b *TextBuilder) Append(leaf cords.Leaf, style Style) error {
 		return nil
 	}
 	b.cordBuilder.Append(leaf)
-	b.styles = append(b.styles, styleSpan{style: style, span: toSpan(b.length, leaf.Weight())})
+	//T().Infof("Append leaf = %v (%d)", leaf, leaf.Weight())
+	b.styles = append(b.styles, styleSpan{style: style, span: toSpan(b.length, b.length+leaf.Weight())})
 	b.length += leaf.Weight()
 	return nil
 }

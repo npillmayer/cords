@@ -1,6 +1,8 @@
 package styled
 
 import (
+	"io"
+
 	"github.com/npillmayer/cords"
 	"github.com/npillmayer/uax/bidi"
 )
@@ -24,6 +26,7 @@ import (
 type Paragraph struct {
 	text     *Text                // a Paragraph is a styled text
 	Offset   uint64               // the paragraph's start position in terms of positions of the embedding text.
+	cutoff   uint64               // cut off text due to line wrapping
 	eBidiDir bidi.Direction       // embedding bidi text direction
 	levels   *bidi.ResolvedLevels // levels from UAX#9 algorithm
 }
@@ -59,6 +62,11 @@ func ParagraphFromText(text *Text, from, to uint64, embBidi bidi.Direction,
 func (para *Paragraph) Style(style Style, from, to uint64) *Paragraph {
 	para.text.Style(style, from, to)
 	return para
+}
+
+// Raw returns the underlying raw text of the paragraph.
+func (para *Paragraph) Raw() cords.Cord {
+	return para.text.Raw()
 }
 
 // BidiLevels returns the resolved Bidi levels in a paragraph of text.
@@ -105,4 +113,38 @@ func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos uint64
 // StyleRuns returns a slice of style runs for a styled text.
 func (para *Paragraph) StyleRuns() []StyleChange {
 	return para.text.styleRuns(para.Offset)
+}
+
+// Reader returns an io.Reader for the raw text of the paragraph (without styles).
+func (para *Paragraph) Reader() io.Reader {
+	return para.text.Raw().Reader()
+}
+
+// WrapAt splits of a front segment (usually a “line”) from a paragraph.
+func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
+	pos -= para.cutoff
+	if pos >= para.Raw().Len() {
+		T().Infof("Paragraph.WrapAt(EOT)")
+	}
+	T().Infof("  Levels = %v", para.BidiLevels())
+	line, p, err := cords.Split(para.text.Raw(), pos)
+	if err != nil {
+		return nil, nil, err
+	}
+	lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
+	if err != nil {
+		return nil, nil, err
+	}
+	para.text.text = p
+	para.text.runs = runs(pStyles)
+	text := &Text{
+		text: line,
+		runs: runs(lineStyles),
+	}
+	var lineLev *bidi.ResolvedLevels
+	lineLev, para.levels = para.levels.Split(pos, true)
+	T().Infof("para.levels = %v", para.levels)
+	lineRuns := lineLev.Reorder()
+	para.cutoff += text.Raw().Len()
+	return text, lineRuns, nil
 }

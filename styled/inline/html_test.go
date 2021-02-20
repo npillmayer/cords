@@ -1,4 +1,4 @@
-package html
+package inline
 
 import (
 	"fmt"
@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"golang.org/x/net/html"
 )
 
-func TestHTMLSimple(t *testing.T) {
+func TestHTMLFromTree(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
@@ -41,7 +42,7 @@ func TestHTMLSimple(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	t.Logf("text = '%s'", text)
+	t.Logf("text = '%s'", text.Raw())
 	tmpfile := dotty(text, t)
 	defer tmpfile.Close()
 	//t.Fail()
@@ -58,7 +59,7 @@ func TestHTMLParse(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	t.Logf("text = '%s'", text)
+	t.Logf("text = '%s'", text.Raw())
 	tmpfile := dotty(text, t)
 	defer tmpfile.Close()
 	//t.Fail()
@@ -66,14 +67,14 @@ func TestHTMLParse(t *testing.T) {
 
 // --- Helpers ---------------------------------------------------------------
 
-func dotty(text cords.Cord, t *testing.T) *os.File {
-	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
+func dotty(text *styled.Text, t *testing.T) *os.File {
+	tmpfile, err := ioutil.TempFile(".", "styled.*.dot")
 	if err != nil {
 		log.Fatal(err)
 	}
 	//defer os.Remove(tmpfile.Name()) // clean up
 	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
-	cords.Cord2Dot(text, tmpfile)
+	cords.Cord2Dot(text.Raw(), tmpfile)
 	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

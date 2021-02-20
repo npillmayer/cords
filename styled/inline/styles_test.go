@@ -1,20 +1,19 @@
 package inline
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
-	//"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestTextSimple(t *testing.T) {
 	gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	// gtrace.CoreTracer = gotestingadapter.New()
-	// teardown := gotestingadapter.RedirectTracing(t)
+	// teardown := gotestconfig.QuickConfig(t)
 	// defer teardown()
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
@@ -27,34 +26,25 @@ func TestTextSimple(t *testing.T) {
 
 func TestHTMLSimple(t *testing.T) {
 	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
-	// gtrace.CoreTracer = gotestingadapter.New()
-	// teardown := gotestingadapter.RedirectTracing(t)
+	// teardown := gotestconfig.QuickConfig(t)
 	// defer teardown()
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	s := HTMLStyle{ItalicsStyle}
-	t.Logf("italics=%s", s)
-	s = s.Add(MarkedStyle)
-	t.Logf("combined=%v", s.String())
-	//t.Fail()
-}
-
-/*
-func TestHTMLFormatter(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	text := styled.TextFromString("Hello World, how are you?")
-	bold, italic := HTMLStyle{BoldStyle}, HTMLStyle{ItalicsStyle}
-	text.Style(bold, 6, 11)
-	text.Style(italic, 13, 16) // erase part of bold run
-	fmtr := NewHTMLFormatter("<html><body><p>", "</p></body></html>")
-	if err := text.Format(fmtr, fmtr.Writer()); err != nil {
-		t.Error(err.Error())
+	input := strings.NewReader("The quick <strong>brown</strong> fox <em>jumps</em> over the lazy dog")
+	text, err := TextFromHTML(input)
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
-	t.Logf(fmtr.String())
-	//t.Fail()
+	t.Logf("HTML inner text = '%s'", text.Raw())
+	styles := text.StyleRuns()
+	cnt := 0
+	for i, style := range styles {
+		t.Logf("  %d: %v", i, style)
+		cnt++
+	}
+	if cnt != 5 {
+		t.Errorf("expected 5 style runs, got %d", cnt)
+	}
 }
-*/
