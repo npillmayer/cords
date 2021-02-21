@@ -7,6 +7,7 @@ replace github.com/npillmayer/schuko => /Users/npi/prg/go/schuko
 replace github.com/npillmayer/uax => /Users/npi/prg/go/uax
 
 require (
+	github.com/fatih/color v1.10.0
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/guiguan/caster v0.0.0-20191104051807-3736c4464f38
 	github.com/npillmayer/schuko v0.0.0-20201204202054-953994f422ef
