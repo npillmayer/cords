@@ -31,15 +31,16 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 */
 
 import (
 	"io"
+	"os"
 
 	"github.com/fatih/color"
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/cords/styled/inline"
+	"github.com/npillmayer/uax/uax11"
 	"golang.org/x/term"
 )
 
@@ -65,11 +66,37 @@ var DefaultCodes = ControlCodes{
 
 // ConsoleFixedWidth is a type for outputting formatted text to a console with
 // a fixed width font.
+//
+// Console/Terminal output is notoriously tricky for bi-directional text and for
+// scripts other than Latin. To fully appreciate the difficulties behind this,
+// refer for example to
+// https://terminal-wg.pages.freedesktop.org/bidi/bidi-intro/why-terminals-are-special.html
+//
+// As long as there is not widely accepted standard for Bidi-handling in terminals, we
+// have to rely on heuristics and explicitly set device-dependent configuration.
+// This is unfortunate for applications which are supposed to run in multi-platform
+// and multi-regional environments. However, it is no longer acceptable for
+// applications to be content with handling Latin text only.
+//
 type ConsoleFixedWidth struct {
 	Codes   *ControlCodes
 	colors  map[styled.Style]*color.Color
 	ccnt    int // number of character positions already printed for line
 	ctarget int // linelength in fixedwidth ‘en’s
+}
+
+// Print outputs a styled paragraph to stdout.
+//
+// If parameter config is nil,
+// a heuristic will create a config from the current terminal's properties (if
+// stdout is interactive). Config.Context will also be created based on heuristics
+// from the user environment.
+func (fw *ConsoleFixedWidth) Print(para *styled.Paragraph, config *Config) error {
+	if config == nil {
+		config = ConfigFromTerminal()
+		config.Context = uax11.ContextFromEnvironment()
+	}
+	return Output(para, os.Stdout, config, fw)
 }
 
 // NewConsoleFixedWidthFormat creates a new formatter. It is to be used for consoles

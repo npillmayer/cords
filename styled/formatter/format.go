@@ -37,7 +37,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"os"
 
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/cords/styled/itemized"
@@ -50,11 +49,10 @@ import (
 
 // Config represents a set of configuration parameters for formatting.
 type Config struct {
-	LineWidth    int
-	Justify      bool
-	Proportional bool
-	Debug        bool
-	Context      *uax11.Context
+	LineWidth int            // line width in terms of ‘en’s, i.e. fixed character width
+	Justify   bool           // require output lines to be fully justified
+	Debug     bool           // output additional information for debugging
+	Context   *uax11.Context // language context
 }
 
 // Format is an interface for formatting drivers, given an io.Writer
@@ -72,6 +70,8 @@ type Format interface {
 //
 // Neither of the arguments may be nil. However, it is safe to have config.Context
 // set to nil. In this case, uax11.LatinContext is used.
+//
+// TODO do not consume para
 func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format) error {
 	//
 	if para == nil || config == nil || format == nil {
@@ -125,21 +125,6 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 	return nil
 }
 
-// Print outputs a styled paragraph to stdout.
-//
-// If parameter config is nil,
-// a heuristic will create a config from the current terminal's properties (if
-// stdout is interactive). Config.Context will also be created based on heuristics
-// from the user environment.
-func Print(para *styled.Paragraph, config *Config) error {
-	if config == nil {
-		config = ConfigFromTerminal()
-		config.Context = uax11.ContextFromEnvironment()
-	}
-	consoleFmt := NewConsoleFixedWidthFormat(nil, nil)
-	return Output(para, os.Stdout, config, consoleFmt)
-}
-
 // --- Line breaking ---------------------------------------------------------
 /*
 Wikipedia:
@@ -172,11 +157,11 @@ func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []u
 			if linestart { // fragment is too long for a line
 				pos := prevpos + len(frag)
 				breaks = append(breaks, uint64(pos))
-				T().Infof("break @ %d", prevpos)
+				T().Debugf("line break @ %d", prevpos)
 				spaceleft = linewidth
 			} else { // fragment overshoots line
 				breaks = append(breaks, uint64(prevpos))
-				T().Infof("break @ %d", prevpos)
+				T().Debugf("line break @ %d", prevpos)
 				spaceleft = linewidth - fraglen
 			}
 		} else { // no break, just append the fragment to the current line
@@ -187,7 +172,7 @@ func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []u
 	}
 	if spaceleft < linewidth { // we have a partial line to consume
 		breaks = append(breaks, para.Raw().Len())
-		T().Infof("break @ %d", para.Raw().Len())
+		T().Debugf("line break @ %d", para.Raw().Len())
 	}
 	return breaks
 }

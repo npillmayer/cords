@@ -1,6 +1,11 @@
 /*
 Package formatter formats styled text on output devices with
-fixed-width fonts.
+fixed-width fonts. It is intended for situations where the application is
+responsible for the visual representation (as opposed to output to a
+browser, which usually addresses the complications of text by itself,
+transparently to the application).
+Think of this package in terms of `fmt.Println` for styled, bi-directional
+text.
 
 Output of styled text differs in many aspectes from simple string output.
 Not only do we need an output device which is capable of displaying text
@@ -19,10 +24,12 @@ correct visual representation. These steps are in a large part covered
 by various Unicode Annexes and it's in general non-trivial to get them
 right (https://raphlinus.github.io/text/2020/10/26/text-layout.html).
 Package formatter will apply rules from UAX#9 (Bidi), UAX#14 (line breaking),
-UAX#11 (character width), as well as some heuristics depending on the output
-device.
+UAX#29 (graphemes) and UAX#11 (character width), as well as some heuristics
+depending on the output device.
 
-Package formatter will not handle issues having to do with fonts or with
+This package does not constitute a typesetter. Therefore we will
+not deal with fonts, glyphing, variable text widths, elaborate line-breaking algorithms,
+etc. In particular we will not handle issues having to do with fonts or with
 locale-specific glyphs missing for an output device.
 
 Status

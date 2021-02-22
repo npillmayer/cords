@@ -131,15 +131,17 @@ func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
-	if err != nil {
-		return nil, nil, err
-	}
 	para.text.text = p
-	para.text.runs = runs(pStyles)
 	text := &Text{
 		text: line,
-		runs: runs(lineStyles),
+	}
+	if !cords.Cord(para.text.runs).IsVoid() {
+		lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
+		if err != nil {
+			return nil, nil, err
+		}
+		para.text.runs = runs(pStyles)
+		text.runs = runs(lineStyles)
 	}
 	var lineLev *bidi.ResolvedLevels
 	lineLev, para.levels = para.levels.Split(pos, true)
