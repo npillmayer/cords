@@ -1,9 +1,33 @@
 /*
-Package formatter formats styled text.
+Package formatter formats styled text on output devices with
+fixed-width fonts.
+
+Output of styled text differs in many aspectes from simple string output.
+Not only do we need an output device which is capable of displaying text
+styles, but we need to consider line-breaking and the handling of
+bi-directional (Bidi) text as well. This package helps performing the
+following tasks:
+
+▪︎ Select a formatter for a given output device
+
+▪︎ Create a suitable formatting configuration
+
+▪︎ Format a styled paragraph of possibly bi-directional text and output it to the device
+
+Formatting and output needs to perform a couple of steps to produce a
+correct visual representation. These steps are in a large part covered
+by various Unicode Annexes and it's in general non-trivial to get them
+right (https://raphlinus.github.io/text/2020/10/26/text-layout.html).
+Package formatter will apply rules from UAX#9 (Bidi), UAX#14 (line breaking),
+UAX#11 (character width), as well as some heuristics depending on the output
+device.
+
+Package formatter will not handle issues having to do with fonts or with
+locale-specific glyphs missing for an output device.
 
 Status
 
-Work in progress.
+Work in progress. API not stable.
 
 _________________________________________________________________________
 

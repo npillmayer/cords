@@ -1,7 +1,41 @@
 package formatter
 
+/*
+BSD 3-Clause License
+
+Copyright (c) 2020–21, Norbert Pillmayer
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 import (
 	"bufio"
+	"errors"
 	"io"
 	"os"
 
@@ -14,55 +48,16 @@ import (
 	"github.com/npillmayer/uax/uax14"
 )
 
-/*
-Wikipedia:
-
-	1. |  SpaceLeft := LineWidth
-	2. |  for each Word in Text
-	3. |      if (Width(Word) + SpaceWidth) > SpaceLeft
-	4. |           insert line break before Word in Text
-	5. |           SpaceLeft := LineWidth - Width(Word)
-	6. |      else
-	7. |           SpaceLeft := SpaceLeft - (Width(Word) + SpaceWidth)
-*/
-func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []uint64 {
-	//
-	linewrap := uax14.NewLineWrap()
-	segmenter := segment.NewSegmenter(linewrap)
-	spaceleft := linewidth
-	segmenter.Init(bufio.NewReader(para.Reader()))
-	breaks := make([]uint64, 0, 20)
-	prevpos := 0
-	for segmenter.Next() {
-		//T().Infof("----------- seg break -------------")
-		//p1, _ := segmenter.Penalties()
-		frag := string(segmenter.Bytes())
-		gstr := grapheme.StringFromString(frag)
-		fraglen := uax11.StringWidth(gstr, context)
-		//T().Infof("next segment (p=%d): %s   (len=%d|%d)", p1, gstr, fraglen, spaceleft)
-		if fraglen >= spaceleft { // TODO discard space, if language allows it
-			breaks = append(breaks, uint64(prevpos))
-			T().Infof("break @ %d", prevpos)
-			spaceleft = linewidth - fraglen
-		} else {
-			spaceleft -= fraglen
-			prevpos += len(frag)
-		}
-	}
-	if spaceleft < linewidth {
-		breaks = append(breaks, para.Raw().Len())
-		T().Infof("break @ %d", para.Raw().Len())
-	}
-	return breaks
-}
-
+// Config represents a set of configuration parameters for formatting.
 type Config struct {
 	LineWidth    int
 	Justify      bool
 	Proportional bool
+	Debug        bool
 	Context      *uax11.Context
 }
 
+// Format is an interface for formatting drivers, given an io.Writer
 type Format interface {
 	Preamble(io.Writer)
 	Postamble(io.Writer)
@@ -73,8 +68,17 @@ type Format interface {
 	Newline(io.Writer)
 }
 
+// Output formats a paragraph of style text using a given formatter.
+//
+// Neither of the arguments may be nil. However, it is safe to have config.Context
+// set to nil. In this case, uax11.LatinContext is used.
 func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format) error {
 	//
+	if para == nil || config == nil || format == nil {
+		return errors.New("illegal argument: nil")
+	} else if config.Context == nil {
+		config.Context = uax11.LatinContext
+	}
 	breaks := firstFit(para, config.LineWidth, config.Context)
 	format.Preamble(out)
 	for i, pos := range breaks {
@@ -121,13 +125,69 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 	return nil
 }
 
+// Print outputs a styled paragraph to stdout.
+//
+// If parameter config is nil,
+// a heuristic will create a config from the current terminal's properties (if
+// stdout is interactive). Config.Context will also be created based on heuristics
+// from the user environment.
 func Print(para *styled.Paragraph, config *Config) error {
 	if config == nil {
-		config = &Config{ // TODO from environment
-			LineWidth: 30,
-			Context:   uax11.LatinContext,
-		}
+		config = ConfigFromTerminal()
+		config.Context = uax11.ContextFromEnvironment()
 	}
 	consoleFmt := NewConsoleFixedWidthFormat(nil, nil)
 	return Output(para, os.Stdout, config, consoleFmt)
+}
+
+// --- Line breaking ---------------------------------------------------------
+/*
+Wikipedia:
+
+	1. |  SpaceLeft := LineWidth
+	2. |  for each Word in Text
+	3. |      if (Width(Word) + SpaceWidth) > SpaceLeft
+	4. |           insert line break before Word in Text
+	5. |           SpaceLeft := LineWidth - Width(Word)
+	6. |      else
+	7. |           SpaceLeft := SpaceLeft - (Width(Word) + SpaceWidth)
+*/
+func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []uint64 {
+	//
+	linewrap := uax14.NewLineWrap()
+	segmenter := segment.NewSegmenter(linewrap)
+	spaceleft := linewidth
+	segmenter.Init(bufio.NewReader(para.Reader()))
+	breaks := make([]uint64, 0, 20)
+	prevpos := 0
+	linestart := true
+	for segmenter.Next() {
+		//T().Infof("----------- seg break -------------")
+		//p1, _ := segmenter.Penalties()
+		frag := string(segmenter.Bytes())
+		gstr := grapheme.StringFromString(frag)
+		fraglen := uax11.StringWidth(gstr, context)
+		//T().Infof("next segment (p=%d): %s   (len=%d|%d)", p1, gstr, fraglen, spaceleft)
+		if fraglen >= spaceleft {
+			if linestart { // fragment is too long for a line
+				pos := prevpos + len(frag)
+				breaks = append(breaks, uint64(pos))
+				T().Infof("break @ %d", prevpos)
+				spaceleft = linewidth
+			} else { // fragment overshoots line
+				breaks = append(breaks, uint64(prevpos))
+				T().Infof("break @ %d", prevpos)
+				spaceleft = linewidth - fraglen
+			}
+		} else { // no break, just append the fragment to the current line
+			spaceleft -= fraglen
+			linestart = false
+		}
+		prevpos += len(frag)
+	}
+	if spaceleft < linewidth { // we have a partial line to consume
+		breaks = append(breaks, para.Raw().Len())
+		T().Infof("break @ %d", para.Raw().Len())
+	}
+	return breaks
 }
