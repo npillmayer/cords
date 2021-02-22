@@ -21,9 +21,9 @@ following tasks:
 
 Formatting and output needs to perform a couple of steps to produce a
 correct visual representation. These steps are in a large part covered
-by various Unicode Annexes and it's in general non-trivial to get them
+by various Unicode Annexes and in general it's non-trivial to get them
 right (https://raphlinus.github.io/text/2020/10/26/text-layout.html).
-Package formatter will apply rules from UAX#9 (Bidi), UAX#14 (line breaking),
+Package formatter will apply rules from UAX#9 (bidi), UAX#14 (line breaking),
 UAX#29 (graphemes) and UAX#11 (character width), as well as some heuristics
 depending on the output device.
 

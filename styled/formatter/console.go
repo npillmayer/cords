@@ -132,6 +132,7 @@ func makeDefaultPalette() map[styled.Style]*color.Color {
 
 // StyledText is called by the formatting driver to output a sequence of
 // uniformly styled text (item). It uses colors to visualize styles.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) StyledText(s string, style styled.Style, w io.Writer) {
 	if style != nil {
 		c, ok := fw.colors[style]
@@ -145,22 +146,26 @@ func (fw *ConsoleFixedWidth) StyledText(s string, style styled.Style, w io.Write
 
 // Preamble is called by the output driver before a paragraph of text will be formatted.
 // It outputs the `Preamble` escape sequence from fw.Codes.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) Preamble(w io.Writer) {
 	w.Write(fw.Codes.Preamble)
 }
 
 // Postamble will be called after a paragraph of text has been formatted.
 // It outputs the `Postamble` escape sequence from fw.Codes.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) Postamble(w io.Writer) {
 	w.Write(fw.Codes.Preamble)
 }
 
 // LTR signals to w that a bidi.LeftToRight sequence is to be output.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) LTR(w io.Writer) {
 	w.Write(fw.Codes.LTR)
 }
 
 // RTL signals to w that a bidi.RightToLeft sequence is to be output.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) RTL(w io.Writer) {
 	w.Write(fw.Codes.RTL)
 }
@@ -169,6 +174,7 @@ func (fw *ConsoleFixedWidth) RTL(w io.Writer) {
 // length is the total width of the characters that will be formatted, measured
 // in “en”s, i.e. fixed width positions. linelength is the target line length
 // to wrap long lines.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) Line(length int, linelength int, w io.Writer) {
 	fw.ccnt = 0
 	fw.ctarget = linelength
@@ -176,6 +182,7 @@ func (fw *ConsoleFixedWidth) Line(length int, linelength int, w io.Writer) {
 
 // Newline will be called at the end of every formatted line of text.
 // It outputs the `Newline` escape sequence from fw.Codes.
+// (Part of interface Format)
 func (fw *ConsoleFixedWidth) Newline(w io.Writer) {
 	w.Write(fw.Codes.Newline)
 }
@@ -183,8 +190,8 @@ func (fw *ConsoleFixedWidth) Newline(w io.Writer) {
 // --- Config for terminals --------------------------------------------------
 
 // ConfigFromTerminal is a simple helper for creating a formatting Config.
-// It checks wether stdout is a terminal and if so, it reads the terminal's width
-// and set the Config.LineWidth parameter accordingly
+// It checks wether stdout is a terminal, and if so it reads the terminal's width
+// and sets the Config.LineWidth parameter accordingly.
 func ConfigFromTerminal() *Config {
 	config := &Config{}
 	if term.IsTerminal(0) {

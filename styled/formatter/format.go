@@ -57,13 +57,13 @@ type Config struct {
 
 // Format is an interface for formatting drivers, given an io.Writer
 type Format interface {
-	Preamble(io.Writer)
-	Postamble(io.Writer)
-	StyledText(string, styled.Style, io.Writer)
-	LTR(io.Writer)
-	RTL(io.Writer)
-	Line(int, int, io.Writer)
-	Newline(io.Writer)
+	Preamble(io.Writer)                         // output a preamble before a styled paragraph
+	Postamble(io.Writer)                        // output a postamble
+	StyledText(string, styled.Style, io.Writer) // output uniformly styled text run (item)
+	LTR(io.Writer)                              // signal the start of a left-to-right run of text
+	RTL(io.Writer)                              // signal the start of a right-to-left run of text
+	Line(int, int, io.Writer)                   // signal for the start of a new line
+	Newline(io.Writer)                          // output an end-of-line delimiter
 }
 
 // Output formats a paragraph of style text using a given formatter.
