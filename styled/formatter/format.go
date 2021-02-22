@@ -37,6 +37,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/cords/styled/itemized"
@@ -64,7 +65,19 @@ type Format interface {
 	RTL(io.Writer)                              // signal the start of a right-to-left run of text
 	Line(int, int, io.Writer)                   // signal for the start of a new line
 	Newline(io.Writer)                          // output an end-of-line delimiter
+	NeedsReordering() ReorderFlag               // what kind of re-ordering support does the formatter need?
 }
+
+// ReorderFlag is a hint from a Format whether it needs strings handed over reordered in
+// some fashion.
+type ReorderFlag int
+
+// Different formatters have different capabilities regarding bidirectional text.
+const (
+	ReorderNone      ReorderFlag = iota // formatter does reordering on its own (e.g., browser)
+	ReorderWords                        // formatter will handle RTL words, but not phrases
+	ReorderGraphemes                    // formatter relies on application for reordering
+)
 
 // Output formats a paragraph of style text using a given formatter.
 //
@@ -101,11 +114,10 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 			} else {
 				format.LTR(out)
 			}
-			segit := run.SegmentIterator()
+			segit := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
 			for segit.Next() {
 				dir, from, to := segit.Segment()
 				T().Infof("segment (%v): %d…%d", dir, from, to)
-				// TODO cut out from…to from line
 				section, err := styled.Section(line, from, to)
 				if err != nil {
 					return err
@@ -114,6 +126,9 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 				for iter.Next() {
 					text, style, from, to := iter.Style()
 					T().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
+					if run.IsOpposite(bidi.LeftToRight) {
+						text = reorder(text, format.NeedsReordering())
+					}
 					format.StyledText(text, style, out)
 				}
 			}
@@ -127,7 +142,11 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 
 // --- Line breaking ---------------------------------------------------------
 /*
-Wikipedia:
+We do just a simplistics kind of line breaking, using a first fit algorithm.
+It does not squash whitespace and simply consideres breaks where UAX#14
+recommends.
+
+From Wikipedia:
 
 	1. |  SpaceLeft := LineWidth
 	2. |  for each Word in Text
@@ -175,4 +194,36 @@ func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []u
 		T().Debugf("line break @ %d", para.Raw().Len())
 	}
 	return breaks
+}
+
+// ---------------------------------------------------------------------------
+
+func reorder(s string, how ReorderFlag) string {
+	if how == ReorderNone {
+		return s
+	}
+	if how == ReorderWords {
+		T().Errorf("REVERSE WORDS: %s", s)
+		seg := segment.NewSegmenter() // uses a simple word breaker
+		seg.Init(strings.NewReader(s))
+		out := make([]byte, len(s))
+		cursor := len(out)
+		for seg.Next() {
+			word := seg.Bytes()
+			cursor -= len(word)
+			copy(out[cursor:], word)
+		}
+		return string(out)
+	}
+	// fully reorder by graphemes
+	gstr := grapheme.StringFromString(s)
+	n := gstr.Len()
+	out := make([]byte, len(s))
+	for i, j := n-1, 0; i >= 0; i-- {
+		g := gstr.Nth(i)
+		T().Infof("grapheme = '%s' (%d)", g, len(g))
+		copy(out[j:], g)
+		j += len(g)
+	}
+	return string(out)
 }

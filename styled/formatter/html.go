@@ -47,6 +47,7 @@ var htmlStyleNames map[inline.Style]string = map[inline.Style]string{
 	inline.MarkedStyle:  "marked",
 }
 
+/*
 type HTMLStyle inline.Style
 
 func (s HTMLStyle) String() string {
@@ -80,7 +81,6 @@ func (s HTMLStyle) Add(sty HTMLStyle) HTMLStyle {
 	return HTMLStyle(s.Add(sty))
 }
 
-/*
 // HTMLFormatter formats a styled text as HTML
 type HTMLFormatter struct {
 	out    *bytes.Buffer

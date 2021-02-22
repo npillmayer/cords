@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import (
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/npillmayer/cords/styled"
@@ -52,16 +53,34 @@ type ControlCodes struct {
 	Newline             []byte
 }
 
-// DefaultCodes is the default set of control codes.
+// StandardCodes is the set of control codes for standards conforming terminals.
 // See https://terminal-wg.pages.freedesktop.org/bidi/recommendation/escape-sequences.html
 //
-var DefaultCodes = ControlCodes{
+var StandardCodes = ControlCodes{
 	Preamble:  []byte{27, '[', '8', 'l'}, // switch to explicit mode
 	Postamble: []byte{},
 	LTR:       []byte{27, '[', '1', ' ', 'k'},
 	RTL:       []byte{27, '[', '2', ' ', 'k'},
 	Newline:   []byte{'\n'},
 	//Default: CSI 0 SPACE k (or CSI SPACE k)
+}
+
+// EmptyCodes is the default set of control codes.
+var EmptyCodes = ControlCodes{
+	Preamble:  []byte{},
+	Postamble: []byte{},
+	LTR:       []byte{},
+	RTL:       []byte{},
+	Newline:   []byte{'\n'},
+}
+
+// WindowsCodes is the default set of control codes for Windows.
+var WindowsCodes = ControlCodes{
+	Preamble:  []byte{},
+	Postamble: []byte{},
+	LTR:       []byte{},
+	RTL:       []byte{},
+	Newline:   []byte{'\r', '\n'},
 }
 
 // ConsoleFixedWidth is a type for outputting formatted text to a console with
@@ -79,10 +98,11 @@ var DefaultCodes = ControlCodes{
 // applications to be content with handling Latin text only.
 //
 type ConsoleFixedWidth struct {
-	Codes   *ControlCodes
-	colors  map[styled.Style]*color.Color
-	ccnt    int // number of character positions already printed for line
-	ctarget int // linelength in fixedwidth ‘en’s
+	Codes        *ControlCodes // escape sequences, usually set by constructur
+	NeedsReorder ReorderFlag   // re-ordering hint, usually set by constructor
+	colors       map[styled.Style]*color.Color
+	ccnt         int // number of character positions already printed for line
+	ctarget      int // linelength in fixedwidth ‘en’s
 }
 
 // Print outputs a styled paragraph to stdout.
@@ -102,14 +122,21 @@ func (fw *ConsoleFixedWidth) Print(para *styled.Paragraph, config *Config) error
 // NewConsoleFixedWidthFormat creates a new formatter. It is to be used for consoles
 // with a fixed width font.
 //
-// codes is a table of escape sequences to control Bidi behaviour of the console.
+// codes is a table of escape sequences to control Bidi behaviour of the console and
+// may be nil.
 // colors is a map from the styled.Styles to colors, used for display. It may contain
 // just a subset of the styles used in the texts which will be handled
 // by this formatter.
 //
-func NewConsoleFixedWidthFormat(codes *ControlCodes, colors map[styled.Style]*color.Color) *ConsoleFixedWidth {
+// This API is for clients having a need for fine control over the formatter.
+// Often it is enough to call `NewLocalConsoleFormat`.
+//
+func NewConsoleFixedWidthFormat(codes *ControlCodes, colors map[styled.Style]*color.Color,
+	reorder ReorderFlag) *ConsoleFixedWidth {
+	//
 	fw := &ConsoleFixedWidth{
-		Codes: &DefaultCodes,
+		Codes:        &EmptyCodes,
+		NeedsReorder: reorder,
 	}
 	if codes != nil {
 		fw.Codes = codes
@@ -124,8 +151,10 @@ func NewConsoleFixedWidthFormat(codes *ControlCodes, colors map[styled.Style]*co
 
 func makeDefaultPalette() map[styled.Style]*color.Color {
 	palette := map[styled.Style]*color.Color{
-		inline.PlainStyle: color.New(color.FgBlue),
-		inline.BoldStyle:  color.New(color.FgRed),
+		inline.BoldStyle:    color.New(color.Bold),
+		inline.EmStyle:      color.New(color.Underline),
+		inline.ItalicsStyle: color.New(color.Underline),
+		inline.StrongStyle:  color.New(color.FgRed).Add(color.Bold),
 	}
 	return palette
 }
@@ -187,10 +216,51 @@ func (fw *ConsoleFixedWidth) Newline(w io.Writer) {
 	w.Write(fw.Codes.Newline)
 }
 
+// NeedsReordering signals to the formatting driver what kind of support the
+// console needs with Bidi text.
+func (fw *ConsoleFixedWidth) NeedsReordering() ReorderFlag {
+	return fw.NeedsReorder
+}
+
+// --- Flavours of console formatters ----------------------------------------
+
+// NewLocalConsoleFormat creates a formatter for the terminal stdout is connected to.
+// It uses various heuristics to identify the correct settings.
+func NewLocalConsoleFormat() *ConsoleFixedWidth {
+	termvar := os.Getenv("TERM")
+	if strings.Contains(termvar, "xterm") {
+		return newXTermFormat(termvar)
+	}
+	codes := WindowsCodes
+	return NewConsoleFixedWidthFormat(&codes, nil, ReorderNone)
+}
+
+func newXTermFormat(termvar string) *ConsoleFixedWidth {
+	// Apple Mac:
+	// TERM_PROGRAM=Apple_Terminal
+	// TERM=xterm-256color
+	appleTerm := false
+	if termprog, ok := os.LookupEnv("TERM_PROGRAM"); ok {
+		if strings.Contains(strings.ToLower(termprog), "apple") {
+			appleTerm = true
+		}
+	}
+	controls := EmptyCodes
+	palette := makeDefaultPalette()
+	xterm := NewConsoleFixedWidthFormat(&controls, palette, ReorderNone)
+	if appleTerm {
+		xterm.NeedsReorder = ReorderNone
+	} else if strings.Contains(termvar, "kitty") {
+		// TERM=xterm-kitty
+		xterm.NeedsReorder = ReorderWords
+	}
+	return xterm
+}
+
 // --- Config for terminals --------------------------------------------------
 
 // ConfigFromTerminal is a simple helper for creating a formatting Config.
-// It checks wether stdout is a terminal, and if so it reads the terminal's width
+// It checks whether stdout is a terminal, and if so it reads the terminal's width
 // and sets the Config.LineWidth parameter accordingly.
 func ConfigFromTerminal() *Config {
 	config := &Config{}
