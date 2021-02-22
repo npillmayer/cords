@@ -70,7 +70,7 @@ one for console output (like in the example above) and one for HTML output.
 Status
 
 Work in progress, especially the HTML formatter is in it's infancy.
-Needs a lot more of testing.
+Needs a lot more testing.
 API not stable.
 
 _________________________________________________________________________

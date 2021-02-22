@@ -1,6 +1,7 @@
 package formatter
 
 import (
+	"os"
 	"testing"
 
 	"github.com/npillmayer/cords/styled"
@@ -27,7 +28,7 @@ func TestReorderGraphemes(t *testing.T) {
 func TestFmt1(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
 	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
 	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
@@ -66,4 +67,21 @@ func ExampleConsoleFixedWidth() {
 	// The quick brown fox jumps over the כלב <nl>
 	// עצלן!<nl>
 	//
+}
+
+func TestHTML1(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	//
+	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
+	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
+	text.Style(inline.BoldStyle, 4, 9)
+	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	html := NewHTML(ReorderNone)
+	html.Print(para, os.Stdout, nil)
+	//t.Fail()
 }
