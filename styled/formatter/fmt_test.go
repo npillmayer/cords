@@ -45,6 +45,27 @@ func TestFmt1(t *testing.T) {
 	//t.Fail()
 }
 
+func TestVTE(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	//
+	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
+	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
+	text.Style(inline.BoldStyle, 4, 9)
+	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	os.Setenv("VTE_VERSION", "123")
+	console := newXTermFormat("xterm-color256")
+	err = console.Print(para, nil)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Errorf("TODO: RTL does not work")
+}
+
 // Example for bi-directional text and line-breaking according to the Unicode
 // Bidi algorithm. We set up an unusual console format to make newlines visible
 // in the Godoc documentation. Then we configure for a line length of 40 'en's,

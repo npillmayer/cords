@@ -238,17 +238,27 @@ func NewLocalConsoleFormat() *ConsoleFixedWidth {
 func newXTermFormat(termvar string) *ConsoleFixedWidth {
 	// Apple Mac:
 	// TERM_PROGRAM=Apple_Terminal
-	// TERM=xterm-256color
 	appleTerm := false
 	if termprog, ok := os.LookupEnv("TERM_PROGRAM"); ok {
 		if strings.Contains(strings.ToLower(termprog), "apple") {
 			appleTerm = true
 		}
 	}
+	// VTE_VERSION=6203
+	vteTerm := false
+	if _, ok := os.LookupEnv("VTE_VERSION"); ok {
+		vteTerm = true
+		appleTerm = false // for unlikely case of vte port on Mac
+	}
 	controls := EmptyCodes
 	palette := makeDefaultPalette()
+	if vteTerm {
+		controls = StandardCodes
+	}
 	xterm := NewConsoleFixedWidthFormat(&controls, palette, ReorderNone)
-	if appleTerm {
+	if vteTerm {
+		xterm.NeedsReorder = ReorderGraphemes
+	} else if appleTerm {
 		xterm.NeedsReorder = ReorderNone
 	} else if strings.Contains(termvar, "kitty") {
 		// TERM=xterm-kitty
