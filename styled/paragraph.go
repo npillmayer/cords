@@ -93,7 +93,7 @@ func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
 // This may be thought of as a “push”-interface to access style runs for a text.
 // For a “pull”-interface please refer to interface `itemized.Iterator`.
 //
-func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos uint64) error) error {
+func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos, length uint64) error) error {
 	t := para.text
 	if t == nil {
 		return nil
@@ -105,7 +105,7 @@ func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos uint64
 			return err
 		}
 		st := leaf.(*styleLeaf).style
-		return f(content, st, i+para.Offset)
+		return f(content, st, i+para.Offset, length)
 	})
 	return err
 }
