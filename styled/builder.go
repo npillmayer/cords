@@ -55,3 +55,8 @@ func (b *TextBuilder) Append(leaf cords.Leaf, style Style) error {
 	b.length += leaf.Weight()
 	return nil
 }
+
+// Len returns the provisional total length of the fragments collected up to now.
+func (b *TextBuilder) Len() uint64 {
+	return b.length
+}
