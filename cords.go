@@ -141,6 +141,7 @@ func (cord Cord) String() string {
 	var bf bytes.Buffer
 	var err error
 	err = cord.EachLeaf(func(leaf Leaf, pos uint64) error {
+		//T().Debugf("cord fragment = '%s'", leaf.String())
 		if _, err = bf.WriteString(leaf.String()); err != nil {
 			T().Errorf(err.Error())
 			return err
