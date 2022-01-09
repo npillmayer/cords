@@ -3,6 +3,10 @@ package cords
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"testing"
 )
 
 type nodeids struct {
@@ -31,7 +35,7 @@ func (ids *nodeids) alloc(node *cordNode) int {
 }
 
 // Cord2Dot outputs the internal structure of a Cord in Graphviz DOT format
-// (for debugging purposes).
+// (for debugging purposes). Outputs to writer `w`.
 //
 func Cord2Dot(text Cord, w io.Writer) {
 	io.WriteString(w, "strict digraph {\n")
@@ -68,11 +72,37 @@ func Cord2Dot(text Cord, w io.Writer) {
 		return nil
 	})
 	if err != nil {
-		T().Errorf("cord DOT: %s", err.Error())
+		tracer().Errorf("cord DOT: %s", err.Error())
 	}
 	io.WriteString(w, nodelist)
 	io.WriteString(w, edgelist)
 	io.WriteString(w, "}\n")
+}
+
+// Dotty is a helper for testing. It writes the internal representation of a Cord
+// to an SVG image file in the current directory. If an error occurs, `t.Error(…)`
+// will be called and the test fails.
+//
+func Dotty(text Cord, t *testing.T) {
+	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer func() {
+		tmpfile.Close()
+		os.Remove(tmpfile.Name()) // clean up
+	}()
+	t.Logf("writing Cord digraph to %s\n", tmpfile.Name())
+	Cord2Dot(text, tmpfile)
+	outOption := fmt.Sprintf("-o%s.svg", tmpfile.Name())
+	cmd := exec.Command("dot", "-Tsvg", outOption, tmpfile.Name())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	t.Log("writing SVG cord tree\n")
+	if err := cmd.Run(); err != nil {
+		t.Error(err.Error())
+	}
 }
 
 func emptyNode(id int) string {

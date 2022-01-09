@@ -4,16 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
 	"testing"
 
 	"github.com/npillmayer/cords"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
 
 	//"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
@@ -25,17 +18,11 @@ func TestInsert(t *testing.T) {
 	spn := toSpan(1, 5)
 	cb.Append(makeStyleLeaf(bold, spn))
 	_ = cb.Cord()
-	//dotty(newrun, t)
 }
 
 func TestBasicStyle(t *testing.T) {
-	// gtrace.CoreTracer = gologadapter.New()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	// make a text
 	text := cords.FromString("Hello World")
@@ -57,13 +44,8 @@ func TestBasicStyle(t *testing.T) {
 }
 
 func TestTextSimple(t *testing.T) {
-	// gtrace.CoreTracer = gologadapter.New()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	text := TextFromString("Hello World, how are you?")
 	bold, italic := teststyle("bold"), teststyle("italic")
@@ -76,9 +58,8 @@ func TestTextSimple(t *testing.T) {
 }
 
 func TestEach(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	text := TextFromString("Hello World, how are you?")
 	bold := teststyle("bold")
@@ -156,24 +137,4 @@ func (vf testfmtr) Format(buf []byte, f Style, w io.Writer) error {
 func (vf testfmtr) EndRun(f Style, w io.Writer) error {
 	_, err := w.Write([]byte("|"))
 	return err
-}
-
-// --- dot -------------------------------------------------------------------
-
-func dotty(text cords.Cord, t *testing.T) *os.File {
-	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
-	if err != nil {
-		log.Fatal(err)
-	}
-	//defer os.Remove(tmpfile.Name()) // clean up
-	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
-	cords.Cord2Dot(text, tmpfile)
-	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	fmt.Printf("writing SVG tree image to tree.svg\n")
-	if err := cmd.Run(); err != nil {
-		t.Error(err.Error())
-	}
-	return tmpfile
 }

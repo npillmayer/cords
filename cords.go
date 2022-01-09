@@ -143,7 +143,7 @@ func (cord Cord) String() string {
 	err = cord.EachLeaf(func(leaf Leaf, pos uint64) error {
 		//T().Debugf("cord fragment = '%s'", leaf.String())
 		if _, err = bf.WriteString(leaf.String()); err != nil {
-			T().Errorf(err.Error())
+			tracer().Errorf(err.Error())
 			return err
 		}
 		return nil
@@ -459,11 +459,11 @@ func dump(node *cordNode) {
 	traverse(node, node.Weight(), 0, func(node *cordNode, pos uint64, depth int) error {
 		if node.IsLeaf() {
 			l := node.AsLeaf()
-			T().Debugf("%sL = %v", indent(depth), strstart(l))
+			tracer().Debugf("%sL = %v", indent(depth), strstart(l))
 			return nil
 		}
 		n := node.AsInner()
-		T().Debugf("%sN = %v", indent(depth), n)
+		tracer().Debugf("%sN = %v", indent(depth), n)
 		return nil
 	})
 }

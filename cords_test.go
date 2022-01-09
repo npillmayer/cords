@@ -4,17 +4,12 @@ import (
 	"io"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestNewStringCord(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c := FromString("Hello World")
 	t.Logf("c = '%s'", c)
@@ -31,10 +26,8 @@ func TestNewStringCord(t *testing.T) {
 }
 
 func TestCordIndex1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c := FromString("Hello World")
 	node, i, err := c.index(6)
@@ -48,10 +41,8 @@ func TestCordIndex1(t *testing.T) {
 }
 
 func TestCordConcat(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello World")
 	c2 := FromString(", how are you?")
@@ -71,10 +62,8 @@ func TestCordConcat(t *testing.T) {
 }
 
 func TestCordLength1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello ")
 	t.Logf("c1.len=%d", c1.root.Len())
@@ -94,10 +83,8 @@ func TestCordLength1(t *testing.T) {
 }
 
 func TestRotateLeft(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello")
 	c2 := FromString(" World,")
@@ -116,10 +103,8 @@ func TestRotateLeft(t *testing.T) {
 }
 
 func TestCordIndex2(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
@@ -135,10 +120,8 @@ func TestCordIndex2(t *testing.T) {
 }
 
 func TestBalance1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello")
 	c2 := FromString(" World,")
@@ -163,10 +146,8 @@ func TestBalance1(t *testing.T) {
 }
 
 func TestCordSplit1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
@@ -196,10 +177,8 @@ func TestCordSplit1(t *testing.T) {
 }
 
 func TestCordInsert(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
@@ -220,15 +199,11 @@ func TestCordInsert(t *testing.T) {
 	if x.String() != "Hello, World!" {
 		t.Errorf("Double insert resulted in inexpected string: %s", x)
 	}
-	// f := dotty(FromString(","), t)
-	// defer f.Close()
 }
 
 func TestCordSplit2(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	// Build example cord from Wikipedia
 	c3 := Concat(FromString("s"), FromString("_Simon"))
@@ -256,10 +231,8 @@ func TestCordSplit2(t *testing.T) {
 }
 
 func TestCordCut(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c1 := FromString("Hello ")
 	c2 := FromString("World")
@@ -274,15 +247,11 @@ func TestCordCut(t *testing.T) {
 	if y.String() != "o Wo" {
 		t.Errorf("Expected cut-out segment to be 'o Wo', is '%s'", y)
 	}
-	// f := dotty(x, t)
-	// defer f.Close()
 }
 
 func TestCordReport(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	c := FromString("Hello_")
 	c = Concat(c, FromString("my_"))
@@ -302,10 +271,8 @@ func TestCordReport(t *testing.T) {
 }
 
 func TestCordSubstr(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	// Build example cord from Wikipedia
 	c3 := Concat(FromString("s"), FromString("_Simon"))
@@ -329,15 +296,11 @@ func TestCordSubstr(t *testing.T) {
 	if x.root.Height() != 4 {
 		t.Errorf("Expected height of root node to be 4, is %d", x.root.Height())
 	}
-	// tmpfile := dotty(c, t)
-	// defer tmpfile.Close()
 }
 
 func TestCordBuilder(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := NewBuilder()
 	b.Append(StringLeaf("name_is"))
@@ -355,10 +318,8 @@ func TestCordBuilder(t *testing.T) {
 }
 
 func TestCordCutAndInsert(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := NewBuilder()
 	b.Append(StringLeaf("Hello_"))
@@ -377,18 +338,11 @@ func TestCordCutAndInsert(t *testing.T) {
 	if y.IsVoid() {
 		t.Errorf("cord is void after cut and insert")
 	}
-	// f := dotty(y, t)
-	// defer f.Close()
 }
 
 func TestCordReader(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	// gtrace.CoreTracer = gologadapter.New()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := NewBuilder()
 	b.Append(StringLeaf("name_is"))
@@ -401,7 +355,7 @@ func TestCordReader(t *testing.T) {
 	dump(&cord.root.cordNode)
 	t.Logf("builder made cord='%s'", cord)
 	reader := cord.Reader()
-	p := make([]byte, 5, 5)
+	p := make([]byte, 5)
 	n, err := reader.Read(p)
 	if err != nil {
 		t.Errorf(err.Error())
@@ -418,7 +372,7 @@ func TestCordReader(t *testing.T) {
 		t.Logf("n=%d, p=%s", n, string(p))
 		t.Fatalf("expected Read() to return 5 bytes, have %d", n)
 	}
-	p = make([]byte, 50, 50)
+	p = make([]byte, 50)
 	n, err = reader.Read(p)
 	if err != nil {
 		t.Errorf(err.Error())
@@ -427,7 +381,7 @@ func TestCordReader(t *testing.T) {
 		t.Logf("n=%d, p=%s", n, string(p))
 		t.Fatalf("expected Read() to return 12 bytes, have %d", n)
 	}
-	n, err = reader.Read(p)
+	_, err = reader.Read(p)
 	if err != io.EOF {
 		if err != nil {
 			t.Errorf(err.Error())

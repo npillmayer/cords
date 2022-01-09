@@ -1,27 +1,16 @@
 package inline
 
 import (
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/cords"
-	"github.com/npillmayer/cords/styled"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"golang.org/x/net/html"
 )
 
 func TestHTMLFromTree(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	r := strings.NewReader(`
 	<!DOCTYPE html>
@@ -43,16 +32,11 @@ func TestHTMLFromTree(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("text = '%s'", text.Raw())
-	tmpfile := dotty(text, t)
-	defer tmpfile.Close()
-	//t.Fail()
 }
 
 func TestHTMLParse(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	r := strings.NewReader(`<p>My <b>first</b> paragraph.</p>`)
 	text, err := TextFromHTML(r)
@@ -60,27 +44,4 @@ func TestHTMLParse(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	t.Logf("text = '%s'", text.Raw())
-	tmpfile := dotty(text, t)
-	defer tmpfile.Close()
-	//t.Fail()
-}
-
-// --- Helpers ---------------------------------------------------------------
-
-func dotty(text *styled.Text, t *testing.T) *os.File {
-	tmpfile, err := ioutil.TempFile(".", "styled.*.dot")
-	if err != nil {
-		log.Fatal(err)
-	}
-	//defer os.Remove(tmpfile.Name()) // clean up
-	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
-	cords.Cord2Dot(text.Raw(), tmpfile)
-	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	fmt.Printf("writing SVG tree image to tree.svg\n")
-	if err := cmd.Run(); err != nil {
-		t.Error(err.Error())
-	}
-	return tmpfile
 }

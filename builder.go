@@ -19,7 +19,7 @@ func NewBuilder() *Builder {
 func (b Builder) Cord() Cord {
 	b.done = true
 	if b.cord.IsVoid() {
-		T().Debugf("cord builder: cord is void")
+		tracer().Debugf("cord builder: cord is void")
 	}
 	return b.cord
 }

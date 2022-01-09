@@ -2,19 +2,11 @@ package metrics
 
 import (
 	"bufio"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/npillmayer/cords"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -33,7 +25,6 @@ func TestRegexAllSubmatchIndex(t *testing.T) {
 		t.Logf(string(content[loc[2]:loc[3]]))
 		t.Logf(string(content[loc[4]:loc[5]]))
 	}
-	//t.Fail()
 }
 
 func TestRegexAllIndex(t *testing.T) {
@@ -48,14 +39,11 @@ func TestRegexAllIndex(t *testing.T) {
 	} else {
 		t.Logf("no match")
 	}
-	//t.Fail()
 }
 
 func TestDelimit(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	content := []byte("Londonderry")
 	pattern := `o.`
@@ -69,10 +57,8 @@ func TestDelimit(t *testing.T) {
 }
 
 func TestMetricBasic(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := cords.NewBuilder()
 	b.Append(stringLeaf("name_is"))
@@ -95,13 +81,8 @@ func TestMetricBasic(t *testing.T) {
 }
 
 func TestMetricLines(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	// gtrace.CoreTracer = gologadapter.New()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	b := cords.NewBuilder()
 	b.Append(stringLeaf("Hello\n"))
@@ -138,13 +119,8 @@ func TestMetricLines(t *testing.T) {
 }
 
 func TestSplitFunc(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	// gtrace.CoreTracer = gologadapter.New()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	str := strings.NewReader("")
 	//str := strings.NewReader("the quick brown fox")
@@ -161,13 +137,8 @@ func TestSplitFunc(t *testing.T) {
 }
 
 func TestMetricSpanWord(t *testing.T) {
-	// gtrace.CoreTracer = gotestingadapter.New()
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
 	//
 	text := cords.FromString("Hello my name is Simon")
 	//
@@ -180,18 +151,11 @@ func TestMetricSpanWord(t *testing.T) {
 	if cord.IsVoid() {
 		t.Fatalf("resulting aligned cord is void, shouldn't")
 	}
-	// tmpfile := dotty(cord, t)
-	// defer tmpfile.Close()
 }
 
 func TestMetricWordSpans(t *testing.T) {
-	// gtrace.CoreTracer = gotestingadapter.New()
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
 	//
 	b := cords.NewBuilder()
 	b.Append(stringLeaf("Hello "))
@@ -205,8 +169,6 @@ func TestMetricWordSpans(t *testing.T) {
 		t.Fatalf("Expected non-void result cord, is void")
 	}
 	t.Logf("builder made cord='%s'", text)
-	// tmpfile := dotty(text, t)
-	// defer tmpfile.Close()
 	//
 	metric := Words()
 	value, cord, err := Align(text, 0, text.Len(), metric)
@@ -217,26 +179,6 @@ func TestMetricWordSpans(t *testing.T) {
 	if cord.IsVoid() {
 		t.Fatalf("resulting aligned cord is void, shouldn't")
 	}
-}
-
-// --- Helpers ---------------------------------------------------------------
-
-func dotty(text cords.Cord, t *testing.T) *os.File {
-	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
-	if err != nil {
-		log.Fatal(err)
-	}
-	//defer os.Remove(tmpfile.Name()) // clean up
-	fmt.Printf("writing digraph to %s\n", tmpfile.Name())
-	cords.Cord2Dot(text, tmpfile)
-	cmd := exec.Command("dot", "-Tsvg", "-otree.svg", tmpfile.Name())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	fmt.Printf("writing SVG tree image to tree.svg\n")
-	if err := cmd.Run(); err != nil {
-		t.Error(err.Error())
-	}
-	return tmpfile
 }
 
 // --- Test helpers ----------------------------------------------------------

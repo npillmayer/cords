@@ -152,36 +152,36 @@ func ApplyMetric(cord Cord, i, j uint64, metric Metric) (MetricValue, error) {
 }
 
 func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
-	T().Debugf("called applyMetric([%d], %d, %d)", node.Weight(), i, j)
+	tracer().Debugf("called applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	if node.IsLeaf() {
 		leaf := node.AsLeaf()
-		T().Debugf("METRIC(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
+		tracer().Debugf("METRIC(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
 		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
 		v := metric.Apply(s)
-		T().Debugf("leaf metric value = %v", v)
+		tracer().Debugf("leaf metric value = %v", v)
 		return v
 	}
 	var v, vl, vr MetricValue
 	if i < node.Weight() && node.Left() != nil {
 		vl = applyMetric(node.Left(), i, j, metric)
-		T().Debugf("left metric value = %v", vl)
+		tracer().Debugf("left metric value = %v", vl)
 	}
 	if node.Right() != nil && j > node.Weight() {
 		w := node.Weight()
 		vr = applyMetric(node.Right(), i-umin(w, i), j-w, metric)
-		T().Debugf("right metric value = %v", vr)
+		tracer().Debugf("right metric value = %v", vr)
 	}
 	if !isnull(vl) && !isnull(vr) {
-		T().Debugf("COMBINE %v  +  %v", vl, vr)
+		tracer().Debugf("COMBINE %v  +  %v", vl, vr)
 		v = metric.Combine(vl, vr, metric)
 	} else if !isnull(vl) {
 		v = vl
 	} else if !isnull(vr) {
 		v = vr
 	}
-	T().Debugf("combined metric value = %v", v)
-	T().Debugf("node=%v", node)
-	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
+	tracer().Debugf("combined metric value = %v", v)
+	tracer().Debugf("node=%v", node)
+	tracer().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	return v
 }
 
@@ -211,10 +211,10 @@ func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) 
 }
 
 func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMetric) (MetricValue, Cord) {
-	T().Debugf("called applyMaterializedMetric([%d], %d, %d)", node.Weight(), i, j)
+	tracer().Debugf("called applyMaterializedMetric([%d], %d, %d)", node.Weight(), i, j)
 	if node.IsLeaf() {
 		leaf := node.AsLeaf()
-		T().Debugf("M-METRIC(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
+		tracer().Debugf("M-METRIC(%s|%d, %d, %d)", leaf, leaf.Len(), i, j)
 		s := leaf.leaf.Substring(umax(0, i), umin(j, leaf.Len()))
 		v := metric.Apply(s)
 		c := buildFragmentCord(metric.Leafs(v, false))
@@ -227,15 +227,15 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 	var c, cl, cr Cord
 	if i < node.Weight() && node.Left() != nil {
 		vl, cl = applyMaterializedMetric(node.Left(), i, j, metric)
-		T().Debugf("left metric value = %v", vl)
+		tracer().Debugf("left metric value = %v", vl)
 	}
 	if node.Right() != nil && j > node.Weight() {
 		w := node.Weight()
 		vr, cr = applyMaterializedMetric(node.Right(), i-umin(w, i), j-w, metric)
-		T().Debugf("right metric value = %v", vr)
+		tracer().Debugf("right metric value = %v", vr)
 	}
 	if !isnull(vl) && !isnull(vr) {
-		T().Debugf("COMBINE %v  +  %v", vl, vr)
+		tracer().Debugf("COMBINE %v  +  %v", vl, vr)
 		v = metric.Combine(vl, vr, metric)
 		mid := buildFragmentCord(metric.Leafs(v, false))
 		c = Concat(cl, mid, cr)
@@ -246,12 +246,12 @@ func applyMaterializedMetric(node *cordNode, i, j uint64, metric MaterializedMet
 		v = vr
 		c = cr
 	}
-	T().Debugf("combined metric value = %v", v)
-	T().Debugf("node=%v", node)
+	tracer().Debugf("combined metric value = %v", v)
+	tracer().Debugf("node=%v", node)
 	if !c.IsVoid() {
 		dump(&c.root.cordNode)
 	}
-	T().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
+	tracer().Debugf("dropping out of applyMetric([%d], %d, %d)", node.Weight(), i, j)
 	return v, c
 }
 
