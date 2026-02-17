@@ -17,7 +17,6 @@ type cordReader struct {
 
 func (cr *cordReader) Read(p []byte) (n int, err error) {
 	l := uint64(len(p))
-	//T().Debugf("l=%d", l)
 	if cr.cursor+l > cr.cord.Len() {
 		l = cr.cord.Len() - cr.cursor
 		if l == 0 {

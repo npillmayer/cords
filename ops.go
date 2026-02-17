@@ -1,45 +1,11 @@
 package cords
 
-/*
-BSD 3-Clause License
-
-Copyright (c) 2020–21, Norbert Pillmayer
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 import (
 	"bytes"
 	"fmt"
 )
 
 // Concat concatenates cords and returns a new cord.
-//
 func Concat(cord Cord, others ...Cord) Cord {
 	var nonvoid []Cord
 	if !cord.IsVoid() {
@@ -114,7 +80,6 @@ func checkForRightNil(c Cord) {
 
 // Split splits a cord into two new (smaller) cords right before position i.
 // Split(C,i) ⇒ split C into C1 and C2, with C1=b0,…,bi-1 and C2=bi,…,bn.
-//
 func Split(cord Cord, i uint64) (Cord, Cord, error) {
 	if i == 0 {
 		return Cord{}, cord, nil
@@ -204,7 +169,6 @@ func Substr(cord Cord, i, l uint64) (Cord, error) {
 
 // Index returns the cord Leaf (i.e., a text fragment) which includes the byte
 // at position i, together with an index position within the fragment's text.
-//
 func (cord Cord) Index(i uint64) (Leaf, uint64, error) {
 	if cord.Len() < i {
 		return nil, 0, ErrIndexOutOfBounds

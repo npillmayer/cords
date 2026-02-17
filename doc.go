@@ -1,7 +1,7 @@
 /*
 Package cords offers a versatile string enhancement to ease handling of texts.
 
-Cords
+# Cords
 
 Cords (or sometimes called ropes) organize fragments of immutable text internally
 in a tree-structure. This speeds up frequent string-operations like concatenation,
@@ -20,7 +20,7 @@ _________________________________________________________________________
 
 From a paper by Hans-J. Boehm, Russ Atkinson and Michael Plass, 1995:
 
-Ropes, an Alternative to Strings
+# Ropes, an Alternative to Strings
 
 Xerox PARC, 3333 Coyote Hill Rd., Palo Alto, CA 94304, U.S.A.
 (email:boehm@parc.xerox.com)
@@ -64,19 +64,18 @@ as fancy slices of text, with some additional functionality.
 Cords may be constructed from various sources, with the simplest case being
 a call to
 
-    cords.FromString("Hello World")
+	cords.FromString("Hello World")
 
 Other possibilities are cords from text files or from HTML documents.
 
 _________________________________________________________________________
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
 Copyright © 2017–2021 Norbert Pillmayer <norbert@pillmayer.com>
-
 */
 package cords
 
@@ -129,3 +128,9 @@ const ErrIllegalArguments = CordError("illegal arguments")
 // either not compilable as a valid regular expression or if it accepts
 // the empty string as a match.
 const ErrIllegalDelimiterPattern = CordError("illegal delimiter pattern")
+
+func assert(condition bool, msg string) {
+	if !condition {
+		panic(msg)
+	}
+}

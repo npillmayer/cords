@@ -16,20 +16,20 @@ func TestHTMLFromTree(t *testing.T) {
 	<!DOCTYPE html>
 	<html>
 	<body>
-	
+
 	<h1>My First Heading</h1>
 	<p>My <b>first</b> paragraph.</p>
-	
+
 	</body>
-	</html> 
+	</html>
 `)
 	doc, err := html.Parse(r)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	text, err := InnerText(doc)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("text = '%s'", text.Raw())
 }
@@ -41,7 +41,7 @@ func TestHTMLParse(t *testing.T) {
 	r := strings.NewReader(`<p>My <b>first</b> paragraph.</p>`)
 	text, err := TextFromHTML(r)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("text = '%s'", text.Raw())
 }

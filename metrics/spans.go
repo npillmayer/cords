@@ -33,7 +33,7 @@ func splitWords(data []byte, atEOF bool) (advance int, token []byte, err error) 
 		r, width := utf8.DecodeRune(data[pos:])
 		//T().Debugf("r=%v, width=%d, pos=%d", r, width, pos)
 		if r == utf8.RuneError {
-			T().Debugf("rune error. atEOF=%v, width=%d", atEOF, width)
+			tracer().Debugf("rune error. atEOF=%v, width=%d", atEOF, width)
 			if width == 0 {
 				return pos, data[0:pos], nil
 			}
@@ -104,7 +104,7 @@ func (sm *spanningMetric) Apply(frag []byte) cords.MetricValue {
 	v := &spanningMetricValue{}
 	v.InitFrom(frag)
 	v = sm.scan([]byte(frag), v)
-	T().Debugf("scan of '%s' returned %v", string(frag), v)
+	tracer().Debugf("scan of '%s' returned %v", string(frag), v)
 	if v.split > 0 {
 		v.Measured(v.split, v.split, frag)
 		//} else if !v.HasBoundaries() {
@@ -120,18 +120,17 @@ func (sm *spanningMetric) Apply(frag []byte) cords.MetricValue {
 // Combine for materialzed metrics focuses on the unprocessed bytes of
 // left.suffix and right.prefix, and have remember those for converting them
 // to cord leafs.
-//
 func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 	metric cords.Metric) cords.MetricValue {
 	//
 	l, ok := leftSibling.(*spanningMetricValue)
 	if !ok {
-		T().Errorf("metric calculation: type of value is %T", leftSibling)
+		tracer().Errorf("metric calculation: type of value is %T", leftSibling)
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
 	r, ok := rightSibling.(*spanningMetricValue)
 	if !ok {
-		T().Errorf("metric calculation: type of value is %T", rightSibling)
+		tracer().Errorf("metric calculation: type of value is %T", rightSibling)
 		panic("cords.Metric combine: type inconsistency in metric calculation")
 	}
 	l.mid = [][]int{}
@@ -143,7 +142,7 @@ func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 			span := []int{0, len(d.Suffix())}
 			l.spans = append(l.spans, span)
 			l.mid = append(l.mid, span)
-			T().Debugf("prepended suffix span %v", span)
+			tracer().Debugf("prepended suffix span %v", span)
 		}
 		l.spans = append(l.spans, d.spans...)
 		l.mid = append(l.mid, d.spans...)
@@ -153,7 +152,7 @@ func (sm *spanningMetric) Combine(leftSibling, rightSibling cords.MetricValue,
 			span := []int{len(unproc) - len(d.Prefix()), len(d.Prefix())}
 			l.spans = append(l.spans, span)
 			l.mid = append(l.mid, span)
-			T().Debugf("appended prefix span %v", span)
+			tracer().Debugf("appended prefix span %v", span)
 		}
 	}
 	l.UnifyWith(&r.MetricValueBase)
@@ -176,9 +175,9 @@ func (sm *spanningMetric) Leafs(value cords.MetricValue, getBounds bool) []cords
 		leafs = make([]cords.Leaf, len(v.mid))
 		for i, span := range v.mid {
 			leafs[i] = spanLeaf(span[1])
-			T().Debugf("       create leaf = %v from %d…%d", leafs[i], span[0], span[1])
+			tracer().Debugf("       create leaf = %v from %d…%d", leafs[i], span[0], span[1])
 		}
-		T().Debugf("metric created leafs = %v", leafs)
+		tracer().Debugf("metric created leafs = %v", leafs)
 	}
 	return leafs
 }
@@ -190,7 +189,7 @@ func (sm *spanningMetric) scan(frag []byte, v *spanningMetricValue) *spanningMet
 	}
 	pos, start := 0, 0
 	for s.Scan() {
-		T().Debugf("SCANNED '%s'", s.Text())
+		tracer().Debugf("SCANNED '%s'", s.Text())
 		if pos == 0 {
 			// first scanned segment is always a suffix
 			// this will be done automatically by MetricValueBase if we do not include
@@ -201,12 +200,12 @@ func (sm *spanningMetric) scan(frag []byte, v *spanningMetricValue) *spanningMet
 			// if this is the last span, it will be converted to a prefix afterwards
 			span := []int{pos, len(s.Bytes())}
 			v.spans = append(v.spans, span)
-			T().Debugf("appended span %v", span)
+			tracer().Debugf("appended span %v", span)
 		}
 		pos += len(s.Bytes())
 	}
 	if err := s.Err(); err != nil {
-		T().Errorf("spanning metric: scanner returned error: %s", err)
+		tracer().Errorf("spanning metric: scanner returned error: %s", err)
 		v.lasterr = err
 	}
 	if len(v.spans) == 1 {

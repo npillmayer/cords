@@ -35,12 +35,12 @@ func TestFmt1(t *testing.T) {
 	text.Style(inline.BoldStyle, 4, 9)
 	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	console := NewConsoleFixedWidthFormat(nil, nil, ReorderWords)
 	err = console.Print(para, nil)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	//t.Fail()
 }
@@ -55,13 +55,13 @@ func TestVTE(t *testing.T) {
 	text.Style(inline.BoldStyle, 4, 9)
 	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	os.Setenv("VTE_VERSION", "123")
 	console := newXTermFormat("xterm-color256")
 	err = console.Print(para, nil)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Errorf("TODO: RTL does not work")
 }
@@ -75,7 +75,6 @@ func TestVTE(t *testing.T) {
 // from godoc in the browser. The browser will do the right thing with Bidi anyway.
 // However, the example shows a typical use case and has a chance to work on
 // different terminals with varying support for bidi text.
-//
 func ExampleConsoleFixedWidth() {
 	console := NewLocalConsoleFormat()
 	console.Codes.Newline = []byte("<nl>\n") // just to please godoc
@@ -100,7 +99,7 @@ func TestHTML1(t *testing.T) {
 	text.Style(inline.BoldStyle, 4, 9)
 	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	html := NewHTML(ReorderNone)
 	html.Print(para, os.Stdout, nil)

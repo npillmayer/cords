@@ -35,7 +35,7 @@ func TestHTMLSimple(t *testing.T) {
 	input := strings.NewReader("The quick <strong>brown</strong> fox <em>jumps</em> over the lazy dog")
 	text, err := TextFromHTML(input)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("HTML inner text = '%s'", text.Raw())
 	styles := text.StyleRuns()

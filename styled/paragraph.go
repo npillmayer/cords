@@ -22,7 +22,6 @@ import (
 // Offset is the paragraph's start position in terms of byte positions of the embedding
 // text. It is provided when creating a paragraph and held solely for a client's
 // bookkeeping purposes. The functions of this package do not in any way depend on it.
-//
 type Paragraph struct {
 	text     *Text                // a Paragraph is a styled text
 	Offset   uint64               // the paragraph's start position in terms of positions of the embedding text.
@@ -41,7 +40,6 @@ type Paragraph struct {
 // BidiLevels() to receive the resolved Bidi levels found by the algorithm.
 //
 // A paragraph remembers the `from` parameter in member `Offset`.
-//
 func ParagraphFromText(text *Text, from, to uint64, embBidi bidi.Direction,
 	m bidi.OutOfLineBidiMarkup) (*Paragraph, error) {
 	//
@@ -92,7 +90,6 @@ func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
 //
 // This may be thought of as a “push”-interface to access style runs for a text.
 // For a “pull”-interface please refer to interface `itemized.Iterator`.
-//
 func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos, length uint64) error) error {
 	t := para.text
 	if t == nil {
@@ -124,9 +121,9 @@ func (para *Paragraph) Reader() io.Reader {
 func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	pos -= para.cutoff
 	if pos >= para.Raw().Len() {
-		T().Infof("Paragraph.WrapAt(EOT)")
+		tracer().Infof("Paragraph.WrapAt(EOT)")
 	}
-	T().Infof("  Levels = %v", para.BidiLevels())
+	tracer().Infof("  Levels = %v", para.BidiLevels())
 	line, p, err := cords.Split(para.text.Raw(), pos)
 	if err != nil {
 		return nil, nil, err
@@ -145,7 +142,7 @@ func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	}
 	var lineLev *bidi.ResolvedLevels
 	lineLev, para.levels = para.levels.Split(pos, true)
-	T().Infof("para.levels = %v", para.levels)
+	tracer().Infof("para.levels = %v", para.levels)
 	lineRuns := lineLev.Reorder()
 	para.cutoff += text.Raw().Len()
 	return text, lineRuns, nil

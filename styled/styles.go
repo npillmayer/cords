@@ -62,7 +62,6 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 //
 // This may be thought of as a “push”-interface to access style runs for a text.
 // For a “pull”-interface please refer to interface `itemized.Iterator`.
-//
 func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error) error {
 	err := cords.Cord(t.styles()).EachLeaf(func(leaf cords.Leaf, i uint64) error {
 		length := leaf.Weight()
@@ -87,7 +86,6 @@ func (t *Text) Style(sty Style, from, to uint64) *Text {
 }
 
 // Section copies a piece of styled text, delimited by parameters from and to.
-//
 func Section(t *Text, from, to uint64) (*Text, error) {
 	c, err := cords.Substr(t.Raw(), from, to-from)
 	if err != nil {
@@ -179,29 +177,29 @@ func applyStyle(text cords.Cord, sty Style, from, to uint64) runs {
 // Style adds a style to already existing styles and returns the unified set.
 func (r runs) Style(sty Style, from, to uint64) runs {
 	if cords.Cord(r).IsVoid() {
-		T().Errorf("styled runs: runs are void, cannot style")
+		tracer().Errorf("styled runs: runs are void, cannot style")
 		return r
 	}
 	spn := toSpan(from, to).contained(cords.Cord(r))
 	if spn.void() {
-		T().Errorf("styled runs: illegal span for style, cannot style")
+		tracer().Errorf("styled runs: illegal span for style, cannot style")
 		return r
 	}
-	T().Debugf("====== runs.Style() =========")
+	tracer().Debugf("====== runs.Style() =========")
 	rc, _, err := cords.Cut(cords.Cord(r), spn.l, spn.len())
 	if err != nil {
 		return r
 	}
-	T().Debugf("r=%s, length=%d", rc, rc.Len())
+	tracer().Debugf("r=%s, length=%d", rc, rc.Len())
 	cb := cords.NewBuilder()
 	cb.Append(makeStyleLeaf(sty, spn))
 	newrun := cb.Cord()
-	T().Debugf("newrun=%s, length=%d", newrun, newrun.Len())
+	tracer().Debugf("newrun=%s, length=%d", newrun, newrun.Len())
 	rc, err = cords.Insert(rc, newrun, spn.l)
 	if err != nil {
-		T().Errorf("styled runs: insert operation returned: %s", err.Error())
+		tracer().Errorf("styled runs: insert operation returned: %s", err.Error())
 	}
-	T().Debugf("r=%s, length=%d", r, r.Len())
+	tracer().Debugf("r=%s, length=%d", r, r.Len())
 	r = runs(rc)
 	return r
 }

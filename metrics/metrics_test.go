@@ -21,9 +21,9 @@ func TestRegexAllSubmatchIndex(t *testing.T) {
 	allIndexes := pattern.FindAllSubmatchIndex(content, -1)
 	for _, loc := range allIndexes {
 		t.Logf("loc=%v", loc)
-		t.Logf(string(content[loc[0]:loc[1]]))
-		t.Logf(string(content[loc[2]:loc[3]]))
-		t.Logf(string(content[loc[4]:loc[5]]))
+		t.Log(string(content[loc[0]:loc[1]]))
+		t.Log(string(content[loc[2]:loc[3]]))
+		t.Log(string(content[loc[4]:loc[5]]))
 	}
 }
 
@@ -99,7 +99,7 @@ func TestMetricLines(t *testing.T) {
 	t.Logf("--- count --------------------------------")
 	cnt, err := Count(cord, 0, cord.Len(), LineCount())
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	if cnt != 4 {
 		t.Errorf("expected to find 5 lines, found %d", cnt)
@@ -108,7 +108,7 @@ func TestMetricLines(t *testing.T) {
 	t.Logf("--- find ---------------------------------")
 	locs, err := Find(cord, 0, cord.Len(), FindLines())
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	if len(locs) != 4 {
 		for _, loc := range locs {
@@ -122,8 +122,7 @@ func TestSplitFunc(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
 	//
-	str := strings.NewReader("")
-	//str := strings.NewReader("the quick brown fox")
+	str := strings.NewReader("the quick brown fox")
 	scnr := bufio.NewScanner(str)
 	scnr.Split(splitWords)
 	cnt := 0
@@ -145,7 +144,7 @@ func TestMetricSpanWord(t *testing.T) {
 	metric := Words()
 	value, cord, err := Align(text, 0, text.Len(), metric)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("value of materialized metric = %v", value)
 	if cord.IsVoid() {
@@ -173,7 +172,7 @@ func TestMetricWordSpans(t *testing.T) {
 	metric := Words()
 	value, cord, err := Align(text, 0, text.Len(), metric)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("value of materialized metric = %v", value)
 	if cord.IsVoid() {

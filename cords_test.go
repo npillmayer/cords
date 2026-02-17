@@ -14,14 +14,14 @@ func TestNewStringCord(t *testing.T) {
 	c := FromString("Hello World")
 	t.Logf("c = '%s'", c)
 	if c.String() != "Hello World" {
-		t.Errorf("Expected cords.String() to be 'Hello World', is not")
+		t.Error("Expected cords.String() to be 'Hello World', is not")
 	}
 	if c.root.height != 2 {
 		t.Errorf("Height of root = %d, should be 2", c.root.height)
 	}
 	leaf := c.root.left
 	if !leaf.IsLeaf() {
-		t.Errorf("expected leaf at height 1, is not")
+		t.Error("expected leaf at height 1, is not")
 	}
 }
 
@@ -48,7 +48,7 @@ func TestCordConcat(t *testing.T) {
 	c2 := FromString(", how are you?")
 	c := Concat(c1, c2)
 	if c.IsVoid() {
-		t.Fatalf("concatenation is nil")
+		t.Fatal("concatenation is nil")
 	}
 	t.Logf("c = '%s'", c)
 	t.Logf("c.left = '%s'", c.root.Left())
@@ -57,7 +57,7 @@ func TestCordConcat(t *testing.T) {
 		t.Errorf("expected height(c) to be 3, is %d", c.root.Height())
 	}
 	if &c1.root.cordNode == c.root.left {
-		t.Errorf("copy on write did not work for c1.root")
+		t.Error("copy on write did not work for c1.root")
 	}
 }
 
@@ -98,7 +98,7 @@ func TestRotateLeft(t *testing.T) {
 	x := rotateRight(c.root)
 	dump(&x.cordNode)
 	if x.Left().Height() != 2 || x.Right().Height() != 2 {
-		t.Errorf("Expected both left and right sub-tree to be of height 2, aren't")
+		t.Error("Expected both left and right sub-tree to be of height 2, aren't")
 	}
 }
 
@@ -163,7 +163,7 @@ func TestCordSplit1(t *testing.T) {
 	t.Logf("======================")
 	dump(&c.root.cordNode)
 	if cl.root == nil || cr.root == nil {
-		t.Fatalf("Split resulted in empty partial cord, should not")
+		t.Fatal("Split resulted in empty partial cord, should not")
 	}
 	if cl.root.Height() != 2 || cr.root.Height() != 3 {
 		t.Errorf("Expected split sub-trees of height 2 and 3, are %d and %d", cl.root.Height(), cr.root.Height())
@@ -172,7 +172,7 @@ func TestCordSplit1(t *testing.T) {
 		t.Errorf("Expected split 'He'|'llo World', but left part is %v", cl)
 	}
 	if c.root == cl.root || c.root == cr.root {
-		t.Fatalf("copy on write did not work as expected")
+		t.Fatal("copy on write did not work as expected")
 	}
 }
 
@@ -185,7 +185,7 @@ func TestCordInsert(t *testing.T) {
 	c := Concat(c1, c2) // Hello World
 	x, err := Insert(c, FromString(","), 5)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("x = '%s'", x.String())
 	if x.Len() != 12 {
@@ -193,7 +193,7 @@ func TestCordInsert(t *testing.T) {
 	}
 	x, err = Insert(x, FromString("!"), 12)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("x = '%s'", x.String())
 	if x.String() != "Hello, World!" {
@@ -216,7 +216,7 @@ func TestCordSplit2(t *testing.T) {
 	//
 	c1, c2, err := Split(c, 11)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	if c1.String() != "Hello_my_na" || c1.Len() != 11 {
 		dump(&c.root.cordNode)
@@ -239,7 +239,7 @@ func TestCordCut(t *testing.T) {
 	c := Concat(c1, c2)       // Hello World
 	x, y, err := Cut(c, 4, 4) // => Hellrld
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	if x.String() != "Hellrld" {
 		t.Errorf("Expected cut-result to be 'Hellrld', is '%s'", x)
@@ -262,7 +262,7 @@ func TestCordReport(t *testing.T) {
 	t.Logf("cord='%s'", c)
 	s, err := c.Report(8, 5)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	t.Logf("s='%s'", s)
 	if s != "_name" {
@@ -283,7 +283,7 @@ func TestCordSubstr(t *testing.T) {
 	t.Logf("cord='%s'", c)
 	x, err := Substr(c, 8, 5)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	dump(&x.root.cordNode)
 	t.Logf("x='%s'", x)
@@ -308,12 +308,12 @@ func TestCordBuilder(t *testing.T) {
 	b.Append(StringLeaf("_Simon"))
 	cord := b.Cord()
 	if cord.IsVoid() {
-		t.Fatalf("Expected non-void result cord, is void")
+		t.Fatal("Expected non-void result cord, is void")
 	}
 	dump(&cord.root.cordNode)
 	t.Logf("builder made cord='%s'", cord)
 	if cord.String() != "Hello_my_name_is_Simon" {
-		t.Errorf("cord string is different from expected string")
+		t.Error("cord string is different from expected string")
 	}
 }
 
@@ -331,12 +331,12 @@ func TestCordCutAndInsert(t *testing.T) {
 	x, _, err := Cut(c, 10, 5)
 	//c, _, err := Split(c, 10)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	l := FromString("THIS IS NEW")
 	y, _ := Insert(x, l, 10)
 	if y.IsVoid() {
-		t.Errorf("cord is void after cut and insert")
+		t.Error("cord is void after cut and insert")
 	}
 }
 
@@ -358,15 +358,15 @@ func TestCordReader(t *testing.T) {
 	p := make([]byte, 5)
 	n, err := reader.Read(p)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	}
 	if n != 5 || string(p) != "Hello" {
 		t.Logf("n=%d, p=%s", n, string(p))
-		t.Fatalf("expected Read() to return 'Hello', did not")
+		t.Fatal("expected Read() to return 'Hello', did not")
 	}
 	n, err = reader.Read(p)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	}
 	if n != 5 {
 		t.Logf("n=%d, p=%s", n, string(p))
@@ -375,7 +375,7 @@ func TestCordReader(t *testing.T) {
 	p = make([]byte, 50)
 	n, err = reader.Read(p)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	}
 	if n != 12 {
 		t.Logf("n=%d, p=%s", n, string(p))
@@ -384,9 +384,9 @@ func TestCordReader(t *testing.T) {
 	_, err = reader.Read(p)
 	if err != io.EOF {
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err.Error())
 		} else {
-			t.Errorf("exptected EOF, got no error")
+			t.Error("exptected EOF, got no error")
 		}
 	}
 }

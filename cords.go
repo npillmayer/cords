@@ -5,37 +5,14 @@ BSD 3-Clause License
 
 Copyright (c) 2020–21, Norbert Pillmayer
 
-All rights reserved.
+Please refer to the License file in the repository root.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
 	"bytes"
 	"fmt"
+	"iter"
 )
 
 // This implementation follows more or less the description of the `Rope´ data
@@ -64,27 +41,26 @@ import (
 //
 // A cord created by
 //
-//     Cord{}
+//	Cord{}
 //
 // is a valid object and behaves like the empty string.
 //
 // Due to their internal structure cords do have performance characteristics
 // differing from Go strings or byte arrays.
 //
-//    Operation     |   Rope          |  String
-//    --------------+-----------------+--------
-//    Index         |   O(log n)      |   O(1)
-//    Split         |   O(log n)      |   O(1)
-//    Iterate       |   O(n)          |   O(n)
+//	Operation     |   Rope          |  String
+//	--------------+-----------------+--------
+//	Index         |   O(log n)      |   O(1)
+//	Split         |   O(log n)      |   O(1)
+//	Iterate       |   O(n)          |   O(n)
 //
-//    Concatenate   |   O(log n)      |   O(n)
-//    Insert        |   O(log n)      |   O(n)
-//    Delete        |   O(log n)      |   O(n)
+//	Concatenate   |   O(log n)      |   O(n)
+//	Insert        |   O(log n)      |   O(n)
+//	Delete        |   O(log n)      |   O(n)
 //
 // For use cases with many editing operations on large texts, cords have stable performance
 // and space characteristics. It's more appropriate to think of cords as a type for ‘text’
 // than as strings (https://mortoray.com/2014/03/17/strings-and-text-are-not-the-same/).
-//
 type Cord struct {
 	root *innerNode
 }
@@ -111,7 +87,6 @@ func FromString(s string) Cord {
 // The root node of a non-void cord is always of type innerNode and has exactly one
 // child, which is on its left. This way, the weight of the root node always will
 // reflect the byte-length of the cord.
-//
 func makeCord(node *cordNode) Cord {
 	if node.IsLeaf() {
 		r := makeInnerNode()
@@ -148,9 +123,8 @@ func (cord Cord) String() string {
 		}
 		return nil
 	})
-	if err != nil {
-		// TODO: what to do? String() should not return an error. Can there be an error?
-	}
+	// TODO if err!=nil: What to do? String() should not return an error. Can there be an error?
+	assert(err == nil, "internal error in cord.String()")
 	return bf.String()
 }
 
@@ -182,6 +156,20 @@ func (cord Cord) each(f func(node *cordNode, pos uint64, depth int) error) error
 	}
 	err := traverse(&cord.root.cordNode, cord.root.weight, 0, f)
 	return err
+}
+
+func (cord Cord) RangeLeaf() iter.Seq[Leaf] {
+	return func(yield func(Leaf) bool) {
+		_ = cord.each(func(node *cordNode, pos uint64, depth int) (e error) {
+			if node.IsLeaf() {
+				leafNode := node.AsLeaf()
+				if !yield(leafNode.leaf) {
+					return
+				}
+			}
+			return
+		})
+	}
 }
 
 // EachLeaf iterates over all leaf nodes of the cord.
@@ -237,7 +225,7 @@ type Leaf interface {
 // leave unchanged parts of the tree in place and rather reference them.
 
 type cordNode struct {
-	self interface{}
+	self any
 }
 
 type innerNode struct {
@@ -412,6 +400,17 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 	return ln1, ln2
 }
 
+// spit splits a leaf node at position i, resulting in 2 new leaf nodes.
+// Interface Leaf must support the Split(…) operation.
+// func (leaf *leafNode) Split(i uint64) (Leaf, Leaf) {
+// 	l1, l2 := leaf.leaf.Split(i)
+// 	ln1 := makeLeafNode()
+// 	ln1.leaf = l1
+// 	ln2 := makeLeafNode()
+// 	ln2.leaf = l2
+// 	return ln1, ln2
+// }
+
 // --- Default Leaf implementation -------------------------------------------
 
 // StringLeaf is the default implementation of type Leaf.
@@ -420,7 +419,6 @@ func (leaf *leafNode) split(i uint64) (*leafNode, *leafNode) {
 //
 // StringLeaf is made public, because it may be of use for other constructors
 // of cords.
-//
 type StringLeaf string
 
 // makeStringLeafNode creates a leaf node and a leaf from a given string.
