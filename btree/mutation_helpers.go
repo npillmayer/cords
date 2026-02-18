@@ -26,6 +26,10 @@ func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
 	return cloned
 }
 
+// cloneInner copies an internal node including its fixed backing storage.
+//
+// The returned node is independent and safe to mutate on the current path-copy
+// operation.
 func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
 	assert(inner != nil, "cloneInner called with nil inner node")
 	cloned := &innerNode[I, S]{
@@ -37,6 +41,10 @@ func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
 	return cloned
 }
 
+// recomputeNodeSummary recalculates summary from immediate children/items.
+//
+// This is used after local structural edits. It does not recurse because child
+// summaries are already maintained by lower-level edits.
 func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) {
 	assert(n != nil, "recomputeNodeSummary called with nil node")
 	switch n := n.(type) {
@@ -49,6 +57,7 @@ func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) {
 	}
 }
 
+// recomputeLeafSummary rebuilds a leaf summary from item summaries.
 func (t *Tree[I, S]) recomputeLeafSummary(leaf *leafNode[I, S]) {
 	assert(leaf != nil, "recomputeLeafSummary called with nil leaf")
 	leaf.summary = t.cfg.Monoid.Zero()
@@ -57,6 +66,7 @@ func (t *Tree[I, S]) recomputeLeafSummary(leaf *leafNode[I, S]) {
 	}
 }
 
+// recomputeInnerSummary rebuilds an internal summary by folding child summaries.
 func (t *Tree[I, S]) recomputeInnerSummary(inner *innerNode[I, S]) {
 	assert(inner != nil, "recomputeInnerSummary called with nil inner node")
 	inner.summary = t.cfg.Monoid.Zero()
@@ -103,6 +113,9 @@ func (t *Tree[I, S]) insertChildAt(inner *innerNode[I, S], idx int, child treeNo
 	t.recomputeInnerSummary(inner)
 }
 
+// removeChildAt removes one child pointer from an internal node at idx.
+//
+// It compacts the fixed backing store and refreshes summary.
 func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 	assert(inner != nil, "removeChildAt called with nil inner node")
 	assert(idx >= 0 && idx < len(inner.children), "removeChildAt index out of range")
@@ -117,6 +130,10 @@ func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 	t.recomputeInnerSummary(inner)
 }
 
+// insertLeafItemsAt inserts one or more items at leaf-local idx.
+//
+// The leaf may temporarily exceed normal occupancy (up to overflow storage),
+// which is resolved by higher-level split logic.
 func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...I) {
 	assert(leaf != nil, "insertLeafItemsAt called with nil leaf")
 	assert(idx >= 0 && idx <= len(leaf.items), "insertLeafItemsAt index out of range")
@@ -134,6 +151,7 @@ func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...
 	leaf.items = leaf.itemStore[:n+k]
 }
 
+// removeLeafItemsRange removes half-open interval [from,to) from a leaf.
 func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 	assert(leaf != nil, "removeLeafItemsRange called with nil leaf")
 	assert(from >= 0 && from <= to && to <= len(leaf.items), "removeLeafItemsRange bounds invalid")
@@ -153,10 +171,12 @@ func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 	leaf.items = leaf.itemStore[:n-k]
 }
 
+// leafOverflow reports whether leaf exceeds the allowed non-overflow occupancy.
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {
 	return leaf != nil && len(leaf.items) > MaxLeafItems
 }
 
+// leafUnderflow reports whether a non-root leaf violates minimum occupancy.
 func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
 	assert(leaf != nil, "leafUnderflow called with nil leaf")
 	if isRoot {
@@ -165,10 +185,12 @@ func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
 	return len(leaf.items) < Base
 }
 
+// innerOverflow reports whether internal node exceeds maximum children.
 func (t *Tree[I, S]) innerOverflow(inner *innerNode[I, S]) bool {
 	return inner != nil && len(inner.children) > MaxChildren
 }
 
+// innerUnderflow reports whether a non-root internal node is below min fill.
 func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
 	assert(inner != nil, "innerUnderflow called with nil inner node")
 	if isRoot {
@@ -198,6 +220,9 @@ func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items 
 }
 
 // splitLeaf splits an overflowing leaf into two siblings.
+//
+// The split is midpoint-based and guarantees both outputs satisfy non-root
+// minimum occupancy.
 func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode[I, S]) {
 	assert(leaf != nil, "splitLeaf called with nil leaf")
 	n := len(leaf.items)

@@ -1,5 +1,7 @@
 package btree
 
+// makeLeaf materializes a new leaf backed by fixed inline storage and computes
+// its summary.
 func (t *Tree[I, S]) makeLeaf(items []I) *leafNode[I, S] {
 	leaf := &leafNode[I, S]{}
 	assert(len(items) <= len(leaf.itemStore), "makeLeaf exceeds fixed leaf capacity")
@@ -13,6 +15,8 @@ func (t *Tree[I, S]) makeLeaf(items []I) *leafNode[I, S] {
 	return leaf
 }
 
+// makeInternal materializes a new internal node backed by fixed inline storage
+// and computes its summary from child summaries.
 func (t *Tree[I, S]) makeInternal(children ...treeNode[I, S]) *innerNode[I, S] {
 	inner := &innerNode[I, S]{}
 	assert(len(children) <= len(inner.childStore), "makeInternal exceeds fixed node capacity")

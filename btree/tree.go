@@ -226,6 +226,15 @@ func (t *Tree[I, S]) Concat(other *Tree[I, S]) (*Tree[I, S], error) {
 	return combined, nil
 }
 
+// concatNodes joins two subtrees that may have different heights.
+//
+// The function returns up to two nodes at the same output height:
+//   - a single node when no split is needed (`mergedRight == nil`)
+//   - two sibling nodes when local overflow required a split.
+//
+// This shape mirrors insertion split propagation and lets callers create a new
+// parent only when needed. The algorithm preserves persistence by cloning only
+// the spine it mutates.
 func (t *Tree[I, S]) concatNodes(
 	left treeNode[I, S], leftHeight int,
 	right treeNode[I, S], rightHeight int,
@@ -300,6 +309,11 @@ func (t *Tree[I, S]) concatNodes(
 	return cloned, nil, rightHeight, nil
 }
 
+// concatSameHeight attempts an in-place height-preserving join.
+//
+// When the combined occupancy fits into a single node, it returns that merged
+// node and nil right sibling. Otherwise it returns the original pair unchanged,
+// signaling the caller to keep them as two siblings.
 func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (treeNode[I, S], treeNode[I, S], error) {
 	assert(height > 0, "concatSameHeight called with non-positive height")
 	if height == 1 {
@@ -328,6 +342,10 @@ func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (t
 	return left, right, nil
 }
 
+// countItems returns the total number of leaf items under n.
+//
+// This is intentionally recursive and simple for now; we can replace it with
+// cached subtree sizes later if profiling shows it on hot paths.
 func (t *Tree[I, S]) countItems(n treeNode[I, S]) int {
 	if n == nil {
 		return 0
@@ -342,6 +360,10 @@ func (t *Tree[I, S]) countItems(n treeNode[I, S]) int {
 	return total
 }
 
+// splitNodePathCopy splits subtree n at index using path-copy semantics.
+//
+// Only nodes on the split seam are rebuilt; untouched siblings are shared.
+// This is the structural primitive used by public SplitAt.
 func (t *Tree[I, S]) splitNodePathCopy(n treeNode[I, S], height, index int) (treeNode[I, S], treeNode[I, S], error) {
 	if n == nil {
 		assert(index == 0, "splitNodePathCopy called with nil node and non-zero index")
@@ -395,6 +417,10 @@ func (t *Tree[I, S]) splitNodePathCopy(n treeNode[I, S], height, index int) (tre
 	return leftNode, rightNode, nil
 }
 
+// subtreeHeight computes height by following the left spine.
+//
+// The tree enforces uniform child heights, so any root-to-leaf path yields the
+// same height.
 func (t *Tree[I, S]) subtreeHeight(n treeNode[I, S]) int {
 	h := 0
 	cur := normalizeNode[I, S](n)
@@ -412,6 +438,12 @@ func (t *Tree[I, S]) subtreeHeight(n treeNode[I, S]) int {
 	return 0
 }
 
+// normalizeRoot canonicalizes root representation after structural edits.
+//
+// It applies the standard B-tree root rules:
+//   - nil root => empty tree (height 0)
+//   - leaf root => height 1
+//   - internal root with single child => collapse repeatedly.
 func (t *Tree[I, S]) normalizeRoot() {
 	if t == nil {
 		return
@@ -444,6 +476,11 @@ func (t *Tree[I, S]) normalizeRoot() {
 	}
 }
 
+// deleteOneAt performs a single-item delete on this tree in place.
+//
+// The receiver is expected to be a private clone when called from public APIs.
+// Returns needsRebalance only if recursive delete could not resolve occupancy
+// (currently treated as unimplemented in public DeleteAt).
 func (t *Tree[I, S]) deleteOneAt(index int) (needsRebalance bool, err error) {
 	assert(t.root != nil, "deleteOneAt called on empty tree")
 	updated, needsRebalance, err := t.deleteRecursive(t.root, t.height, index, true)
@@ -456,6 +493,10 @@ func (t *Tree[I, S]) deleteOneAt(index int) (needsRebalance bool, err error) {
 	return needsRebalance, nil
 }
 
+// assertDeleteRootNormalized verifies post-delete root invariants.
+//
+// This is a defensive internal check: violations indicate a tree algorithm bug,
+// not an input error.
 func (t *Tree[I, S]) assertDeleteRootNormalized() {
 	if t.root == nil {
 		assert(t.height == 0, "delete root normalization: nil root must have height 0")
@@ -472,6 +513,14 @@ func (t *Tree[I, S]) assertDeleteRootNormalized() {
 	assert(t.height >= 2, "delete root normalization: root inner must have height >= 2")
 }
 
+// deleteRecursive removes one item at index from subtree n.
+//
+// Returns:
+//   - updated subtree root (possibly nil if subtree became empty)
+//   - needsRebalance: whether caller must repair occupancy at parent level
+//   - err for input-index failures.
+//
+// The algorithm is path-copy and mirrors insertion unwind structure.
 func (t *Tree[I, S]) deleteRecursive(
 	n treeNode[I, S], height, index int, isRoot bool,
 ) (updated treeNode[I, S], needsRebalance bool, err error) {
@@ -531,6 +580,9 @@ func (t *Tree[I, S]) deleteRecursive(
 	return cloned, childNeedsRebalance || selfUnderflow, nil
 }
 
+// insertOneAt inserts one item into this tree in place.
+//
+// Like deleteOneAt, callers should use a private clone to preserve persistence.
 func (t *Tree[I, S]) insertOneAt(index int, item I) error {
 	if t.root == nil {
 		t.root = t.makeLeaf([]I{item})
@@ -551,6 +603,9 @@ func (t *Tree[I, S]) insertOneAt(index int, item I) error {
 	return nil
 }
 
+// insertRecursive inserts one item into subtree n and propagates split results.
+//
+// The returned promoted sibling is non-nil only when the updated subtree split.
 func (t *Tree[I, S]) insertRecursive(n treeNode[I, S], height, index int, item I) (treeNode[I, S], treeNode[I, S], error) {
 	assert(n != nil, "insertRecursive called with nil node")
 	assert(height > 0, "insertRecursive called with invalid height")
@@ -592,6 +647,10 @@ func (t *Tree[I, S]) insertRecursive(n treeNode[I, S], height, index int, item I
 	return left, normalizeNode[I, S](right), nil
 }
 
+// locateChildForInsert maps a subtree item index to child slot + local index.
+//
+// It uses `remaining <= childItems` so boundary indices land in the left child,
+// matching insertion semantics at child seams.
 func (t *Tree[I, S]) locateChildForInsert(inner *innerNode[I, S], index int) (childSlot int, localIndex int, err error) {
 	assert(inner != nil, "locateChildForInsert called with nil inner node")
 	assert(len(inner.children) > 0, "locateChildForInsert called with empty children")
@@ -608,6 +667,10 @@ func (t *Tree[I, S]) locateChildForInsert(inner *innerNode[I, S], index int) (ch
 	return 0, 0, nil
 }
 
+// locateChildForDelete maps a subtree item index to child slot + local index.
+//
+// It uses `remaining < childItems` so each absolute index is owned by exactly
+// one child.
 func (t *Tree[I, S]) locateChildForDelete(inner *innerNode[I, S], index int) (childSlot int, localIndex int, err error) {
 	assert(inner != nil, "locateChildForDelete called with nil inner node")
 	assert(len(inner.children) > 0, "locateChildForDelete called with empty children")
@@ -625,6 +688,9 @@ func (t *Tree[I, S]) locateChildForDelete(inner *innerNode[I, S], index int) (ch
 	return 0, 0, ErrIndexOutOfBounds
 }
 
+// rebalanceChildAfterDelete repairs occupancy for child at slot.
+//
+// `childHeight` selects leaf vs internal sibling operations.
 func (t *Tree[I, S]) rebalanceChildAfterDelete(parent *innerNode[I, S], slot int, childHeight int) bool {
 	assert(parent != nil, "rebalanceChildAfterDelete called with nil parent")
 	assert(slot >= 0 && slot < len(parent.children), "rebalanceChildAfterDelete slot out of range")
@@ -728,6 +794,10 @@ func (t *Tree[I, S]) rebalanceLeafChild(parent *innerNode[I, S], slot int) bool 
 	)
 }
 
+// rebalanceInnerChild applies borrow/merge to an underfull internal child.
+//
+// Child pointers are moved between siblings; parent summary is recomputed by
+// lower-level mutation helpers.
 func (t *Tree[I, S]) rebalanceInnerChild(parent *innerNode[I, S], slot int) bool {
 	child, ok := parent.children[slot].(*innerNode[I, S])
 	assert(ok, "rebalanceInnerChild expected internal child")
@@ -787,6 +857,9 @@ func (t *Tree[I, S]) rebalanceInnerChild(parent *innerNode[I, S], slot int) bool
 	)
 }
 
+// splitInner splits one overflowing internal node into two siblings.
+//
+// Current fixed-capacity design only expects one-sibling promotion per step.
 func (t *Tree[I, S]) splitInner(inner *innerNode[I, S]) (*innerNode[I, S], *innerNode[I, S], error) {
 	assert(inner != nil, "splitInner called with nil inner node")
 	n := len(inner.children)
@@ -805,6 +878,9 @@ func (t *Tree[I, S]) splitInner(inner *innerNode[I, S]) (*innerNode[I, S], *inne
 	return left, right, nil
 }
 
+// normalizeNode removes typed-nil interface wrappers.
+//
+// It prevents accidental non-nil interface values that wrap nil pointers.
 func normalizeNode[I SummarizedItem[S], S any](n treeNode[I, S]) treeNode[I, S] {
 	switch v := n.(type) {
 	case nil:

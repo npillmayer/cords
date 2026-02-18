@@ -29,6 +29,11 @@ func (t *Tree[I, S]) Check() error {
 	return nil
 }
 
+// checkNode validates one subtree and returns:
+//   - total item count under that subtree
+//   - subtree height
+//
+// The function enforces occupancy rules and uniform child heights.
 func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height int, err error) {
 	if n == nil {
 		return 0, 0, fmt.Errorf("%w: nil node", ErrInvalidConfig)
@@ -98,6 +103,7 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 	return totalItems, childHeight + 1, nil
 }
 
+// checkLeafInvariants verifies fixed-array backing/view consistency for a leaf.
 func (t *Tree[I, S]) checkLeafInvariants(leaf *leafNode[I, S]) error {
 	if leaf == nil {
 		return fmt.Errorf("%w: nil leaf node", ErrInvalidConfig)
@@ -117,6 +123,7 @@ func (t *Tree[I, S]) checkLeafInvariants(leaf *leafNode[I, S]) error {
 	return nil
 }
 
+// checkInnerInvariants verifies fixed-array backing/view consistency for internals.
 func (t *Tree[I, S]) checkInnerInvariants(inner *innerNode[I, S]) error {
 	if inner == nil {
 		return fmt.Errorf("%w: nil internal node", ErrInvalidConfig)

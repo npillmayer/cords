@@ -55,6 +55,10 @@ func (c *Cursor[I, S, K]) Seek(target K) (itemIndex int, acc K, err error) {
 	return c.tree.Len(), reached, nil
 }
 
+// seekNode descends to the first leaf position where accumulated dimension
+// reaches target.
+//
+// `startIndex` and `acc` describe the prefix state before subtree n.
 func (c *Cursor[I, S, K]) seekNode(n treeNode[I, S], startIndex int, acc K, target K) (idx int, reached K, found bool, err error) {
 	assert(n != nil, "cursor seekNode called with nil node")
 	if n.isLeaf() {
