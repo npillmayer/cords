@@ -1,6 +1,8 @@
 package styled
 
 import (
+	"iter"
+
 	"github.com/npillmayer/cords"
 )
 
@@ -73,6 +75,19 @@ func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error)
 		return f(content, st, i)
 	})
 	return err
+}
+
+func (t *Text) RangeStyleRun() iter.Seq2[string, Style] {
+	return func(yield func(string, Style) bool) {
+		n := 0
+		_ = t.EachStyleRun(func(content string, sty Style, pos uint64) (e error) {
+			if !yield(content, sty) {
+				return
+			}
+			n++
+			return
+		})
+	}
 }
 
 // Style styles a run of text, given the start and end position.

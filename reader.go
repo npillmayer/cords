@@ -30,6 +30,6 @@ func (cr *cordReader) Read(p []byte) (n int, err error) {
 		panic("cord reader: bytes.Buffer has grown byte array")
 	}
 	cr.cursor += l
-	//T().Debugf("buf=%v, buf.Bytes()=%v", buf, buf.Bytes())
+	//tracer().Debugf("buf=%v, buf.Bytes()=%v", buf, buf.Bytes())
 	return int(l), nil
 }

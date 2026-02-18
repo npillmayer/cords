@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/npillmayer/cords"
@@ -73,6 +74,31 @@ func TestEach(t *testing.T) {
 	})
 	if cnt != 3 {
 		t.Errorf("expected formatted text to have 3 style runs, has %d", cnt)
+	}
+}
+
+func TestRange(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
+	//
+	text := TextFromString("Hello World, how are you?")
+	normal := teststyle("normal")
+	bold := teststyle("bold")
+	text.Style(normal, 0, text.text.Len())
+	text.Style(bold, 6, 16)
+	//
+	cnt := 0
+	sb := &strings.Builder{}
+	for run, style := range text.RangeStyleRun() {
+		cnt++
+		t.Logf("run: “%s” : %v", run, style)
+		fmt.Fprintf(sb, "%v", style)
+	}
+	if cnt != 3 {
+		t.Errorf("expected formatted text to have 3 style runs, has %d", cnt)
+	}
+	if sb.String() != "[normal][bold][normal]" {
+		t.Errorf("expected formatted text to have 3 style runs, has %v", sb.String())
 	}
 }
 

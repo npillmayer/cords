@@ -261,9 +261,7 @@ func (node *cordNode) AsLeaf() *leafNode {
 }
 
 func (node *cordNode) IsLeaf() bool {
-	if node.self == nil {
-		panic("node has no self, inconsistency")
-	}
+	assert(node.self != nil, "internal error: node has not self")
 	_, ok := node.self.(*leafNode)
 	return ok
 }

@@ -4,18 +4,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-
-	//"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestLoad(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
-	//teardown := gotestingadapter.RedirectTracing(t)
-	//defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
 	//
 	var wg sync.WaitGroup
 	cord, err := Load("lorem/lorem_small.txt", 0, 0, &wg)

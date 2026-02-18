@@ -2,6 +2,7 @@ package cords
 
 import (
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
@@ -386,7 +387,28 @@ func TestCordReader(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		} else {
-			t.Error("exptected EOF, got no error")
+			t.Error("expected EOF, got no error")
 		}
+	}
+}
+
+func TestRangeIterator(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
+	//
+	b := NewBuilder()
+	b.Append(StringLeaf("name_is"))
+	b.Prepend(StringLeaf("Hello_my_"))
+	b.Append(StringLeaf("_Simon"))
+	cord := b.Cord()
+	if cord.IsVoid() {
+		t.Fatalf("Expected non-void result cord, is void")
+	}
+	s := strings.Builder{}
+	for leaf := range cord.RangeLeaf() {
+		s.WriteString(leaf.String())
+	}
+	if s.String() != "Hello_my_name_is_Simon" {
+		t.Fatalf("expected 'Hello_my_name_is_Simon', got '%s'", s.String())
 	}
 }
