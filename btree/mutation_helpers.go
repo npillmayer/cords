@@ -1,7 +1,5 @@
 package btree
 
-import "fmt"
-
 // cloneNode clones a node for path-copy updates.
 func (t *Tree[I, S]) cloneNode(n treeNode[I, S]) treeNode[I, S] {
 	if n == nil {
@@ -18,9 +16,7 @@ func (t *Tree[I, S]) cloneNode(n treeNode[I, S]) treeNode[I, S] {
 }
 
 func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
-	if leaf == nil {
-		return nil
-	}
+	assert(leaf != nil, "cloneLeaf called with nil leaf")
 	cloned := &leafNode[I, S]{
 		summary: leaf.summary,
 		n:       leaf.n,
@@ -31,9 +27,7 @@ func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
 }
 
 func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
-	if inner == nil {
-		return nil
-	}
+	assert(inner != nil, "cloneInner called with nil inner node")
 	cloned := &innerNode[I, S]{
 		summary: inner.summary,
 		n:       inner.n,
@@ -43,10 +37,8 @@ func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
 	return cloned
 }
 
-func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) error {
-	if n == nil {
-		return fmt.Errorf("%w: nil node", ErrInvalidConfig)
-	}
+func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) {
+	assert(n != nil, "recomputeNodeSummary called with nil node")
 	switch n := n.(type) {
 	case *leafNode[I, S]:
 		t.recomputeLeafSummary(n)
@@ -55,7 +47,6 @@ func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) error {
 	default:
 		panic("unknown tree node type")
 	}
-	return nil
 }
 
 func (t *Tree[I, S]) recomputeLeafSummary(leaf *leafNode[I, S]) {
@@ -126,24 +117,21 @@ func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 	t.recomputeInnerSummary(inner)
 }
 
-func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...I) error {
+func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...I) {
 	assert(leaf != nil, "insertLeafItemsAt called with nil leaf")
 	assert(idx >= 0 && idx <= len(leaf.items), "insertLeafItemsAt index out of range")
 	if len(values) == 0 {
-		return nil
+		return
 	}
 	n := len(leaf.items)
 	k := len(values)
-	if n+k > len(leaf.itemStore) {
-		return fmt.Errorf("%w: fixed leaf capacity exceeded", ErrUnimplemented)
-	}
+	assert(n+k <= len(leaf.itemStore), "insertLeafItemsAt exceeds fixed leaf capacity")
 	if idx < n {
 		copy(leaf.itemStore[idx+k:n+k], leaf.itemStore[idx:n])
 	}
 	copy(leaf.itemStore[idx:idx+k], values)
 	leaf.n = uint8(n + k)
 	leaf.items = leaf.itemStore[:n+k]
-	return nil
 }
 
 func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
@@ -165,48 +153,28 @@ func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 	leaf.items = leaf.itemStore[:n-k]
 }
 
-func (t *Tree[I, S]) maxLeafItems() int {
-	return fixedMaxLeafItems
-}
-
-func (t *Tree[I, S]) minLeafItems() int {
-	return fixedBase
-}
-
-func (t *Tree[I, S]) maxChildren() int {
-	return fixedMaxChildren
-}
-
-func (t *Tree[I, S]) minChildren() int {
-	return fixedBase
-}
-
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {
-	return leaf != nil && len(leaf.items) > t.maxLeafItems()
+	return leaf != nil && len(leaf.items) > fixedMaxLeafItems
 }
 
 func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
-	if leaf == nil {
-		return false
-	}
+	assert(leaf != nil, "leafUnderflow called with nil leaf")
 	if isRoot {
 		return false
 	}
-	return len(leaf.items) < t.minLeafItems()
+	return len(leaf.items) < fixedBase
 }
 
 func (t *Tree[I, S]) innerOverflow(inner *innerNode[I, S]) bool {
-	return inner != nil && len(inner.children) > t.maxChildren()
+	return inner != nil && len(inner.children) > fixedMaxChildren
 }
 
 func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
-	if inner == nil {
-		return false
-	}
+	assert(inner != nil, "innerUnderflow called with nil inner node")
 	if isRoot {
 		return false
 	}
-	return len(inner.children) < t.minChildren()
+	return len(inner.children) < fixedBase
 }
 
 // insertIntoLeafLocal inserts items at a local leaf offset.
@@ -214,45 +182,34 @@ func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
 // It returns the updated (left) leaf and optionally a promoted right sibling if
 // a split occurred.
 func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items ...I) (*leafNode[I, S], *leafNode[I, S], error) {
-	if leaf == nil {
-		return nil, nil, fmt.Errorf("%w: nil leaf", ErrInvalidConfig)
-	}
-	if index < 0 || index > len(leaf.items) {
-		return nil, nil, ErrIndexOutOfBounds
-	}
+	assert(leaf != nil, "insertIntoLeafLocal called with nil leaf")
+	assert(index >= 0 && index <= len(leaf.items), "insertIntoLeafLocal index out of range")
 	if len(items) == 0 {
 		return t.cloneLeaf(leaf), nil, nil
 	}
 	cloned := t.cloneLeaf(leaf)
-	if err := t.insertLeafItemsAt(cloned, index, items...); err != nil {
-		return nil, nil, err
-	}
+	t.insertLeafItemsAt(cloned, index, items...)
 	t.recomputeLeafSummary(cloned)
 	if !t.leafOverflow(cloned) {
 		return cloned, nil, nil
 	}
-	left, right, err := t.splitLeaf(cloned)
-	return left, right, err
+	left, right := t.splitLeaf(cloned)
+	return left, right, nil
 }
 
 // splitLeaf splits an overflowing leaf into two siblings.
-func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode[I, S], error) {
-	if leaf == nil {
-		return nil, nil, fmt.Errorf("%w: nil leaf", ErrInvalidConfig)
-	}
+func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode[I, S]) {
+	assert(leaf != nil, "splitLeaf called with nil leaf")
 	n := len(leaf.items)
-	maxItems := t.maxLeafItems()
+	maxItems := fixedMaxLeafItems
 	if n <= maxItems {
-		return t.cloneLeaf(leaf), nil, nil
+		return t.cloneLeaf(leaf), nil
 	}
-	if n > 2*maxItems {
-		return nil, nil, fmt.Errorf("%w: leaf split requires more than one sibling", ErrUnimplemented)
-	}
+	assert(n <= 2*maxItems, "splitLeaf requires more than one promoted sibling")
 	mid := n / 2
 	left := t.makeLeaf(leaf.items[:mid])
 	right := t.makeLeaf(leaf.items[mid:])
-	if len(left.items) < t.minLeafItems() || len(right.items) < t.minLeafItems() {
-		return nil, nil, fmt.Errorf("%w: split violates leaf occupancy bounds", ErrInvalidConfig)
-	}
-	return left, right, nil
+	assert(len(left.items) >= fixedBase && len(right.items) >= fixedBase,
+		"splitLeaf violates leaf occupancy bounds")
+	return left, right
 }

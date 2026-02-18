@@ -129,12 +129,8 @@ func (t *Tree[I, S]) SplitAt(index int) (*Tree[I, S], *Tree[I, S], error) {
 	right.height = right.subtreeHeight(right.root)
 	left.normalizeRoot()
 	right.normalizeRoot()
-	if err := left.Check(); err != nil {
-		return nil, nil, err
-	}
-	if err := right.Check(); err != nil {
-		return nil, nil, err
-	}
+	assert(left.Check() == nil, "left tree is invalid")
+	assert(right.Check() == nil, "right tree is invalid")
 	return left, right, nil
 }
 
@@ -199,9 +195,7 @@ func (t *Tree[I, S]) concatNodes(
 
 	if leftHeight > rightHeight {
 		inner, ok := left.(*innerNode[I, S])
-		if !ok {
-			return nil, nil, 0, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, leftHeight)
-		}
+		assert(ok, "concatNodes expected internal left node at greater height")
 		cloned := t.cloneInner(inner)
 		last := len(cloned.children) - 1
 		childLeft, childRight, _, joinErr := t.concatNodes(cloned.children[last], leftHeight-1, right, rightHeight)
@@ -218,7 +212,7 @@ func (t *Tree[I, S]) concatNodes(
 		if t.innerOverflow(cloned) {
 			l, r, splitErr := t.splitInner(cloned)
 			if splitErr != nil {
-				return nil, nil, 0, splitErr
+				assert(false, splitErr.Error())
 			}
 			return l, r, leftHeight, nil
 		}
@@ -226,9 +220,7 @@ func (t *Tree[I, S]) concatNodes(
 	}
 
 	inner, ok := right.(*innerNode[I, S])
-	if !ok {
-		return nil, nil, 0, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, rightHeight)
-	}
+	assert(ok, "concatNodes expected internal right node at greater height")
 	cloned := t.cloneInner(inner)
 	first := 0
 	childLeft, childRight, _, joinErr := t.concatNodes(left, leftHeight, cloned.children[first], rightHeight-1)
@@ -245,7 +237,7 @@ func (t *Tree[I, S]) concatNodes(
 	if t.innerOverflow(cloned) {
 		l, r, splitErr := t.splitInner(cloned)
 		if splitErr != nil {
-			return nil, nil, 0, splitErr
+			assert(false, splitErr.Error())
 		}
 		return l, r, rightHeight, nil
 	}
@@ -253,17 +245,13 @@ func (t *Tree[I, S]) concatNodes(
 }
 
 func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (treeNode[I, S], treeNode[I, S], error) {
-	if height <= 0 {
-		return nil, nil, fmt.Errorf("%w: invalid height %d", ErrInvalidConfig, height)
-	}
+	assert(height > 0, "concatSameHeight called with non-positive height")
 	if height == 1 {
 		leftLeaf, lok := left.(*leafNode[I, S])
 		rightLeaf, rok := right.(*leafNode[I, S])
-		if !lok || !rok {
-			return nil, nil, fmt.Errorf("%w: expected leaf nodes at height 1", ErrInvalidConfig)
-		}
+		assert(lok && rok, "concatSameHeight expected leaf nodes at height 1")
 		total := len(leftLeaf.items) + len(rightLeaf.items)
-		if total <= t.maxLeafItems() {
+		if total <= fixedMaxLeafItems {
 			merged := make([]I, 0, total)
 			merged = append(merged, leftLeaf.items...)
 			merged = append(merged, rightLeaf.items...)
@@ -273,11 +261,9 @@ func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (t
 	}
 	leftInner, lok := left.(*innerNode[I, S])
 	rightInner, rok := right.(*innerNode[I, S])
-	if !lok || !rok {
-		return nil, nil, fmt.Errorf("%w: expected internal nodes at height %d", ErrInvalidConfig, height)
-	}
+	assert(lok && rok, "concatSameHeight expected internal nodes")
 	total := len(leftInner.children) + len(rightInner.children)
-	if total <= t.maxChildren() {
+	if total <= fixedMaxChildren {
 		children := make([]treeNode[I, S], 0, total)
 		children = append(children, leftInner.children...)
 		children = append(children, rightInner.children...)
@@ -302,15 +288,11 @@ func (t *Tree[I, S]) countItems(n treeNode[I, S]) int {
 
 func (t *Tree[I, S]) splitNodePathCopy(n treeNode[I, S], height, index int) (treeNode[I, S], treeNode[I, S], error) {
 	if n == nil {
-		if index == 0 {
-			return nil, nil, nil
-		}
-		return nil, nil, ErrIndexOutOfBounds
+		assert(index == 0, "splitNodePathCopy called with nil node and non-zero index")
+		return nil, nil, nil
 	}
 	total := t.countItems(n)
-	if index < 0 || index > total {
-		return nil, nil, ErrIndexOutOfBounds
-	}
+	assert(index >= 0 && index <= total, "splitNodePathCopy index out of bounds")
 	if index == 0 {
 		return nil, n, nil
 	}
@@ -319,24 +301,20 @@ func (t *Tree[I, S]) splitNodePathCopy(n treeNode[I, S], height, index int) (tre
 	}
 	if height == 1 {
 		leaf, ok := n.(*leafNode[I, S])
-		if !ok {
-			return nil, nil, fmt.Errorf("%w: expected leaf at height 1", ErrInvalidConfig)
-		}
+		assert(ok, "splitNodePathCopy expected leaf at height 1")
 		left := t.makeLeaf(leaf.items[:index])
 		right := t.makeLeaf(leaf.items[index:])
 		return left, right, nil
 	}
 	inner, ok := n.(*innerNode[I, S])
-	if !ok {
-		return nil, nil, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, height)
-	}
+	assert(ok, "splitNodePathCopy expected internal node")
 	slot, local, err := t.locateChildForInsert(inner, index)
 	if err != nil {
-		return nil, nil, err
+		assert(false, err.Error())
 	}
 	childLeft, childRight, err := t.splitNodePathCopy(inner.children[slot], height-1, local)
 	if err != nil {
-		return nil, nil, err
+		assert(false, err.Error())
 	}
 	var leftNode treeNode[I, S]
 	var rightNode treeNode[I, S]
@@ -431,36 +409,28 @@ func (t *Tree[I, S]) insertOneAt(index int, item I) error {
 }
 
 func (t *Tree[I, S]) insertRecursive(n treeNode[I, S], height, index int, item I) (treeNode[I, S], treeNode[I, S], error) {
-	if n == nil {
-		return nil, nil, fmt.Errorf("%w: nil node", ErrInvalidConfig)
-	}
-	if height <= 0 {
-		return nil, nil, fmt.Errorf("%w: invalid height", ErrInvalidConfig)
-	}
+	assert(n != nil, "insertRecursive called with nil node")
+	assert(height > 0, "insertRecursive called with invalid height")
 	if height == 1 {
 		leaf, ok := n.(*leafNode[I, S])
-		if !ok {
-			return nil, nil, fmt.Errorf("%w: expected leaf at height 1", ErrInvalidConfig)
-		}
+		assert(ok, "insertRecursive expected leaf at height 1")
 		left, right, err := t.insertIntoLeafLocal(leaf, index, item)
 		if err != nil {
-			return nil, nil, err
+			assert(false, err.Error())
 		}
 		return left, normalizeNode[I, S](right), nil
 	}
 
 	inner, ok := n.(*innerNode[I, S])
-	if !ok {
-		return nil, nil, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, height)
-	}
+	assert(ok, "insertRecursive expected internal node")
 	cloned := t.cloneInner(inner)
 	slot, localIndex, err := t.locateChildForInsert(cloned, index)
 	if err != nil {
-		return nil, nil, err
+		assert(false, err.Error())
 	}
 	updatedChild, promotedChild, err := t.insertRecursive(cloned.children[slot], height-1, localIndex, item)
 	if err != nil {
-		return nil, nil, err
+		assert(false, err.Error())
 	}
 	promotedChild = normalizeNode[I, S](promotedChild)
 	cloned.children[slot] = updatedChild
@@ -474,18 +444,15 @@ func (t *Tree[I, S]) insertRecursive(n treeNode[I, S], height, index int, item I
 	}
 	left, right, err := t.splitInner(cloned)
 	if err != nil {
-		return nil, nil, err
+		assert(false, err.Error())
 	}
 	return left, normalizeNode[I, S](right), nil
 }
 
 func (t *Tree[I, S]) locateChildForInsert(inner *innerNode[I, S], index int) (childSlot int, localIndex int, err error) {
-	if inner == nil || len(inner.children) == 0 {
-		return 0, 0, fmt.Errorf("%w: internal node has no children", ErrInvalidConfig)
-	}
-	if index < 0 {
-		return 0, 0, ErrIndexOutOfBounds
-	}
+	assert(inner != nil, "locateChildForInsert called with nil inner node")
+	assert(len(inner.children) > 0, "locateChildForInsert called with empty children")
+	assert(index >= 0, "locateChildForInsert called with negative index")
 	remaining := index
 	for i, child := range inner.children {
 		childItems := t.countItems(child)
@@ -494,29 +461,25 @@ func (t *Tree[I, S]) locateChildForInsert(inner *innerNode[I, S], index int) (ch
 		}
 		remaining -= childItems
 	}
-	return 0, 0, ErrIndexOutOfBounds
+	assert(false, "locateChildForInsert index exceeded subtree item count")
+	return 0, 0, nil
 }
 
 func (t *Tree[I, S]) splitInner(inner *innerNode[I, S]) (*innerNode[I, S], *innerNode[I, S], error) {
-	if inner == nil {
-		return nil, nil, fmt.Errorf("%w: nil inner node", ErrInvalidConfig)
-	}
+	assert(inner != nil, "splitInner called with nil inner node")
 	n := len(inner.children)
-	maxChildren := t.maxChildren()
+	maxChildren := fixedMaxChildren
 	if n <= maxChildren {
 		return t.cloneInner(inner), nil, nil
 	}
-	if n > 2*maxChildren {
-		return nil, nil, fmt.Errorf("%w: internal split requires more than one sibling", ErrUnimplemented)
-	}
+	assert(n <= 2*maxChildren, "splitInner requires more than one promoted sibling")
 	mid := n / 2
 	leftChildren := append([]treeNode[I, S](nil), inner.children[:mid]...)
 	rightChildren := append([]treeNode[I, S](nil), inner.children[mid:]...)
 	left := t.makeInternal(leftChildren...)
 	right := t.makeInternal(rightChildren...)
-	if len(left.children) < t.minChildren() || len(right.children) < t.minChildren() {
-		return nil, nil, fmt.Errorf("%w: split violates internal occupancy bounds", ErrInvalidConfig)
-	}
+	assert(len(left.children) >= fixedBase && len(right.children) >= fixedBase,
+		"splitInner violates internal occupancy bounds")
 	return left, right, nil
 }
 

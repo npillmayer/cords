@@ -56,9 +56,7 @@ func (c *Cursor[I, S, K]) Seek(target K) (itemIndex int, acc K, err error) {
 }
 
 func (c *Cursor[I, S, K]) seekNode(n treeNode[I, S], startIndex int, acc K, target K) (idx int, reached K, found bool, err error) {
-	if n == nil {
-		return startIndex, acc, false, fmt.Errorf("%w: nil node", ErrInvalidConfig)
-	}
+	assert(n != nil, "cursor seekNode called with nil node")
 	if n.isLeaf() {
 		leaf := n.(*leafNode[I, S])
 		cur := acc
@@ -75,9 +73,7 @@ func (c *Cursor[I, S, K]) seekNode(n treeNode[I, S], startIndex int, acc K, targ
 	curIdx := startIndex
 	curAcc := acc
 	for _, child := range inner.children {
-		if child == nil {
-			return curIdx, curAcc, false, fmt.Errorf("%w: nil child", ErrInvalidConfig)
-		}
+		assert(child != nil, "cursor seekNode encountered nil child")
 		nextAcc := c.dim.Add(curAcc, child.Summary())
 		if c.dim.Compare(nextAcc, target) >= 0 {
 			return c.seekNode(child, curIdx, curAcc, target)
