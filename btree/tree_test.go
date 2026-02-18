@@ -304,3 +304,130 @@ func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 		t.Fatalf("expected untouched left subtree to be shared")
 	}
 }
+
+func buildTreeWithRootChildren(t *testing.T, startValue int, minRootChildren int) *Tree[TextChunk, TextSummary] {
+	t.Helper()
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < 10000; i++ {
+		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(startValue+i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+		root, ok := tree.root.(*innerNode[TextChunk, TextSummary])
+		if ok && tree.Height() == 2 && len(root.children) >= minRootChildren {
+			return tree
+		}
+	}
+	t.Fatalf("failed to build tree with >=%d root children", minRootChildren)
+	return nil
+}
+
+func TestConcatSharesRootsWhenJoinCannotMergeTopLevel(t *testing.T) {
+	threshold := fixedBase + 1 // forces root-child sum > fixedMaxChildren after concat
+	left := buildTreeWithRootChildren(t, 0, threshold)
+	right := buildTreeWithRootChildren(t, 100000, threshold)
+
+	leftRoot := left.root
+	rightRoot := right.root
+	combined, err := left.Concat(right)
+	if err != nil {
+		t.Fatalf("concat failed: %v", err)
+	}
+	if err := combined.Check(); err != nil {
+		t.Fatalf("combined invariants failed: %v", err)
+	}
+	if combined.Height() != 3 {
+		t.Fatalf("expected combined height 3, got %d", combined.Height())
+	}
+	root, ok := combined.root.(*innerNode[TextChunk, TextSummary])
+	if !ok || len(root.children) != 2 {
+		t.Fatalf("expected new root with two children")
+	}
+	if root.children[0] != leftRoot {
+		t.Fatalf("expected combined root left child to share left root")
+	}
+	if root.children[1] != rightRoot {
+		t.Fatalf("expected combined root right child to share right root")
+	}
+}
+
+func TestConcatDifferentHeightsKeepsOrder(t *testing.T) {
+	left := buildTreeWithRootChildren(t, 0, fixedBase+1) // height 2
+	right, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, s := range []string{"x", "y", "z"} {
+		right, err = right.InsertAt(right.Len(), FromString(s))
+		if err != nil {
+			t.Fatalf("right insert failed: %v", err)
+		}
+	}
+	combined, err := left.Concat(right)
+	if err != nil {
+		t.Fatalf("concat failed: %v", err)
+	}
+	if err := combined.Check(); err != nil {
+		t.Fatalf("combined invariants failed: %v", err)
+	}
+	got := collectTextItems(combined)
+	leftItems := collectTextItems(left)
+	if len(got) != len(leftItems)+3 {
+		t.Fatalf("unexpected combined length: %d", len(got))
+	}
+	for i := range leftItems {
+		if got[i] != leftItems[i] {
+			t.Fatalf("left prefix mismatch at %d", i)
+		}
+	}
+	if got[len(leftItems)] != "x" || got[len(leftItems)+1] != "y" || got[len(leftItems)+2] != "z" {
+		t.Fatalf("unexpected right suffix: %v", got[len(leftItems):])
+	}
+}
+
+func TestSplitAtStructuralOnlyAcrossAllBoundaries(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < 120; i++ {
+		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	all := collectTextItems(tree)
+	for split := 0; split <= len(all); split++ {
+		left, right, err := tree.SplitAt(split)
+		if err != nil {
+			t.Fatalf("split at %d failed: %v", split, err)
+		}
+		gotLeft := collectTextItems(left)
+		gotRight := collectTextItems(right)
+		if len(gotLeft) != split {
+			t.Fatalf("split %d: left length mismatch got=%d want=%d", split, len(gotLeft), split)
+		}
+		if len(gotRight) != len(all)-split {
+			t.Fatalf("split %d: right length mismatch got=%d want=%d", split, len(gotRight), len(all)-split)
+		}
+		for i := 0; i < split; i++ {
+			if gotLeft[i] != all[i] {
+				t.Fatalf("split %d: left mismatch at %d", split, i)
+			}
+		}
+		for i := split; i < len(all); i++ {
+			if gotRight[i-split] != all[i] {
+				t.Fatalf("split %d: right mismatch at %d", split, i)
+			}
+		}
+	}
+}

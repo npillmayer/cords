@@ -251,10 +251,9 @@ Implemented:
   promoted-sibling output for upcoming parent-level insert propagation.
 - Recursive path-copy `InsertAt` with upward split propagation (including root splits).
 - `SplitAt` now performs path-copy structural splitting with subtree sharing.
-  - It falls back to rebuild only for strict edge cases where occupancy checks
-    would otherwise reject the split result.
-- Baseline `Concat` appends right-tree items via repeated end-inserts.
-  - Functional and persistent, but not yet optimized for maximal subtree sharing.
+  - No rebuild fallback path remains.
+- `Concat` now uses a structural, height-aware join.
+  - It path-copies only affected boundary paths and shares untouched subtrees.
 - Fixed-array node backend is the active implementation.
 - Mutation primitives perform in-place shifts on fixed storage
   (no per-node slice reallocation on local edits).
@@ -302,15 +301,14 @@ This section compares the **current** `btree/` implementation with Zed's model.
 
 - No `Context`-parameterized summaries yet (intentionally deferred).
 - No rich seek-target/bias/path-stack cursor model yet.
-- `Concat` is still baseline and not optimized for subtree sharing.
 - No delete/cut/merge/borrow rebalancing yet.
 - No cached item count (current `Len()` is traversal-based).
 
 ## Recommended Next Steps
 
-1. Implement core persistent edit primitives (`SplitAt`, `Concat`, `InsertAt`).
-2. Define path-copy invariants explicitly before mutation logic lands.
-3. Upgrade cursor API toward target+bias semantics.
+1. Implement delete/merge/borrow primitives and re-tighten occupancy policies.
+2. Define path-copy invariants explicitly before delete/rebalance logic lands.
+3. Upgrade cursor API toward richer target+bias semantics.
 4. Add efficient positional dimensions needed by rope API (bytes first).
 5. Re-evaluate adding `Context` when metrics/styled-text operations start.
 
@@ -475,6 +473,5 @@ Mitigations:
 ### Migration Plan
 
 1. Keep fixed-array backend as the only active backend.
-2. Optimize `Concat`/join and remove rebuild fallback paths in `SplitAt`.
-3. Add delete/merge/borrow operations and re-tighten occupancy policies.
-4. Benchmark edit/read workloads and allocation profiles.
+2. Add delete/merge/borrow operations and re-tighten occupancy policies.
+3. Benchmark edit/read workloads and allocation profiles.

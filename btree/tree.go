@@ -129,18 +129,10 @@ func (t *Tree[I, S]) SplitAt(index int) (*Tree[I, S], *Tree[I, S], error) {
 	right.height = right.subtreeHeight(right.root)
 	left.normalizeRoot()
 	right.normalizeRoot()
-	if errL, errR := left.Check(), right.Check(); errL == nil && errR == nil {
-		return left, right, nil
-	}
-	// Fallback for structural edge cases where Check() rejects the split result.
-	// This preserves correctness while split logic evolves.
-	items := t.itemsInOrder()
-	left, err = t.buildFromItems(items[:index])
-	if err != nil {
+	if err := left.Check(); err != nil {
 		return nil, nil, err
 	}
-	right, err = t.buildFromItems(items[index:])
-	if err != nil {
+	if err := right.Check(); err != nil {
 		return nil, nil, err
 	}
 	return left, right, nil
@@ -157,15 +149,141 @@ func (t *Tree[I, S]) Concat(other *Tree[I, S]) (*Tree[I, S], error) {
 	if other.IsEmpty() {
 		return t.Clone(), nil
 	}
-	combined := t.Clone()
-	appendAt := combined.Len()
-	for _, item := range other.itemsInOrder() {
-		if err := combined.insertOneAt(appendAt, item); err != nil {
-			return nil, err
-		}
-		appendAt++
+	left, right, height, err := t.concatNodes(t.root, t.height, other.root, other.height)
+	if err != nil {
+		return nil, err
 	}
+	combined := t.Clone()
+	left = normalizeNode[I, S](left)
+	right = normalizeNode[I, S](right)
+	if left == nil {
+		combined.root = right
+		combined.height = height
+		combined.normalizeRoot()
+		return combined, nil
+	}
+	if right == nil {
+		combined.root = left
+		combined.height = height
+		combined.normalizeRoot()
+		return combined, nil
+	}
+	combined.root = t.makeInternal(left, right)
+	combined.height = height + 1
+	combined.normalizeRoot()
 	return combined, nil
+}
+
+func (t *Tree[I, S]) concatNodes(
+	left treeNode[I, S], leftHeight int,
+	right treeNode[I, S], rightHeight int,
+) (mergedLeft treeNode[I, S], mergedRight treeNode[I, S], outHeight int, err error) {
+	left = normalizeNode[I, S](left)
+	right = normalizeNode[I, S](right)
+	switch {
+	case left == nil && right == nil:
+		return nil, nil, 0, nil
+	case left == nil:
+		return right, nil, rightHeight, nil
+	case right == nil:
+		return left, nil, leftHeight, nil
+	}
+
+	if leftHeight == rightHeight {
+		l, r, joinErr := t.concatSameHeight(left, right, leftHeight)
+		if joinErr != nil {
+			return nil, nil, 0, joinErr
+		}
+		return normalizeNode[I, S](l), normalizeNode[I, S](r), leftHeight, nil
+	}
+
+	if leftHeight > rightHeight {
+		inner, ok := left.(*innerNode[I, S])
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, leftHeight)
+		}
+		cloned := t.cloneInner(inner)
+		last := len(cloned.children) - 1
+		childLeft, childRight, _, joinErr := t.concatNodes(cloned.children[last], leftHeight-1, right, rightHeight)
+		if joinErr != nil {
+			return nil, nil, 0, joinErr
+		}
+		cloned.children[last] = childLeft
+		childRight = normalizeNode[I, S](childRight)
+		if childRight != nil {
+			t.insertChildAt(cloned, last+1, childRight)
+		} else {
+			t.recomputeInnerSummary(cloned)
+		}
+		if t.innerOverflow(cloned) {
+			l, r, splitErr := t.splitInner(cloned)
+			if splitErr != nil {
+				return nil, nil, 0, splitErr
+			}
+			return l, r, leftHeight, nil
+		}
+		return cloned, nil, leftHeight, nil
+	}
+
+	inner, ok := right.(*innerNode[I, S])
+	if !ok {
+		return nil, nil, 0, fmt.Errorf("%w: expected internal node at height %d", ErrInvalidConfig, rightHeight)
+	}
+	cloned := t.cloneInner(inner)
+	first := 0
+	childLeft, childRight, _, joinErr := t.concatNodes(left, leftHeight, cloned.children[first], rightHeight-1)
+	if joinErr != nil {
+		return nil, nil, 0, joinErr
+	}
+	cloned.children[first] = childLeft
+	childRight = normalizeNode[I, S](childRight)
+	if childRight != nil {
+		t.insertChildAt(cloned, 1, childRight)
+	} else {
+		t.recomputeInnerSummary(cloned)
+	}
+	if t.innerOverflow(cloned) {
+		l, r, splitErr := t.splitInner(cloned)
+		if splitErr != nil {
+			return nil, nil, 0, splitErr
+		}
+		return l, r, rightHeight, nil
+	}
+	return cloned, nil, rightHeight, nil
+}
+
+func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (treeNode[I, S], treeNode[I, S], error) {
+	if height <= 0 {
+		return nil, nil, fmt.Errorf("%w: invalid height %d", ErrInvalidConfig, height)
+	}
+	if height == 1 {
+		leftLeaf, lok := left.(*leafNode[I, S])
+		rightLeaf, rok := right.(*leafNode[I, S])
+		if !lok || !rok {
+			return nil, nil, fmt.Errorf("%w: expected leaf nodes at height 1", ErrInvalidConfig)
+		}
+		total := len(leftLeaf.items) + len(rightLeaf.items)
+		if total <= t.maxLeafItems() {
+			merged := make([]I, 0, total)
+			merged = append(merged, leftLeaf.items...)
+			merged = append(merged, rightLeaf.items...)
+			return t.makeLeaf(merged), nil, nil
+		}
+		return left, right, nil
+	}
+	leftInner, lok := left.(*innerNode[I, S])
+	rightInner, rok := right.(*innerNode[I, S])
+	if !lok || !rok {
+		return nil, nil, fmt.Errorf("%w: expected internal nodes at height %d", ErrInvalidConfig, height)
+	}
+	total := len(leftInner.children) + len(rightInner.children)
+	if total <= t.maxChildren() {
+		children := make([]treeNode[I, S], 0, total)
+		children = append(children, leftInner.children...)
+		children = append(children, rightInner.children...)
+		return t.makeInternal(children...), nil, nil
+	}
+	return left, right, nil
 }
 
 func (t *Tree[I, S]) countItems(n treeNode[I, S]) int {
@@ -180,41 +298,6 @@ func (t *Tree[I, S]) countItems(n treeNode[I, S]) int {
 		total += t.countItems(child)
 	}
 	return total
-}
-
-func (t *Tree[I, S]) itemsInOrder() []I {
-	if t == nil || t.root == nil {
-		return nil
-	}
-	out := make([]I, 0, t.Len())
-	t.appendItems(t.root, &out)
-	return out
-}
-
-func (t *Tree[I, S]) appendItems(n treeNode[I, S], out *[]I) {
-	if n == nil {
-		return
-	}
-	if n.isLeaf() {
-		*out = append(*out, n.(*leafNode[I, S]).items...)
-		return
-	}
-	for _, child := range n.(*innerNode[I, S]).children {
-		t.appendItems(child, out)
-	}
-}
-
-func (t *Tree[I, S]) buildFromItems(items []I) (*Tree[I, S], error) {
-	tree, err := New[I, S](t.cfg)
-	if err != nil {
-		return nil, err
-	}
-	for i, item := range items {
-		if err := tree.insertOneAt(i, item); err != nil {
-			return nil, err
-		}
-	}
-	return tree, nil
 }
 
 func (t *Tree[I, S]) splitNodePathCopy(n treeNode[I, S], height, index int) (treeNode[I, S], treeNode[I, S], error) {
