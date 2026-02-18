@@ -154,7 +154,7 @@ func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 }
 
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {
-	return leaf != nil && len(leaf.items) > fixedMaxLeafItems
+	return leaf != nil && len(leaf.items) > MaxLeafItems
 }
 
 func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
@@ -162,11 +162,11 @@ func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
 	if isRoot {
 		return false
 	}
-	return len(leaf.items) < fixedBase
+	return len(leaf.items) < Base
 }
 
 func (t *Tree[I, S]) innerOverflow(inner *innerNode[I, S]) bool {
-	return inner != nil && len(inner.children) > fixedMaxChildren
+	return inner != nil && len(inner.children) > MaxChildren
 }
 
 func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
@@ -174,7 +174,7 @@ func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
 	if isRoot {
 		return false
 	}
-	return len(inner.children) < fixedBase
+	return len(inner.children) < Base
 }
 
 // insertIntoLeafLocal inserts items at a local leaf offset.
@@ -201,7 +201,7 @@ func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items 
 func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode[I, S]) {
 	assert(leaf != nil, "splitLeaf called with nil leaf")
 	n := len(leaf.items)
-	maxItems := fixedMaxLeafItems
+	maxItems := MaxLeafItems
 	if n <= maxItems {
 		return t.cloneLeaf(leaf), nil
 	}
@@ -209,7 +209,7 @@ func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode
 	mid := n / 2
 	left := t.makeLeaf(leaf.items[:mid])
 	right := t.makeLeaf(leaf.items[mid:])
-	assert(len(left.items) >= fixedBase && len(right.items) >= fixedBase,
+	assert(len(left.items) >= Base && len(right.items) >= Base,
 		"splitLeaf violates leaf occupancy bounds")
 	return left, right
 }

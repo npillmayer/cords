@@ -124,12 +124,12 @@ func TestLeafInsertLocalNoSplit(t *testing.T) {
 
 func TestLeafInsertLocalSplit(t *testing.T) {
 	tree := makeTextTree(t)
-	base := make([]TextChunk, 0, DefaultDegree)
-	for i := 0; i < DefaultDegree; i++ {
+	base := make([]TextChunk, 0, MaxChildren)
+	for i := range MaxChildren {
 		base = append(base, FromString(string(rune('a'+(i%26)))))
 	}
 	leaf := tree.makeLeaf(base)
-	left, right, err := tree.insertIntoLeafLocal(leaf, DefaultDegree/2, FromString("X"))
+	left, right, err := tree.insertIntoLeafLocal(leaf, MaxChildren/2, FromString("X"))
 	if err != nil {
 		t.Fatalf("insertIntoLeafLocal failed: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestLeafInsertLocalSplit(t *testing.T) {
 		t.Fatalf("split result still overflows")
 	}
 	got := append(chunkStrings(left.items), chunkStrings(right.items)...)
-	if len(got) != DefaultDegree+1 {
-		t.Fatalf("unexpected split output length: got %d want %d", len(got), DefaultDegree+1)
+	if len(got) != MaxChildren+1 {
+		t.Fatalf("unexpected split output length: got %d want %d", len(got), MaxChildren+1)
 	}
 }

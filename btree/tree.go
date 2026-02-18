@@ -304,7 +304,7 @@ func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (t
 		rightLeaf, rok := right.(*leafNode[I, S])
 		assert(lok && rok, "concatSameHeight expected leaf nodes at height 1")
 		total := len(leftLeaf.items) + len(rightLeaf.items)
-		if total <= fixedMaxLeafItems {
+		if total <= MaxLeafItems {
 			merged := make([]I, 0, total)
 			merged = append(merged, leftLeaf.items...)
 			merged = append(merged, rightLeaf.items...)
@@ -316,7 +316,7 @@ func (t *Tree[I, S]) concatSameHeight(left, right treeNode[I, S], height int) (t
 	rightInner, rok := right.(*innerNode[I, S])
 	assert(lok && rok, "concatSameHeight expected internal nodes")
 	total := len(leftInner.children) + len(rightInner.children)
-	if total <= fixedMaxChildren {
+	if total <= MaxChildren {
 		children := make([]treeNode[I, S], 0, total)
 		children = append(children, leftInner.children...)
 		children = append(children, rightInner.children...)
@@ -673,7 +673,7 @@ func (t *Tree[I, S]) rebalanceLeafChild(parent *innerNode[I, S], slot int) bool 
 		func() bool {
 			left, lok := parent.children[slot-1].(*leafNode[I, S])
 			assert(lok, "rebalanceLeafChild expected leaf left sibling")
-			if len(left.items) <= fixedBase {
+			if len(left.items) <= Base {
 				return false
 			}
 			leftClone := t.cloneLeaf(left)
@@ -689,7 +689,7 @@ func (t *Tree[I, S]) rebalanceLeafChild(parent *innerNode[I, S], slot int) bool 
 		func() bool {
 			right, rok := parent.children[slot+1].(*leafNode[I, S])
 			assert(rok, "rebalanceLeafChild expected leaf right sibling")
-			if len(right.items) <= fixedBase {
+			if len(right.items) <= Base {
 				return false
 			}
 			rightClone := t.cloneLeaf(right)
@@ -736,7 +736,7 @@ func (t *Tree[I, S]) rebalanceInnerChild(parent *innerNode[I, S], slot int) bool
 		func() bool {
 			left, lok := parent.children[slot-1].(*innerNode[I, S])
 			assert(lok, "rebalanceInnerChild expected internal left sibling")
-			if len(left.children) <= fixedBase {
+			if len(left.children) <= Base {
 				return false
 			}
 			leftClone := t.cloneInner(left)
@@ -750,7 +750,7 @@ func (t *Tree[I, S]) rebalanceInnerChild(parent *innerNode[I, S], slot int) bool
 		func() bool {
 			right, rok := parent.children[slot+1].(*innerNode[I, S])
 			assert(rok, "rebalanceInnerChild expected internal right sibling")
-			if len(right.children) <= fixedBase {
+			if len(right.children) <= Base {
 				return false
 			}
 			rightClone := t.cloneInner(right)
@@ -787,7 +787,7 @@ func (t *Tree[I, S]) rebalanceInnerChild(parent *innerNode[I, S], slot int) bool
 func (t *Tree[I, S]) splitInner(inner *innerNode[I, S]) (*innerNode[I, S], *innerNode[I, S], error) {
 	assert(inner != nil, "splitInner called with nil inner node")
 	n := len(inner.children)
-	maxChildren := fixedMaxChildren
+	maxChildren := MaxChildren
 	if n <= maxChildren {
 		return t.cloneInner(inner), nil, nil
 	}
@@ -797,7 +797,7 @@ func (t *Tree[I, S]) splitInner(inner *innerNode[I, S]) (*innerNode[I, S], *inne
 	rightChildren := append([]treeNode[I, S](nil), inner.children[mid:]...)
 	left := t.makeInternal(leftChildren...)
 	right := t.makeInternal(rightChildren...)
-	assert(len(left.children) >= fixedBase && len(right.children) >= fixedBase,
+	assert(len(left.children) >= Base && len(right.children) >= Base,
 		"splitInner violates internal occupancy bounds")
 	return left, right, nil
 }

@@ -404,9 +404,9 @@ func TestDeleteRecursiveRebalancesUnderflowAtParent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, fixedBase)
-	rightItems := make([]TextChunk, 0, fixedBase)
-	for i := 0; i < fixedBase; i++ {
+	leftItems := make([]TextChunk, 0, Base)
+	rightItems := make([]TextChunk, 0, Base)
+	for i := 0; i < Base; i++ {
 		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
 		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
 	}
@@ -435,9 +435,9 @@ func TestDeleteAtLeafMergeAndRootCollapse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, fixedBase)
-	rightItems := make([]TextChunk, 0, fixedBase)
-	for i := 0; i < fixedBase; i++ {
+	leftItems := make([]TextChunk, 0, Base)
+	rightItems := make([]TextChunk, 0, Base)
+	for i := 0; i < Base; i++ {
 		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
 		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
 	}
@@ -455,7 +455,7 @@ func TestDeleteAtLeafMergeAndRootCollapse(t *testing.T) {
 		t.Fatalf("expected root collapse to leaf, got height=%d", deleted.Height())
 	}
 	got := collectTextItems(deleted)
-	if len(got) != 2*fixedBase-1 {
+	if len(got) != 2*Base-1 {
 		t.Fatalf("unexpected length after merge delete: %d", len(got))
 	}
 	if got[0] != "1" {
@@ -470,18 +470,18 @@ func TestDeleteAtLeafBorrow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, fixedBase+1)
-	rightItems := make([]TextChunk, 0, fixedBase)
-	for i := 0; i < fixedBase+1; i++ {
+	leftItems := make([]TextChunk, 0, Base+1)
+	rightItems := make([]TextChunk, 0, Base)
+	for i := 0; i < Base+1; i++ {
 		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
 	}
-	for i := fixedBase + 1; i < 2*fixedBase+1; i++ {
+	for i := Base + 1; i < 2*Base+1; i++ {
 		rightItems = append(rightItems, FromString(strconv.Itoa(i)))
 	}
 	tree.root = tree.makeInternal(tree.makeLeaf(leftItems), tree.makeLeaf(rightItems))
 	tree.height = 2
 
-	deleted, err := tree.DeleteAt(fixedBase + 1) // delete first item in right leaf
+	deleted, err := tree.DeleteAt(Base + 1) // delete first item in right leaf
 	if err != nil {
 		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
 	}
@@ -497,7 +497,7 @@ func TestDeleteAtLeafBorrow(t *testing.T) {
 	if !lok || !rok {
 		t.Fatalf("expected leaf children")
 	}
-	if len(l.items) != fixedBase || len(r.items) != fixedBase {
+	if len(l.items) != Base || len(r.items) != Base {
 		t.Fatalf("unexpected occupancy after leaf borrow: left=%d right=%d", len(l.items), len(r.items))
 	}
 	want := []string{"0", "1", "2", "3", "4", "5", "6", "8", "9", "10", "11", "12"}
@@ -520,8 +520,8 @@ func TestDeleteAtInnerMerge(t *testing.T) {
 		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, fixedBase)
-			for j := 0; j < fixedBase; j++ {
+			items := make([]TextChunk, 0, Base)
+			for j := 0; j < Base; j++ {
 				items = append(items, FromString(strconv.Itoa(cur)))
 				cur++
 			}
@@ -529,8 +529,8 @@ func TestDeleteAtInnerMerge(t *testing.T) {
 		}
 		return tree.makeInternal(children...)
 	}
-	leftInner := makeInner(0, fixedBase)
-	rightInner := makeInner(100, fixedBase)
+	leftInner := makeInner(0, Base)
+	rightInner := makeInner(100, Base)
 	tree.root = tree.makeInternal(leftInner, rightInner)
 	tree.height = 3
 
@@ -544,7 +544,7 @@ func TestDeleteAtInnerMerge(t *testing.T) {
 	if deleted.Height() != 2 {
 		t.Fatalf("expected root collapse after inner merge, got height=%d", deleted.Height())
 	}
-	if deleted.Len() != 2*fixedBase*fixedBase-1 {
+	if deleted.Len() != 2*Base*Base-1 {
 		t.Fatalf("unexpected len after inner merge delete: %d", deleted.Len())
 	}
 }
@@ -560,8 +560,8 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, fixedBase)
-			for j := 0; j < fixedBase; j++ {
+			items := make([]TextChunk, 0, Base)
+			for j := 0; j < Base; j++ {
 				items = append(items, FromString(strconv.Itoa(cur)))
 				cur++
 			}
@@ -569,8 +569,8 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 		}
 		return tree.makeInternal(children...)
 	}
-	leftInner := makeInner(0, fixedBase+1)
-	rightInner := makeInner(100, fixedBase)
+	leftInner := makeInner(0, Base+1)
+	rightInner := makeInner(100, Base)
 	tree.root = tree.makeInternal(leftInner, rightInner)
 	tree.height = 3
 	rightStart := tree.countItems(leftInner)
@@ -594,7 +594,7 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 	if !lok || !rok {
 		t.Fatalf("expected internal children after inner borrow")
 	}
-	if len(leftAfter.children) != fixedBase || len(rightAfter.children) != fixedBase {
+	if len(leftAfter.children) != Base || len(rightAfter.children) != Base {
 		t.Fatalf("unexpected child counts after inner borrow: left=%d right=%d", len(leftAfter.children), len(rightAfter.children))
 	}
 }
@@ -610,8 +610,8 @@ func TestDeleteAtCascadingUnderflow(t *testing.T) {
 		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, fixedBase)
-			for j := 0; j < fixedBase; j++ {
+			items := make([]TextChunk, 0, Base)
+			for j := 0; j < Base; j++ {
 				items = append(items, FromString(strconv.Itoa(cur)))
 				cur++
 			}
@@ -619,8 +619,8 @@ func TestDeleteAtCascadingUnderflow(t *testing.T) {
 		}
 		return tree.makeInternal(children...)
 	}
-	leftInner := makeInner(0, fixedBase)
-	rightInner := makeInner(1000, fixedBase)
+	leftInner := makeInner(0, Base)
+	rightInner := makeInner(1000, Base)
 	tree.root = tree.makeInternal(leftInner, rightInner)
 	tree.height = 3
 	origLen := tree.Len()
@@ -760,7 +760,7 @@ func buildTreeWithRootChildren(t *testing.T, startValue int, minRootChildren int
 }
 
 func TestConcatSharesRootsWhenJoinCannotMergeTopLevel(t *testing.T) {
-	threshold := fixedBase + 1 // forces root-child sum > fixedMaxChildren after concat
+	threshold := Base + 1 // forces root-child sum > fixedMaxChildren after concat
 	left := buildTreeWithRootChildren(t, 0, threshold)
 	right := buildTreeWithRootChildren(t, 100000, threshold)
 
@@ -789,7 +789,7 @@ func TestConcatSharesRootsWhenJoinCannotMergeTopLevel(t *testing.T) {
 }
 
 func TestConcatDifferentHeightsKeepsOrder(t *testing.T) {
-	left := buildTreeWithRootChildren(t, 0, fixedBase+1) // height 2
+	left := buildTreeWithRootChildren(t, 0, Base+1) // height 2
 	right, err := New[TextChunk, TextSummary](Config[TextSummary]{
 		Monoid: TextMonoid{},
 	})

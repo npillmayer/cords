@@ -38,7 +38,7 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 		if leaf == nil {
 			return 0, 0, fmt.Errorf("%w: nil leaf node", ErrInvalidConfig)
 		}
-		if err := t.checkBackendLeafInvariants(leaf); err != nil {
+		if err := t.checkLeafInvariants(leaf); err != nil {
 			return 0, 0, err
 		}
 		if isRoot {
@@ -46,19 +46,19 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 				return 0, 0, fmt.Errorf("%w: root leaf must not be empty", ErrInvalidConfig)
 			}
 		} else {
-			if len(leaf.items) < fixedBase {
+			if len(leaf.items) < Base {
 				return 0, 0, fmt.Errorf("%w: leaf underflow (%d < %d)",
-					ErrInvalidConfig, len(leaf.items), fixedBase)
+					ErrInvalidConfig, len(leaf.items), Base)
 			}
-			if len(leaf.items) > fixedMaxLeafItems {
+			if len(leaf.items) > MaxLeafItems {
 				return 0, 0, fmt.Errorf("%w: leaf overflow (%d > %d)",
-					ErrInvalidConfig, len(leaf.items), fixedMaxLeafItems)
+					ErrInvalidConfig, len(leaf.items), MaxLeafItems)
 			}
 		}
 		return len(leaf.items), 1, nil
 	}
 	inner := n.(*innerNode[I, S])
-	if err := t.checkBackendInnerInvariants(inner); err != nil {
+	if err := t.checkInnerInvariants(inner); err != nil {
 		return 0, 0, err
 	}
 	if len(inner.children) == 0 {
@@ -69,13 +69,13 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 			return 0, 0, fmt.Errorf("%w: root has a single child and should be collapsed", ErrInvalidConfig)
 		}
 	} else {
-		if len(inner.children) < fixedBase {
+		if len(inner.children) < Base {
 			return 0, 0, fmt.Errorf("%w: child count %d under min fill %d",
-				ErrInvalidConfig, len(inner.children), fixedBase)
+				ErrInvalidConfig, len(inner.children), Base)
 		}
-		if len(inner.children) > fixedMaxChildren {
+		if len(inner.children) > MaxChildren {
 			return 0, 0, fmt.Errorf("%w: child count %d exceeds degree %d",
-				ErrInvalidConfig, len(inner.children), fixedMaxChildren)
+				ErrInvalidConfig, len(inner.children), MaxChildren)
 		}
 	}
 	var totalItems int
@@ -96,4 +96,42 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 		}
 	}
 	return totalItems, childHeight + 1, nil
+}
+
+func (t *Tree[I, S]) checkLeafInvariants(leaf *leafNode[I, S]) error {
+	if leaf == nil {
+		return fmt.Errorf("%w: nil leaf node", ErrInvalidConfig)
+	}
+	if int(leaf.n) != len(leaf.items) {
+		return fmt.Errorf("%w: leaf occupancy mismatch (%d != %d)", ErrInvalidConfig, leaf.n, len(leaf.items))
+	}
+	if len(leaf.items) > len(leaf.itemStore) {
+		return fmt.Errorf("%w: leaf len exceeds storage (%d > %d)", ErrInvalidConfig, len(leaf.items), len(leaf.itemStore))
+	}
+	if cap(leaf.items) != len(leaf.itemStore) {
+		return fmt.Errorf("%w: leaf view cap mismatch (%d != %d)", ErrInvalidConfig, cap(leaf.items), len(leaf.itemStore))
+	}
+	if len(leaf.items) > 0 && &leaf.items[0] != &leaf.itemStore[0] {
+		return fmt.Errorf("%w: leaf view is not backed by fixed storage", ErrInvalidConfig)
+	}
+	return nil
+}
+
+func (t *Tree[I, S]) checkInnerInvariants(inner *innerNode[I, S]) error {
+	if inner == nil {
+		return fmt.Errorf("%w: nil internal node", ErrInvalidConfig)
+	}
+	if int(inner.n) != len(inner.children) {
+		return fmt.Errorf("%w: child occupancy mismatch (%d != %d)", ErrInvalidConfig, inner.n, len(inner.children))
+	}
+	if len(inner.children) > len(inner.childStore) {
+		return fmt.Errorf("%w: child len exceeds storage (%d > %d)", ErrInvalidConfig, len(inner.children), len(inner.childStore))
+	}
+	if cap(inner.children) != len(inner.childStore) {
+		return fmt.Errorf("%w: child view cap mismatch (%d != %d)", ErrInvalidConfig, cap(inner.children), len(inner.childStore))
+	}
+	if len(inner.children) > 0 && &inner.children[0] != &inner.childStore[0] {
+		return fmt.Errorf("%w: child view is not backed by fixed storage", ErrInvalidConfig)
+	}
+	return nil
 }
