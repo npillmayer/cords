@@ -1,5 +1,3 @@
-//go:build btree_fixed
-
 package btree
 
 import (

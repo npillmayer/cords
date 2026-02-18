@@ -255,10 +255,8 @@ Implemented:
     would otherwise reject the split result.
 - Baseline `Concat` appends right-tree items via repeated end-inserts.
   - Functional and persistent, but not yet optimized for maximal subtree sharing.
-- Build-switched node backend:
-  - default backend uses dynamic slices,
-  - `btree_fixed` backend uses fixed array storage in nodes plus logical lengths.
-- `btree_fixed` mutation primitives now perform in-place shifts on fixed storage
+- Fixed-array node backend is the active implementation.
+- Mutation primitives perform in-place shifts on fixed storage
   (no per-node slice reallocation on local edits).
 - Backend-specific invariants validate fixed-storage view/occupancy consistency
   during `Check()`.
@@ -419,13 +417,12 @@ Go has no const generics, so fixed capacities are effectively compile-time.
 That means:
 
 - Runtime `Degree`/`MinFill` knobs are removed from `Config`.
-- Tunability moves to constants (or build tags) instead of per-tree runtime knobs.
+- Tunability moves to internal constants instead of per-tree runtime knobs.
 
 Recommended approach:
 
-- Keep current dynamic-slice implementation as baseline.
-- Add a build variant (or alternate package path) for fixed-array nodes.
-- Compare both with the same public tree API.
+- Keep capacities fixed and internal for now.
+- Re-evaluate exposing tuning knobs only after benchmarks justify it.
 
 ### Operation Changes
 
@@ -477,8 +474,7 @@ Mitigations:
 
 ### Migration Plan
 
-1. Add fixed-array node types behind an internal build switch.
-2. Port existing helper primitives (`clone`, `insert/remove`, `split`) to array mode.
-3. Keep current invariants and tests; run both variants against same behavior tests.
+1. Keep fixed-array backend as the only active backend.
+2. Optimize `Concat`/join and remove rebuild fallback paths in `SplitAt`.
+3. Add delete/merge/borrow operations and re-tighten occupancy policies.
 4. Benchmark edit/read workloads and allocation profiles.
-5. Choose default backend after correctness + performance comparison.

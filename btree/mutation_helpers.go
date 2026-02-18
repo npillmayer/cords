@@ -1,5 +1,3 @@
-//go:build !btree_fixed
-
 package btree
 
 import "fmt"
@@ -23,20 +21,26 @@ func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
 	if leaf == nil {
 		return nil
 	}
-	return &leafNode[I, S]{
+	cloned := &leafNode[I, S]{
 		summary: leaf.summary,
-		items:   append([]I(nil), leaf.items...),
+		n:       leaf.n,
 	}
+	copy(cloned.itemStore[:int(cloned.n)], leaf.itemStore[:int(leaf.n)])
+	cloned.items = cloned.itemStore[:int(cloned.n)]
+	return cloned
 }
 
 func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
 	if inner == nil {
 		return nil
 	}
-	return &innerNode[I, S]{
-		summary:  inner.summary,
-		children: append([]treeNode[I, S](nil), inner.children...),
+	cloned := &innerNode[I, S]{
+		summary: inner.summary,
+		n:       inner.n,
 	}
+	copy(cloned.childStore[:int(cloned.n)], inner.childStore[:int(inner.n)])
+	cloned.children = cloned.childStore[:int(cloned.n)]
+	return cloned
 }
 
 func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) error {
@@ -97,31 +101,84 @@ func removeRange[T any](src []T, from, to int) []T {
 func (t *Tree[I, S]) insertChildAt(inner *innerNode[I, S], idx int, child treeNode[I, S]) {
 	assert(inner != nil, "insertChildAt called with nil inner node")
 	assert(idx >= 0 && idx <= len(inner.children), "insertChildAt index out of range")
-	inner.children = insertAt(inner.children, idx, child)
+	n := len(inner.children)
+	assert(n < len(inner.childStore), "insertChildAt exceeds fixed child capacity")
+	if idx < n {
+		copy(inner.childStore[idx+1:n+1], inner.childStore[idx:n])
+	}
+	inner.childStore[idx] = child
+	inner.n = uint8(n + 1)
+	inner.children = inner.childStore[:n+1]
 	t.recomputeInnerSummary(inner)
 }
 
 func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 	assert(inner != nil, "removeChildAt called with nil inner node")
 	assert(idx >= 0 && idx < len(inner.children), "removeChildAt index out of range")
-	inner.children = removeRange(inner.children, idx, idx+1)
+	n := len(inner.children)
+	if idx < n-1 {
+		copy(inner.childStore[idx:n-1], inner.childStore[idx+1:n])
+	}
+	var zeroNode treeNode[I, S]
+	inner.childStore[n-1] = zeroNode
+	inner.n = uint8(n - 1)
+	inner.children = inner.childStore[:n-1]
 	t.recomputeInnerSummary(inner)
 }
 
+func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...I) error {
+	assert(leaf != nil, "insertLeafItemsAt called with nil leaf")
+	assert(idx >= 0 && idx <= len(leaf.items), "insertLeafItemsAt index out of range")
+	if len(values) == 0 {
+		return nil
+	}
+	n := len(leaf.items)
+	k := len(values)
+	if n+k > len(leaf.itemStore) {
+		return fmt.Errorf("%w: fixed leaf capacity exceeded", ErrUnimplemented)
+	}
+	if idx < n {
+		copy(leaf.itemStore[idx+k:n+k], leaf.itemStore[idx:n])
+	}
+	copy(leaf.itemStore[idx:idx+k], values)
+	leaf.n = uint8(n + k)
+	leaf.items = leaf.itemStore[:n+k]
+	return nil
+}
+
+func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
+	assert(leaf != nil, "removeLeafItemsRange called with nil leaf")
+	assert(from >= 0 && from <= to && to <= len(leaf.items), "removeLeafItemsRange bounds invalid")
+	if from == to {
+		return
+	}
+	n := len(leaf.items)
+	k := to - from
+	if to < n {
+		copy(leaf.itemStore[from:n-k], leaf.itemStore[to:n])
+	}
+	var zero I
+	for i := n - k; i < n; i++ {
+		leaf.itemStore[i] = zero
+	}
+	leaf.n = uint8(n - k)
+	leaf.items = leaf.itemStore[:n-k]
+}
+
 func (t *Tree[I, S]) maxLeafItems() int {
-	return DefaultDegree
+	return fixedMaxLeafItems
 }
 
 func (t *Tree[I, S]) minLeafItems() int {
-	return DefaultMinFill
+	return fixedBase
 }
 
 func (t *Tree[I, S]) maxChildren() int {
-	return DefaultDegree
+	return fixedMaxChildren
 }
 
 func (t *Tree[I, S]) minChildren() int {
-	return DefaultMinFill
+	return fixedBase
 }
 
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {
@@ -167,7 +224,9 @@ func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items 
 		return t.cloneLeaf(leaf), nil, nil
 	}
 	cloned := t.cloneLeaf(leaf)
-	cloned.items = insertAt(cloned.items, index, items...)
+	if err := t.insertLeafItemsAt(cloned, index, items...); err != nil {
+		return nil, nil, err
+	}
 	t.recomputeLeafSummary(cloned)
 	if !t.leafOverflow(cloned) {
 		return cloned, nil, nil

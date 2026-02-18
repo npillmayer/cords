@@ -12,7 +12,7 @@ Current status:
   - summary and dimension interfaces,
   - item-to-summary linkage at the type level (`item.Summary()`),
   - distinct `leafNode` and `innerNode` representations,
-  - backend-selectable node storage (`dynamic` default, `btree_fixed` build tag),
+  - fixed-array node storage with dynamic views (`items`/`children`) over inline buffers,
   - tree API surface and summary-guided cursor seek,
   - recursive path-copy insert with split propagation,
   - path-copy split with subtree sharing (fallback to rebuild for strict edge cases),
