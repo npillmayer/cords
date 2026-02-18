@@ -475,3 +475,64 @@ Mitigations:
 1. Keep fixed-array backend as the only active backend.
 2. Add delete/merge/borrow operations and re-tighten occupancy policies.
 3. Benchmark edit/read workloads and allocation profiles.
+
+## Delete Rebalancing Plan (Borrow/Merge)
+
+1. Lock invariants
+- Enforce occupancy in `Check()`:
+  - non-root leaf: `fixedBase <= len(items) <= fixedMaxLeafItems`
+  - non-root inner: `fixedBase <= len(children) <= fixedMaxChildren`
+- Enforce root normalization constraints:
+  - empty tree: `root == nil && height == 0`
+  - root leaf must be non-empty
+  - root inner with one child is invalid (must be collapsed)
+- Keep internal inconsistencies as assertions; keep returned errors for input misuse.
+
+2. Add single-item delete primitive
+- Add `DeleteAt(index int) (*Tree, error)` as first delete API.
+- Validate index as input error (`0 <= index < Len()`).
+- Implement compositionally via `SplitAt(index)`, drop one item via `SplitAt(1)`, and `Concat`.
+- Preserve persistence/path-copy semantics without introducing merge/borrow logic yet.
+
+3. Introduce recursive delete core
+- Add internal recursive delete with path-copy descent.
+- Return `underflow` signal to parent when non-root node drops below min occupancy.
+- Recompute summaries on the modified path.
+
+4. Implement borrow (redistribution) helpers
+- Leaf borrow:
+  - borrow from left sibling: move last item left->right.
+  - borrow from right sibling: move first item right->left.
+- Inner borrow:
+  - transfer one child pointer from sibling to underfull node.
+- Recompute summaries on both siblings and parent.
+
+5. Implement merge helpers
+- Leaf merge: concatenate neighboring leaves and remove one child from parent.
+- Inner merge: concatenate child arrays and remove one child from parent.
+- Bubble parent underflow upward when needed.
+
+6. Centralize parent-side rebalancing policy
+- On child underflow:
+  - try borrow from left sibling if it has spare occupancy,
+  - else borrow from right sibling,
+  - else merge with a sibling (stable side preference).
+- Keep this in one helper to avoid divergent edge-case logic.
+
+7. Root normalization after delete
+- If root becomes empty: `root=nil`, `height=0`.
+- If root is inner with one child: promote that child and decrement height.
+- Keep root normalization explicit at operation end.
+
+8. Tests before range delete
+- Borrow left/right for leaves and inners.
+- Merge leaf and inner paths.
+- Cascading underflow to root shrink.
+- Persistence guarantees (original tree unchanged).
+- Input validation (`index<0`, `index>=Len()`).
+
+9. Add range delete
+- Add `DeleteRange` using either:
+  - split/delete/concat composition, or
+  - batched recursive delete.
+- Choose based on benchmark and complexity tradeoff.

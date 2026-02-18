@@ -100,19 +100,19 @@ func collectTextItems(tree *Tree[TextChunk, TextSummary]) []string {
 	return out
 }
 
-func TestInsertAtNoOpClone(t *testing.T) {
+func TestInsertAtNoOpReturnsSameTree(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
 		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	clone, err := tree.InsertAt(0)
+	out, err := tree.InsertAt(0)
 	if err != nil {
 		t.Fatalf("unexpected error for no-op insert: %v", err)
 	}
-	if clone == tree {
-		t.Fatalf("expected clone to be a distinct struct pointer")
+	if out != tree {
+		t.Fatalf("expected no-op insert to return the same tree pointer")
 	}
 }
 
@@ -271,6 +271,438 @@ func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
 	}
 	if err := combined.Check(); err != nil {
 		t.Fatalf("combined invariants failed: %v", err)
+	}
+}
+
+func TestDeleteAtKeepsOrderAndPersistence(t *testing.T) {
+	base, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < 9; i++ {
+		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	deleted, err := base.DeleteAt(4)
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+	want := []string{"0", "1", "2", "3", "5", "6", "7", "8"}
+	got := collectTextItems(deleted)
+	if len(got) != len(want) {
+		t.Fatalf("unexpected item count after delete: got %d want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("delete result mismatch at %d: got %v want %v", i, got, want)
+		}
+	}
+	orig := collectTextItems(base)
+	if len(orig) != 9 || orig[4] != "4" {
+		t.Fatalf("base tree changed unexpectedly: %v", orig)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("deleted tree invariants failed: %v", err)
+	}
+}
+
+func TestDeleteRangeKeepsOrderAndPersistence(t *testing.T) {
+	base, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	deleted, err := base.DeleteRange(3, 4) // remove 3,4,5,6
+	if err != nil {
+		t.Fatalf("delete range failed: %v", err)
+	}
+	want := []string{"0", "1", "2", "7", "8", "9"}
+	got := collectTextItems(deleted)
+	if len(got) != len(want) {
+		t.Fatalf("unexpected item count after range delete: got %d want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("range delete mismatch at %d: got %v want %v", i, got, want)
+		}
+	}
+	orig := collectTextItems(base)
+	if len(orig) != 10 || orig[3] != "3" {
+		t.Fatalf("base tree changed unexpectedly: %v", orig)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("range-deleted tree invariants failed: %v", err)
+	}
+}
+
+func TestDeleteAtBounds(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tree, err = tree.InsertAt(0, FromString("a"), FromString("b"))
+	if err != nil {
+		t.Fatalf("unexpected insert error: %v", err)
+	}
+	if _, err := tree.DeleteAt(-1); err == nil {
+		t.Fatalf("expected index error for negative delete index")
+	}
+	if _, err := tree.DeleteAt(2); err == nil {
+		t.Fatalf("expected index error for delete index==len")
+	}
+}
+
+func TestDeleteRangeBoundsAndNoOp(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tree, err = tree.InsertAt(0, FromString("a"), FromString("b"), FromString("c"))
+	if err != nil {
+		t.Fatalf("unexpected insert error: %v", err)
+	}
+	if _, err := tree.DeleteRange(-1, 1); err == nil {
+		t.Fatalf("expected index error for negative start")
+	}
+	if _, err := tree.DeleteRange(1, -1); err == nil {
+		t.Fatalf("expected index error for negative count")
+	}
+	if _, err := tree.DeleteRange(4, 0); err == nil {
+		t.Fatalf("expected index error for start > len")
+	}
+	if _, err := tree.DeleteRange(2, 2); err == nil {
+		t.Fatalf("expected index error for range overflow")
+	}
+	clone, err := tree.DeleteRange(1, 0)
+	if err != nil {
+		t.Fatalf("unexpected no-op range delete error: %v", err)
+	}
+	if clone != tree {
+		t.Fatalf("expected no-op DeleteRange to return the same tree pointer")
+	}
+}
+
+func TestDeleteRecursiveRebalancesUnderflowAtParent(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	leftItems := make([]TextChunk, 0, fixedBase)
+	rightItems := make([]TextChunk, 0, fixedBase)
+	for i := 0; i < fixedBase; i++ {
+		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
+	}
+	left := tree.makeLeaf(leftItems)
+	right := tree.makeLeaf(rightItems)
+	tree.root = tree.makeInternal(left, right)
+	tree.height = 2
+
+	updated, needsRebalance, err := tree.deleteRecursive(tree.root, tree.height, 0, true)
+	if err != nil {
+		t.Fatalf("deleteRecursive failed unexpectedly: %v", err)
+	}
+	if needsRebalance {
+		t.Fatalf("expected root-level rebalance to resolve underflow")
+	}
+	updatedInner, ok := updated.(*innerNode[TextChunk, TextSummary])
+	if !ok || len(updatedInner.children) != 1 {
+		t.Fatalf("expected merged root with a single child after rebalance")
+	}
+}
+
+func TestDeleteAtLeafMergeAndRootCollapse(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	leftItems := make([]TextChunk, 0, fixedBase)
+	rightItems := make([]TextChunk, 0, fixedBase)
+	for i := 0; i < fixedBase; i++ {
+		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
+	}
+	tree.root = tree.makeInternal(tree.makeLeaf(leftItems), tree.makeLeaf(rightItems))
+	tree.height = 2
+
+	deleted, err := tree.DeleteAt(0)
+	if err != nil {
+		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("DeleteAt merge result is invalid: %v", err)
+	}
+	if deleted.Height() != 1 {
+		t.Fatalf("expected root collapse to leaf, got height=%d", deleted.Height())
+	}
+	got := collectTextItems(deleted)
+	if len(got) != 2*fixedBase-1 {
+		t.Fatalf("unexpected length after merge delete: %d", len(got))
+	}
+	if got[0] != "1" {
+		t.Fatalf("unexpected first item after deleting head: %v", got)
+	}
+}
+
+func TestDeleteAtLeafBorrow(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	leftItems := make([]TextChunk, 0, fixedBase+1)
+	rightItems := make([]TextChunk, 0, fixedBase)
+	for i := 0; i < fixedBase+1; i++ {
+		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+	}
+	for i := fixedBase + 1; i < 2*fixedBase+1; i++ {
+		rightItems = append(rightItems, FromString(strconv.Itoa(i)))
+	}
+	tree.root = tree.makeInternal(tree.makeLeaf(leftItems), tree.makeLeaf(rightItems))
+	tree.height = 2
+
+	deleted, err := tree.DeleteAt(fixedBase + 1) // delete first item in right leaf
+	if err != nil {
+		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("DeleteAt borrow result is invalid: %v", err)
+	}
+	root, ok := deleted.root.(*innerNode[TextChunk, TextSummary])
+	if !ok || len(root.children) != 2 {
+		t.Fatalf("expected internal root with 2 children")
+	}
+	l, lok := root.children[0].(*leafNode[TextChunk, TextSummary])
+	r, rok := root.children[1].(*leafNode[TextChunk, TextSummary])
+	if !lok || !rok {
+		t.Fatalf("expected leaf children")
+	}
+	if len(l.items) != fixedBase || len(r.items) != fixedBase {
+		t.Fatalf("unexpected occupancy after leaf borrow: left=%d right=%d", len(l.items), len(r.items))
+	}
+	want := []string{"0", "1", "2", "3", "4", "5", "6", "8", "9", "10", "11", "12"}
+	got := collectTextItems(deleted)
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected order after leaf borrow at %d: got %v want %v", i, got, want)
+		}
+	}
+}
+
+func TestDeleteAtInnerMerge(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary] {
+		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
+		cur := start
+		for i := 0; i < leafCount; i++ {
+			items := make([]TextChunk, 0, fixedBase)
+			for j := 0; j < fixedBase; j++ {
+				items = append(items, FromString(strconv.Itoa(cur)))
+				cur++
+			}
+			children = append(children, tree.makeLeaf(items))
+		}
+		return tree.makeInternal(children...)
+	}
+	leftInner := makeInner(0, fixedBase)
+	rightInner := makeInner(100, fixedBase)
+	tree.root = tree.makeInternal(leftInner, rightInner)
+	tree.height = 3
+
+	deleted, err := tree.DeleteAt(0)
+	if err != nil {
+		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("DeleteAt inner-merge result invalid: %v", err)
+	}
+	if deleted.Height() != 2 {
+		t.Fatalf("expected root collapse after inner merge, got height=%d", deleted.Height())
+	}
+	if deleted.Len() != 2*fixedBase*fixedBase-1 {
+		t.Fatalf("unexpected len after inner merge delete: %d", deleted.Len())
+	}
+}
+
+func TestDeleteAtInnerBorrow(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary] {
+		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
+		cur := start
+		for i := 0; i < leafCount; i++ {
+			items := make([]TextChunk, 0, fixedBase)
+			for j := 0; j < fixedBase; j++ {
+				items = append(items, FromString(strconv.Itoa(cur)))
+				cur++
+			}
+			children = append(children, tree.makeLeaf(items))
+		}
+		return tree.makeInternal(children...)
+	}
+	leftInner := makeInner(0, fixedBase+1)
+	rightInner := makeInner(100, fixedBase)
+	tree.root = tree.makeInternal(leftInner, rightInner)
+	tree.height = 3
+	rightStart := tree.countItems(leftInner)
+
+	deleted, err := tree.DeleteAt(rightStart)
+	if err != nil {
+		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("DeleteAt inner-borrow result invalid: %v", err)
+	}
+	if deleted.Height() != 3 {
+		t.Fatalf("expected height 3 after inner borrow, got %d", deleted.Height())
+	}
+	root, ok := deleted.root.(*innerNode[TextChunk, TextSummary])
+	if !ok || len(root.children) != 2 {
+		t.Fatalf("expected root with 2 internal children")
+	}
+	leftAfter, lok := root.children[0].(*innerNode[TextChunk, TextSummary])
+	rightAfter, rok := root.children[1].(*innerNode[TextChunk, TextSummary])
+	if !lok || !rok {
+		t.Fatalf("expected internal children after inner borrow")
+	}
+	if len(leftAfter.children) != fixedBase || len(rightAfter.children) != fixedBase {
+		t.Fatalf("unexpected child counts after inner borrow: left=%d right=%d", len(leftAfter.children), len(rightAfter.children))
+	}
+}
+
+func TestDeleteAtCascadingUnderflow(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary] {
+		children := make([]treeNode[TextChunk, TextSummary], 0, leafCount)
+		cur := start
+		for i := 0; i < leafCount; i++ {
+			items := make([]TextChunk, 0, fixedBase)
+			for j := 0; j < fixedBase; j++ {
+				items = append(items, FromString(strconv.Itoa(cur)))
+				cur++
+			}
+			children = append(children, tree.makeLeaf(items))
+		}
+		return tree.makeInternal(children...)
+	}
+	leftInner := makeInner(0, fixedBase)
+	rightInner := makeInner(1000, fixedBase)
+	tree.root = tree.makeInternal(leftInner, rightInner)
+	tree.height = 3
+	origLen := tree.Len()
+	origItems := collectTextItems(tree)
+
+	deleted, err := tree.DeleteAt(0)
+	if err != nil {
+		t.Fatalf("DeleteAt failed unexpectedly: %v", err)
+	}
+	if err := deleted.Check(); err != nil {
+		t.Fatalf("DeleteAt cascading-underflow result invalid: %v", err)
+	}
+	if deleted.Height() != 2 {
+		t.Fatalf("expected cascading merge to reduce height 3->2, got %d", deleted.Height())
+	}
+	if deleted.Len() != origLen-1 {
+		t.Fatalf("unexpected len after cascading delete: got %d want %d", deleted.Len(), origLen-1)
+	}
+	got := collectTextItems(deleted)
+	if got[0] != "1" {
+		t.Fatalf("unexpected first item after cascading delete: %q", got[0])
+	}
+	if tree.Len() != origLen {
+		t.Fatalf("original tree length changed unexpectedly: got %d want %d", tree.Len(), origLen)
+	}
+	if len(origItems) == 0 || origItems[0] != "0" {
+		t.Fatalf("original tree content changed unexpectedly")
+	}
+}
+
+func TestDeleteAtToEmptyTreeNormalizesRoot(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, s := range []string{"a", "b", "c", "d", "e"} {
+		tree, err = tree.InsertAt(tree.Len(), FromString(s))
+		if err != nil {
+			t.Fatalf("insert failed: %v", err)
+		}
+	}
+	for tree.Len() > 0 {
+		tree, err = tree.DeleteAt(0)
+		if err != nil {
+			t.Fatalf("delete failed: %v", err)
+		}
+	}
+	if tree.root != nil {
+		t.Fatalf("expected nil root after deleting all items")
+	}
+	if tree.Height() != 0 {
+		t.Fatalf("expected height 0 for empty tree, got %d", tree.Height())
+	}
+	if err := tree.Check(); err != nil {
+		t.Fatalf("empty tree invariants failed: %v", err)
+	}
+}
+
+func TestDeleteRangeWholeTreeToEmpty(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, s := range []string{"x", "y", "z"} {
+		tree, err = tree.InsertAt(tree.Len(), FromString(s))
+		if err != nil {
+			t.Fatalf("insert failed: %v", err)
+		}
+	}
+	empty, err := tree.DeleteRange(0, tree.Len())
+	if err != nil {
+		t.Fatalf("DeleteRange whole-tree failed: %v", err)
+	}
+	if empty.Len() != 0 || empty.Height() != 0 {
+		t.Fatalf("expected empty tree after whole-range delete, len=%d height=%d", empty.Len(), empty.Height())
+	}
+	if err := empty.Check(); err != nil {
+		t.Fatalf("empty tree invariants failed: %v", err)
 	}
 }
 

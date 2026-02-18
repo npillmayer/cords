@@ -41,6 +41,20 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 		if err := t.checkBackendLeafInvariants(leaf); err != nil {
 			return 0, 0, err
 		}
+		if isRoot {
+			if len(leaf.items) == 0 {
+				return 0, 0, fmt.Errorf("%w: root leaf must not be empty", ErrInvalidConfig)
+			}
+		} else {
+			if len(leaf.items) < fixedBase {
+				return 0, 0, fmt.Errorf("%w: leaf underflow (%d < %d)",
+					ErrInvalidConfig, len(leaf.items), fixedBase)
+			}
+			if len(leaf.items) > fixedMaxLeafItems {
+				return 0, 0, fmt.Errorf("%w: leaf overflow (%d > %d)",
+					ErrInvalidConfig, len(leaf.items), fixedMaxLeafItems)
+			}
+		}
 		return len(leaf.items), 1, nil
 	}
 	inner := n.(*innerNode[I, S])
@@ -50,7 +64,15 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 	if len(inner.children) == 0 {
 		return 0, 0, fmt.Errorf("%w: internal node has no children", ErrInvalidConfig)
 	}
-	if !isRoot {
+	if isRoot {
+		if len(inner.children) == 1 {
+			return 0, 0, fmt.Errorf("%w: root has a single child and should be collapsed", ErrInvalidConfig)
+		}
+	} else {
+		if len(inner.children) < fixedBase {
+			return 0, 0, fmt.Errorf("%w: child count %d under min fill %d",
+				ErrInvalidConfig, len(inner.children), fixedBase)
+		}
 		if len(inner.children) > fixedMaxChildren {
 			return 0, 0, fmt.Errorf("%w: child count %d exceeds degree %d",
 				ErrInvalidConfig, len(inner.children), fixedMaxChildren)
