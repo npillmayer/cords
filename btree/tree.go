@@ -128,6 +128,9 @@ func (t *Tree[I, S]) DeleteRange(index, count int) (*Tree[I, S], error) {
 	if count == 0 {
 		return t, nil
 	}
+	if count == 1 {
+		return t.DeleteAt(index)
+	}
 	left, right, err := t.SplitAt(index)
 	if err != nil {
 		return nil, err

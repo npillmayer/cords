@@ -346,6 +346,39 @@ func TestDeleteRangeKeepsOrderAndPersistence(t *testing.T) {
 	}
 }
 
+func TestDeleteRangeSingleEqualsDeleteAt(t *testing.T) {
+	base, err := New[TextChunk, TextSummary](Config[TextSummary]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < 9; i++ {
+		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	ranged, err := base.DeleteRange(4, 1)
+	if err != nil {
+		t.Fatalf("DeleteRange(4,1) failed: %v", err)
+	}
+	single, err := base.DeleteAt(4)
+	if err != nil {
+		t.Fatalf("DeleteAt(4) failed: %v", err)
+	}
+	gotR := collectTextItems(ranged)
+	gotS := collectTextItems(single)
+	if len(gotR) != len(gotS) {
+		t.Fatalf("length mismatch: range=%d single=%d", len(gotR), len(gotS))
+	}
+	for i := range gotR {
+		if gotR[i] != gotS[i] {
+			t.Fatalf("content mismatch at %d: range=%v single=%v", i, gotR, gotS)
+		}
+	}
+}
+
 func TestDeleteAtBounds(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
 		Monoid: TextMonoid{},
