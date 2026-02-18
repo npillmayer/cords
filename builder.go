@@ -46,9 +46,7 @@ func (b *Builder) Append(leaf Leaf) error {
 	}
 	lnode := makeLeafNode()
 	lnode.leaf = leaf
-	if b.cord.root.right != nil {
-		panic("inconsistency in cord-builder, right child of root is not empty")
-	}
+	assert(b.cord.root.right == nil, "inconsistency in cord-builder, right child of root is not empty")
 	b.cord.root.attachRight(&lnode.cordNode)
 	newroot := makeInnerNode()
 	newroot.attachLeft(&b.cord.root.cordNode)
@@ -83,9 +81,8 @@ func (b *Builder) Prepend(leaf Leaf) error {
 }
 
 func (b Builder) balance() {
-	if b.cord.IsVoid() || b.cord.root.Left().IsLeaf() {
-		panic("builder wants cord balanced, but cord has no inner nodes")
-	}
+	assert(!b.cord.IsVoid() && !b.cord.root.Left().IsLeaf(),
+		"builder wants cord balanced, but cord has no inner nodes")
 	if unbalanced(b.cord.root.Left()) {
 		bal := balance(b.cord.root.Left().AsInner())
 		b.cord.root.attachLeft(&bal.cordNode)

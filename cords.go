@@ -325,9 +325,7 @@ func (node *cordNode) String() string {
 // swapNodeClone creates a clone from a node, which must be a child node
 // of node. The newly created clone is then inserted in place of the child.
 func (node *cordNode) swapNodeClone(child *cordNode) *cordNode {
-	if node.IsLeaf() { // node must be an inner node
-		panic("parent node is not of type inner node")
-	}
+	assert(!node.IsLeaf(), "parent node is not of type inner node")
 	cln := cloneNode(child)
 	inner := node.AsInner()
 	if inner.left == child {
