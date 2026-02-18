@@ -12,7 +12,7 @@ func TestNewRejectsInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNewNormalizesDefaults(t *testing.T) {
+func TestNewStoresMonoidConfig(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
 		Monoid: TextMonoid{},
 	})
@@ -20,11 +20,8 @@ func TestNewNormalizesDefaults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	cfg := tree.Config()
-	if cfg.Degree != DefaultDegree {
-		t.Fatalf("expected degree=%d, got %d", DefaultDegree, cfg.Degree)
-	}
-	if cfg.MinFill != DefaultMinFill {
-		t.Fatalf("expected minFill=%d, got %d", DefaultMinFill, cfg.MinFill)
+	if cfg.Monoid == nil {
+		t.Fatalf("expected monoid to be set in normalized config")
 	}
 }
 
@@ -161,15 +158,13 @@ func TestInsertAtBuildsTreeAndPreservesOriginal(t *testing.T) {
 
 func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// 17 items with degree 4 trigger a leaf split chain and internal split/root growth.
-	for i := 0; i < 17; i++ {
+	// With fixed degree 12, a few hundred items trigger internal split/root growth.
+	for i := 0; i < 200; i++ {
 		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
@@ -182,10 +177,10 @@ func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
 		t.Fatalf("invariant check failed: %v", err)
 	}
 	got := collectTextItems(tree)
-	if len(got) != 17 {
+	if len(got) != 200 {
 		t.Fatalf("unexpected item count: %d", len(got))
 	}
-	for i := 0; i < 17; i++ {
+	for i := 0; i < 200; i++ {
 		if got[i] != strconv.Itoa(i) {
 			t.Fatalf("unexpected order at %d: got %q want %q", i, got[i], strconv.Itoa(i))
 		}
@@ -194,9 +189,7 @@ func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
 
 func TestSplitAtKeepsOrderAndPersistence(t *testing.T) {
 	base, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -239,17 +232,13 @@ func TestSplitAtKeepsOrderAndPersistence(t *testing.T) {
 
 func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
 	left, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	right, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -287,9 +276,7 @@ func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
 
 func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

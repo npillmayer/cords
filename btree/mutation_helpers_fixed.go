@@ -168,25 +168,19 @@ func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 }
 
 func (t *Tree[I, S]) maxLeafItems() int {
-	if t.cfg.Degree < fixedMaxLeafItems {
-		return t.cfg.Degree
-	}
 	return fixedMaxLeafItems
 }
 
 func (t *Tree[I, S]) minLeafItems() int {
-	return t.cfg.MinFill
+	return fixedBase
 }
 
 func (t *Tree[I, S]) maxChildren() int {
-	if t.cfg.Degree < fixedMaxChildren {
-		return t.cfg.Degree
-	}
 	return fixedMaxChildren
 }
 
 func (t *Tree[I, S]) minChildren() int {
-	return t.cfg.MinFill
+	return fixedBase
 }
 
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {

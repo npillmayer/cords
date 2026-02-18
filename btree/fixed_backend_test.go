@@ -7,22 +7,8 @@ import (
 	"testing"
 )
 
-func TestFixedBackendRejectsOversizedDegree(t *testing.T) {
-	_, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  fixedMaxChildren + 1,
-		MinFill: fixedBase,
-		Monoid:  TextMonoid{},
-	})
-	if err == nil {
-		t.Fatalf("expected config validation error for oversized degree")
-	}
-	if !strings.Contains(err.Error(), "degree must be <=") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestFixedBackendDetectsLeafOccupancyDrift(t *testing.T) {
-	tree := makeTextTree(t, fixedMaxChildren, fixedBase)
+	tree := makeTextTree(t)
 	leaf := tree.makeLeaf(chunks("a", "b"))
 	tree.root = leaf
 	tree.height = 1
@@ -39,7 +25,7 @@ func TestFixedBackendDetectsLeafOccupancyDrift(t *testing.T) {
 }
 
 func TestFixedBackendDetectsChildViewDrift(t *testing.T) {
-	tree := makeTextTree(t, fixedMaxChildren, fixedBase)
+	tree := makeTextTree(t)
 	leaf := tree.makeLeaf(chunks("a"))
 	inner := tree.makeInternal(leaf)
 	tree.root = inner

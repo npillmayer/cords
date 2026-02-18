@@ -4,9 +4,7 @@ import "testing"
 
 func TestCursorSeekBytes(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -50,9 +48,7 @@ func TestCursorSeekBytes(t *testing.T) {
 
 func TestCursorSeekLines(t *testing.T) {
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  4,
-		MinFill: 2,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

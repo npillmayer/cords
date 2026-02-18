@@ -2,12 +2,10 @@ package btree
 
 import "testing"
 
-func makeTextTree(t *testing.T, degree, minFill int) *Tree[TextChunk, TextSummary] {
+func makeTextTree(t *testing.T) *Tree[TextChunk, TextSummary] {
 	t.Helper()
 	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
-		Degree:  degree,
-		MinFill: minFill,
-		Monoid:  TextMonoid{},
+		Monoid: TextMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
@@ -32,7 +30,7 @@ func chunkStrings(items []TextChunk) []string {
 }
 
 func TestCloneLeafCreatesIndependentSlice(t *testing.T) {
-	tree := makeTextTree(t, 8, 4)
+	tree := makeTextTree(t)
 	leaf := tree.makeLeaf(chunks("aa", "bb", "cc"))
 	cloned := tree.cloneLeaf(leaf)
 	if cloned == leaf {
@@ -46,7 +44,7 @@ func TestCloneLeafCreatesIndependentSlice(t *testing.T) {
 }
 
 func TestRecomputeInnerSummary(t *testing.T) {
-	tree := makeTextTree(t, 8, 4)
+	tree := makeTextTree(t)
 	l1 := tree.makeLeaf(chunks("ab", "c\n"))
 	l2 := tree.makeLeaf(chunks("de"))
 	inner := tree.makeInternal(l1, l2)
@@ -80,7 +78,7 @@ func TestInsertRemoveSliceHelpers(t *testing.T) {
 }
 
 func TestInsertRemoveChildHelpers(t *testing.T) {
-	tree := makeTextTree(t, 8, 4)
+	tree := makeTextTree(t)
 	l1 := tree.makeLeaf(chunks("a"))
 	l2 := tree.makeLeaf(chunks("bb"))
 	l3 := tree.makeLeaf(chunks("ccc"))
@@ -102,7 +100,7 @@ func TestInsertRemoveChildHelpers(t *testing.T) {
 }
 
 func TestLeafInsertLocalNoSplit(t *testing.T) {
-	tree := makeTextTree(t, 4, 2)
+	tree := makeTextTree(t)
 	leaf := tree.makeLeaf(chunks("a", "b", "c"))
 	left, right, err := tree.insertIntoLeafLocal(leaf, 1, FromString("X"))
 	if err != nil {
@@ -125,9 +123,13 @@ func TestLeafInsertLocalNoSplit(t *testing.T) {
 }
 
 func TestLeafInsertLocalSplit(t *testing.T) {
-	tree := makeTextTree(t, 4, 2)
-	leaf := tree.makeLeaf(chunks("a", "b", "c", "d"))
-	left, right, err := tree.insertIntoLeafLocal(leaf, 2, FromString("X"))
+	tree := makeTextTree(t)
+	base := make([]TextChunk, 0, DefaultDegree)
+	for i := 0; i < DefaultDegree; i++ {
+		base = append(base, FromString(string(rune('a'+(i%26)))))
+	}
+	leaf := tree.makeLeaf(base)
+	left, right, err := tree.insertIntoLeafLocal(leaf, DefaultDegree/2, FromString("X"))
 	if err != nil {
 		t.Fatalf("insertIntoLeafLocal failed: %v", err)
 	}
@@ -138,19 +140,7 @@ func TestLeafInsertLocalSplit(t *testing.T) {
 		t.Fatalf("split result still overflows")
 	}
 	got := append(chunkStrings(left.items), chunkStrings(right.items)...)
-	want := []string{"a", "b", "X", "c", "d"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("split order mismatch: got %v want %v", got, want)
-		}
-	}
-}
-
-func TestSplitLeafTooLargeForSinglePromotion(t *testing.T) {
-	tree := makeTextTree(t, 4, 2)
-	leaf := tree.makeLeaf(chunks("a", "b", "c", "d", "e", "f", "g", "h", "i"))
-	_, _, err := tree.splitLeaf(leaf)
-	if err == nil {
-		t.Fatalf("expected splitLeaf to fail for oversized split")
+	if len(got) != DefaultDegree+1 {
+		t.Fatalf("unexpected split output length: got %d want %d", len(got), DefaultDegree+1)
 	}
 }

@@ -42,7 +42,6 @@ Current scaffold (`btree/`) uses:
   - `root treeNode[I, S]`
   - `height int`
 - `Config[S]`
-  - `Degree`, `MinFill`
   - `Monoid SummaryMonoid[S]`
 - `SummarizedItem[S]`
   - every item must provide `Summary() S` (compile-time item/summary binding)
@@ -56,10 +55,10 @@ Current scaffold (`btree/`) uses:
   - `summary S`
   - `children []treeNode[I, S]`
 
-Tunable constants:
+Fixed structural constants:
 
-- `degree` (fanout), e.g. 8..24
-- `minFill` threshold for merges/rebalancing
+- `max children/items per node = 12`
+- `target minimum occupancy = 6` (used by balancing helpers)
 
 ## Complexity Targets
 
@@ -299,14 +298,14 @@ This section compares the **current** `btree/` implementation with Zed's model.
 - Monoid-based summary composition.
 - Item/summary linkage at the type level (`item.Summary()`).
 - Distinct node variants (`leafNode` vs `innerNode`).
-- Runtime-configurable tree fanout (`Degree`/`MinFill`) for tuning experiments.
+- Fixed-capacity node shape aligned to a `TREE_BASE=6` style layout.
 
 ### Remaining deltas
 
 - No `Context`-parameterized summaries yet (intentionally deferred).
-- Cursor semantics are still minimal (`Seek` is a stub).
-- No path-copy editing implementation yet (only API scaffolding).
-- No rich seek-target/bias/path-stack model yet.
+- No rich seek-target/bias/path-stack cursor model yet.
+- `Concat` is still baseline and not optimized for subtree sharing.
+- No delete/cut/merge/borrow rebalancing yet.
 - No cached item count (current `Len()` is traversal-based).
 
 ## Recommended Next Steps
@@ -419,7 +418,7 @@ Notes:
 Go has no const generics, so fixed capacities are effectively compile-time.
 That means:
 
-- `Degree`/`MinFill` in runtime config should be removed or ignored in this mode.
+- Runtime `Degree`/`MinFill` knobs are removed from `Config`.
 - Tunability moves to constants (or build tags) instead of per-tree runtime knobs.
 
 Recommended approach:

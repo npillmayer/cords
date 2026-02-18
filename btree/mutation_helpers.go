@@ -109,19 +109,19 @@ func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 }
 
 func (t *Tree[I, S]) maxLeafItems() int {
-	return t.cfg.Degree
+	return DefaultDegree
 }
 
 func (t *Tree[I, S]) minLeafItems() int {
-	return t.cfg.MinFill
+	return DefaultMinFill
 }
 
 func (t *Tree[I, S]) maxChildren() int {
-	return t.cfg.Degree
+	return DefaultDegree
 }
 
 func (t *Tree[I, S]) minChildren() int {
-	return t.cfg.MinFill
+	return DefaultMinFill
 }
 
 func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {

@@ -51,9 +51,9 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 		return 0, 0, fmt.Errorf("%w: internal node has no children", ErrInvalidConfig)
 	}
 	if !isRoot {
-		if len(inner.children) > t.cfg.Degree {
+		if len(inner.children) > t.maxChildren() {
 			return 0, 0, fmt.Errorf("%w: child count %d exceeds degree %d",
-				ErrInvalidConfig, len(inner.children), t.cfg.Degree)
+				ErrInvalidConfig, len(inner.children), t.maxChildren())
 		}
 	}
 	var totalItems int
