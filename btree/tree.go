@@ -136,7 +136,7 @@ func (t *Tree[I, S]) DeleteRange(index, count int) (*Tree[I, S], error) {
 		return nil, err
 	}
 	trimmed := right
-	for i := 0; i < count; i++ {
+	for range count {
 		trimmed, err = trimmed.DeleteAt(0)
 		if err != nil {
 			return nil, err
