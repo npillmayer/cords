@@ -1,4 +1,4 @@
-package cords
+package unused
 
 import (
 	"unicode/utf8"
@@ -199,7 +199,14 @@ func (b *Builder) buildCord() Cord {
 	assert(err == nil, "builder: btree.New failed")
 	tree, err = tree.InsertAt(0, parts...)
 	assert(err == nil, "builder: btree.InsertAt failed")
-	return cordFromTree(tree)
+	// Keep a legacy root alongside btree storage during migration so existing
+	// root-based operations continue to work until fully ported.
+	var legacy Cord
+	for _, part := range parts {
+		legacy = Concat(legacy, FromString(part.String()))
+	}
+	legacy.tree = tree
+	return legacy
 }
 
 func (b *Builder) orderedChunks() []chunk.Chunk {

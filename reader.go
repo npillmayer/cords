@@ -1,9 +1,6 @@
 package cords
 
-import (
-	"bytes"
-	"io"
-)
+import "io"
 
 // Reader returns a reader for the bytes of cord.
 func (cord Cord) Reader() io.Reader {
@@ -24,12 +21,11 @@ func (cr *cordReader) Read(p []byte) (n int, err error) {
 		}
 	}
 	i := cr.cursor
-	buf := bytes.NewBuffer(p[:0])
-	substr(&cr.cord.root.cordNode, i, i+l, buf)
-	if uint64(buf.Len()) > l {
-		panic("cord reader: bytes.Buffer has grown byte array")
+	s, err := cr.cord.Report(i, l)
+	if err != nil {
+		return 0, err
 	}
-	cr.cursor += l
-	//tracer().Debugf("buf=%v, buf.Bytes()=%v", buf, buf.Bytes())
-	return int(l), nil
+	n = copy(p, s)
+	cr.cursor += uint64(n)
+	return n, nil
 }
