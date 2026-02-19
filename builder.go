@@ -58,29 +58,6 @@ func (b *Builder) Reset() {
 	b.cord = Cord{}
 }
 
-// Append appends a text fragment represented by a legacy cord leaf.
-//
-// This compatibility wrapper is intentionally conservative and maps legacy leaf
-// data into staged UTF-8 chunks.
-func (b *Builder) Append(leaf Leaf) error {
-	if leaf == nil || leaf.Weight() == 0 {
-		return nil
-	}
-	return b.AppendString(leaf.String())
-}
-
-// Prepend pushes a text fragment represented by a legacy cord leaf to the
-// beginning of the staged build.
-//
-// This compatibility wrapper is intentionally conservative and maps legacy leaf
-// data into staged UTF-8 chunks.
-func (b *Builder) Prepend(leaf Leaf) error {
-	if leaf == nil || leaf.Weight() == 0 {
-		return nil
-	}
-	return b.PrependString(leaf.String())
-}
-
 // AppendString appends UTF-8 text to the staged build.
 func (b *Builder) AppendString(text string) error {
 	if !utf8.ValidString(text) {

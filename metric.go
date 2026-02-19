@@ -1,5 +1,7 @@
 package cords
 
+import "github.com/npillmayer/cords/chunk"
+
 // Metric is a metric to calculate on a cord.
 //
 // Metric implementations operate on byte slices. With the btree migration, the
@@ -13,7 +15,7 @@ type Metric interface {
 // MaterializedMetric is a metric that can produce leafs from metric values.
 type MaterializedMetric interface {
 	Metric
-	Leafs(MetricValue, bool) []Leaf
+	Chunks(MetricValue, bool) []chunk.Chunk
 }
 
 // MetricValue is a type returned by applying a metric to text fragments.
@@ -51,9 +53,9 @@ func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) 
 		return nil, Cord{}, err
 	}
 	v := metric.Apply([]byte(content))
-	mid := buildFragmentCord(metric.Leafs(v, false))
+	mid := buildFragmentCord(metric.Chunks(v, false))
 
-	bounds := metric.Leafs(v, true)
+	bounds := metric.Chunks(v, true)
 	if len(bounds) >= 2 {
 		left := buildFragmentCord(bounds[:1])
 		right := buildFragmentCord(bounds[1:2])
@@ -62,16 +64,16 @@ func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) 
 	return v, mid, nil
 }
 
-func buildFragmentCord(leafs []Leaf) Cord {
-	if len(leafs) == 0 {
+func buildFragmentCord(parts []chunk.Chunk) Cord {
+	if len(parts) == 0 {
 		return Cord{}
 	}
 	b := NewBuilder()
-	for _, leaf := range leafs {
-		if leaf == nil {
+	for _, c := range parts {
+		if c.IsEmpty() {
 			continue
 		}
-		_ = b.Append(leaf)
+		_ = b.AppendChunk(c)
 	}
 	return b.Cord()
 }

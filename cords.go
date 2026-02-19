@@ -101,24 +101,22 @@ func (cord Cord) height() int {
 	return tree.Height()
 }
 
-// RangeLeaf returns an iterator over all current leaves as Leaf adapters.
-func (cord Cord) RangeLeaf() iter.Seq[Leaf] {
-	return func(yield func(Leaf) bool) {
+// RangeChunk returns an iterator over all chunks of the cord in logical order.
+func (cord Cord) RangeChunk() iter.Seq[chunk.Chunk] {
+	return func(yield func(chunk.Chunk) bool) {
 		tree, err := treeFromCord(cord)
-		assert(err == nil, "cord.RangeLeaf: cannot materialize tree")
+		assert(err == nil, "cord.RangeChunk: cannot materialize tree")
 		if tree == nil {
 			return
 		}
-		tree.ForEachItem(func(c chunk.Chunk) bool {
-			return yield(chunkLeaf{chunk: c})
-		})
+		tree.ForEachItem(yield)
 	}
 }
 
-// EachLeaf iterates over all leaf nodes of the cord.
-func (cord Cord) EachLeaf(f func(Leaf, uint64) error) error {
+// EachChunk iterates over all chunks of the cord with their starting byte offset.
+func (cord Cord) EachChunk(f func(chunk.Chunk, uint64) error) error {
 	tree, convErr := treeFromCord(cord)
-	assert(convErr == nil, "cord.EachLeaf: cannot materialize tree")
+	assert(convErr == nil, "cord.EachChunk: cannot materialize tree")
 	if tree == nil {
 		return nil
 	}
@@ -128,47 +126,9 @@ func (cord Cord) EachLeaf(f func(Leaf, uint64) error) error {
 		if err != nil {
 			return false
 		}
-		leaf := chunkLeaf{chunk: c}
-		err = f(leaf, pos)
-		pos += leaf.Weight()
+		err = f(c, pos)
+		pos += c.Summary().Bytes
 		return err == nil
 	})
 	return err
 }
-
-// Leaf is an interface type for leaves of a cord structure.
-// Leafs carry fragments of text.
-type Leaf interface {
-	Weight() uint64                  // length of the leaf fragment in bytes
-	String() string                  // produce the leaf fragment as a string
-	Substring(uint64, uint64) []byte // substring [i:j]
-	Split(uint64) (Leaf, Leaf)       // split into 2 leafs at position i
-}
-
-// StringLeaf is the default implementation of type Leaf.
-// Calls to cords.FromString(…) will produce chunks rather than StringLeaf,
-// but StringLeaf stays useful for compatibility constructors and tests.
-type StringLeaf string
-
-// Weight of a leaf is its string length in bytes.
-func (lstr StringLeaf) Weight() uint64 {
-	return uint64(len(lstr))
-}
-
-func (lstr StringLeaf) String() string {
-	return string(lstr)
-}
-
-// Split splits a leaf at position i, resulting in 2 new leafs.
-func (lstr StringLeaf) Split(i uint64) (Leaf, Leaf) {
-	left := lstr[:i]
-	right := lstr[i:]
-	return left, right
-}
-
-// Substring returns a string segment of the leaf's text fragment.
-func (lstr StringLeaf) Substring(i, j uint64) []byte {
-	return []byte(lstr)[i:j]
-}
-
-var _ Leaf = StringLeaf("")

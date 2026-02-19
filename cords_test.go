@@ -236,9 +236,9 @@ func TestCordBuilder(t *testing.T) {
 	defer teardown()
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("name_is"))
-	b.Prepend(StringLeaf("Hello_my_"))
-	b.Append(StringLeaf("_Simon"))
+	_ = b.AppendString("name_is")
+	_ = b.PrependString("Hello_my_")
+	_ = b.AppendString("_Simon")
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatal("Expected non-void result cord, is void")
@@ -254,11 +254,11 @@ func TestCordCutAndInsert(t *testing.T) {
 	defer teardown()
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("Hello_"))
-	b.Append(StringLeaf("my_"))
-	b.Append(StringLeaf("name_"))
-	b.Append(StringLeaf("is"))
-	b.Append(StringLeaf("_Simon"))
+	_ = b.AppendString("Hello_")
+	_ = b.AppendString("my_")
+	_ = b.AppendString("name_")
+	_ = b.AppendString("is")
+	_ = b.AppendString("_Simon")
 	c := b.Cord()
 	x, _, err := Cut(c, 10, 5)
 	//c, _, err := Split(c, 10)
@@ -277,9 +277,9 @@ func TestCordReader(t *testing.T) {
 	defer teardown()
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("name_is"))
-	b.Prepend(StringLeaf("Hello_my_"))
-	b.Append(StringLeaf("_Simon"))
+	_ = b.AppendString("name_is")
+	_ = b.PrependString("Hello_my_")
+	_ = b.AppendString("_Simon")
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
@@ -327,16 +327,16 @@ func TestRangeIterator(t *testing.T) {
 	defer teardown()
 	//
 	b := NewBuilder()
-	b.Append(StringLeaf("name_is"))
-	b.Prepend(StringLeaf("Hello_my_"))
-	b.Append(StringLeaf("_Simon"))
+	_ = b.AppendString("name_is")
+	_ = b.PrependString("Hello_my_")
+	_ = b.AppendString("_Simon")
 	cord := b.Cord()
 	if cord.IsVoid() {
 		t.Fatalf("Expected non-void result cord, is void")
 	}
 	s := strings.Builder{}
-	for leaf := range cord.RangeLeaf() {
-		s.WriteString(leaf.String())
+	for c := range cord.RangeChunk() {
+		s.WriteString(c.String())
 	}
 	if s.String() != "Hello_my_name_is_Simon" {
 		t.Fatalf("expected 'Hello_my_name_is_Simon', got '%s'", s.String())

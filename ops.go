@@ -1,5 +1,7 @@
 package cords
 
+import "github.com/npillmayer/cords/chunk"
+
 // Concat concatenates cords and returns a new cord.
 func Concat(cord Cord, others ...Cord) Cord {
 	return concatTree(cord, others...)
@@ -34,16 +36,16 @@ func Substr(cord Cord, i, l uint64) (Cord, error) {
 	return substrTree(cord, i, l)
 }
 
-// Index returns the cord leaf that includes byte position i, together with an
-// index position within that fragment.
-func (cord Cord) Index(i uint64) (Leaf, uint64, error) {
+// Index returns the cord chunk that includes byte position i, together with an
+// index position within that chunk.
+func (cord Cord) Index(i uint64) (chunk.Chunk, uint64, error) {
 	return indexTree(cord, i)
 }
 
 // FragmentCount returns the number of fragments this cord is internally split into.
 func (cord Cord) FragmentCount() int {
 	cnt := 0
-	_ = cord.EachLeaf(func(Leaf, uint64) error {
+	_ = cord.EachChunk(func(chunk.Chunk, uint64) error {
 		cnt++
 		return nil
 	})

@@ -199,26 +199,26 @@ func reportTree(cord Cord, i, l uint64) (string, error) {
 	return sub.String(), nil
 }
 
-func indexTree(cord Cord, i uint64) (Leaf, uint64, error) {
+func indexTree(cord Cord, i uint64) (chunk.Chunk, uint64, error) {
 	tree, err := treeFromCord(cord)
 	if err != nil {
-		return nil, 0, err
+		return chunk.Chunk{}, 0, err
 	}
 	if i >= tree.Summary().Bytes {
-		return nil, 0, ErrIndexOutOfBounds
+		return chunk.Chunk{}, 0, ErrIndexOutOfBounds
 	}
 	cursor, err := btree.NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.ByteDimension{})
 	if err != nil {
-		return nil, 0, err
+		return chunk.Chunk{}, 0, err
 	}
 	itemIndex, acc, err := cursor.Seek(i + 1)
 	if err != nil {
-		return nil, 0, err
+		return chunk.Chunk{}, 0, err
 	}
 	item, err := tree.At(itemIndex)
 	if err != nil {
-		return nil, 0, err
+		return chunk.Chunk{}, 0, err
 	}
 	before := acc - item.Summary().Bytes
-	return chunkLeaf{chunk: item}, i - before, nil
+	return item, i - before, nil
 }

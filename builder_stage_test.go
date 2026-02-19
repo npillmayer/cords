@@ -59,8 +59,8 @@ func TestBuilderDisallowsMutationAfterCord(t *testing.T) {
 	if err := b.AppendString("def"); !errors.Is(err, ErrCordCompleted) {
 		t.Fatalf("expected ErrCordCompleted, got %v", err)
 	}
-	if err := b.Prepend(StringLeaf("x")); !errors.Is(err, ErrCordCompleted) {
-		t.Fatalf("expected ErrCordCompleted from Prepend, got %v", err)
+	if err := b.PrependString("x"); !errors.Is(err, ErrCordCompleted) {
+		t.Fatalf("expected ErrCordCompleted from PrependString, got %v", err)
 	}
 }
 
