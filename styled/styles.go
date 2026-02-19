@@ -148,7 +148,7 @@ func (t *Text) styleRuns(offset uint64) []StyleChange {
 // --- Runs of Styles --------------------------------------------------------
 
 // Runs hold information about style-formats which have been applied to a text.
-// There is not automatic synchronization between the text and the style-formats.
+// There is no automatic synchronization between the text and the style-formats.
 type runs cords.Cord
 
 // String returns an informational string for these Runs. Clients must not rely

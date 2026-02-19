@@ -47,6 +47,9 @@ const ErrIndexOutOfBounds = CordError("index out of bounds")
 // ErrIllegalArguments is flagged whenever function parameters are invalid.
 const ErrIllegalArguments = CordError("illegal arguments")
 
+// ErrIllegalPosition signals that a Pos is inconsistent for a target cord.
+const ErrIllegalPosition = CordError("illegal position")
+
 // ErrIllegalDelimiterPattern is flagged if a given delimiter pattern is
 // either not compilable as a valid regular expression or if it accepts
 // the empty string as a match.
