@@ -7,11 +7,16 @@ import (
 	"github.com/npillmayer/cords/chunk"
 )
 
+// newChunkTree creates an empty rope tree with the chunk summary monoid config.
 func newChunkTree() (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
 	cfg := btree.Config[chunk.Summary]{Monoid: chunk.Monoid{}}
 	return btree.New[chunk.Chunk, chunk.Summary](cfg)
 }
 
+// treeFromCord returns the tree representation for a cord.
+//
+// In the current architecture Cord is always tree-backed; this helper centralizes
+// that access and keeps call sites uniform.
 func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
 	if cord.tree != nil {
 		return cord.tree, nil
@@ -19,6 +24,7 @@ func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
 	return newChunkTree()
 }
 
+// cordFromTree wraps a tree as a Cord, normalizing empty trees to Cord{}.
 func cordFromTree(tree *btree.Tree[chunk.Chunk, chunk.Summary]) Cord {
 	if tree == nil || tree.IsEmpty() {
 		return Cord{}
@@ -26,6 +32,7 @@ func cordFromTree(tree *btree.Tree[chunk.Chunk, chunk.Summary]) Cord {
 	return Cord{tree: tree}
 }
 
+// concatTree concatenates one or more cords while ignoring empty operands.
 func concatTree(cord Cord, others ...Cord) Cord {
 	all := make([]Cord, 0, len(others)+1)
 	if !cord.IsVoid() {
@@ -50,6 +57,7 @@ func concatTree(cord Cord, others ...Cord) Cord {
 	return cordFromTree(base)
 }
 
+// splitTree splits a cord at byte offset i.
 func splitTree(cord Cord, i uint64) (Cord, Cord, error) {
 	tree, err := treeFromCord(cord)
 	if err != nil {
@@ -62,6 +70,10 @@ func splitTree(cord Cord, i uint64) (Cord, Cord, error) {
 	return cordFromTree(left), cordFromTree(right), nil
 }
 
+// splitTreeByByte splits a tree at byte offset i.
+//
+// If i lands in the middle of a chunk, that chunk is split first (UTF-8 boundary
+// required), then both chunk parts are inserted on the corresponding sides.
 func splitTreeByByte(tree *btree.Tree[chunk.Chunk, chunk.Summary], i uint64) (*btree.Tree[chunk.Chunk, chunk.Summary], *btree.Tree[chunk.Chunk, chunk.Summary], error) {
 	total := tree.Summary().Bytes
 	if i > total {
@@ -138,6 +150,7 @@ func splitTreeByByte(tree *btree.Tree[chunk.Chunk, chunk.Summary], i uint64) (*b
 	return left, right, nil
 }
 
+// insertTree inserts c into cord at byte offset i.
 func insertTree(cord Cord, c Cord, i uint64) (Cord, error) {
 	if cord.IsVoid() && i == 0 {
 		return c, nil
@@ -155,6 +168,7 @@ func insertTree(cord Cord, c Cord, i uint64) (Cord, error) {
 	return concatTree(left, c, right), nil
 }
 
+// cutTree removes byte range [i, i+l) and returns (remaining, removed).
 func cutTree(cord Cord, i, l uint64) (Cord, Cord, error) {
 	if l == 0 {
 		return cord, Cord{}, nil
@@ -173,6 +187,7 @@ func cutTree(cord Cord, i, l uint64) (Cord, Cord, error) {
 	return concatTree(left, right), mid, nil
 }
 
+// substrTree returns a new cord for byte range [i, i+l).
 func substrTree(cord Cord, i, l uint64) (Cord, error) {
 	if l == 0 {
 		return Cord{}, nil
@@ -191,6 +206,7 @@ func substrTree(cord Cord, i, l uint64) (Cord, error) {
 	return sub, nil
 }
 
+// reportTree materializes byte range [i, i+l) as a Go string.
 func reportTree(cord Cord, i, l uint64) (string, error) {
 	sub, err := substrTree(cord, i, l)
 	if err != nil {
@@ -199,6 +215,7 @@ func reportTree(cord Cord, i, l uint64) (string, error) {
 	return sub.String(), nil
 }
 
+// indexTree returns the chunk containing byte i and the local offset in that chunk.
 func indexTree(cord Cord, i uint64) (chunk.Chunk, uint64, error) {
 	tree, err := treeFromCord(cord)
 	if err != nil {

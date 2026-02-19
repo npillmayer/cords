@@ -10,8 +10,7 @@ import (
 // Builder incrementally stages text and finalizes it into a Cord.
 //
 // Builder collects UTF-8 text as fixed-size chunks and materializes the cord
-// only when Cord() is called. This keeps mutation logic in one place and makes
-// migration to the new btree backend straightforward.
+// only when Cord() is called.
 //
 // The empty instance is a valid builder, but clients may use NewBuilder.
 type Builder struct {
@@ -33,7 +32,8 @@ func NewBuilder() *Builder {
 // Cord returns the cord built from all staged fragments.
 //
 // It is illegal to continue adding fragments after Cord has been called, but
-// Cord may be called multiple times.
+// Cord may be called multiple times. Repeated calls return the same value until
+// Reset is called.
 func (b *Builder) Cord() Cord {
 	if b == nil {
 		return Cord{}
@@ -59,6 +59,8 @@ func (b *Builder) Reset() {
 }
 
 // AppendString appends UTF-8 text to the staged build.
+//
+// Returns ErrCordCompleted if Cord() has already been called.
 func (b *Builder) AppendString(text string) error {
 	if !utf8.ValidString(text) {
 		return chunk.ErrInvalidUTF8
@@ -67,6 +69,8 @@ func (b *Builder) AppendString(text string) error {
 }
 
 // PrependString prepends UTF-8 text to the staged build.
+//
+// Returns ErrCordCompleted if Cord() has already been called.
 func (b *Builder) PrependString(text string) error {
 	if !utf8.ValidString(text) {
 		return chunk.ErrInvalidUTF8
@@ -75,6 +79,8 @@ func (b *Builder) PrependString(text string) error {
 }
 
 // AppendBytes appends UTF-8 bytes to the staged build.
+//
+// Adjacent chunks may be coalesced when capacity permits.
 func (b *Builder) AppendBytes(text []byte) error {
 	if b == nil {
 		return ErrIllegalArguments
@@ -126,6 +132,8 @@ func (b *Builder) PrependBytes(text []byte) error {
 }
 
 // AppendChunk appends a pre-built chunk.
+//
+// Adjacent chunks may be coalesced when capacity permits.
 func (b *Builder) AppendChunk(c chunk.Chunk) error {
 	if b == nil {
 		return ErrIllegalArguments
@@ -166,6 +174,7 @@ func (b *Builder) PrependChunk(c chunk.Chunk) error {
 	return nil
 }
 
+// buildCord materializes the current staged chunk sequence into a tree-backed Cord.
 func (b *Builder) buildCord() Cord {
 	parts := b.orderedChunks()
 	if len(parts) == 0 {
@@ -179,6 +188,7 @@ func (b *Builder) buildCord() Cord {
 	return cordFromTree(tree)
 }
 
+// orderedChunks returns staged chunks in final logical order: prepends then appends.
 func (b *Builder) orderedChunks() []chunk.Chunk {
 	total := len(b.front) + len(b.back)
 	if total == 0 {
@@ -195,7 +205,8 @@ func (b *Builder) orderedChunks() []chunk.Chunk {
 // splitToChunks splits UTF-8 bytes into chunk-sized pieces.
 //
 // Boundaries are adjusted so no chunk starts or ends in the middle of a UTF-8
-// rune. This mirrors chunk.NewBytes requirements for ingest pipelines.
+// rune. This mirrors chunk.NewBytes requirements for ingest pipelines and file
+// loaders that ingest text progressively.
 func splitToChunks(text []byte) ([]chunk.Chunk, error) {
 	if len(text) == 0 {
 		return nil, nil

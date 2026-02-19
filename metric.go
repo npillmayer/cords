@@ -12,9 +12,13 @@ type Metric interface {
 	Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue
 }
 
-// MaterializedMetric is a metric that can produce leafs from metric values.
+// MaterializedMetric is a metric that can emit chunk payloads from metric values.
 type MaterializedMetric interface {
 	Metric
+	// Chunks returns chunk payloads for a computed metric value.
+	//
+	// If getBounds is true, implementations may return left and right boundary
+	// chunks to be placed around the interior metric chunks.
 	Chunks(MetricValue, bool) []chunk.Chunk
 }
 
@@ -64,6 +68,7 @@ func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) 
 	return v, mid, nil
 }
 
+// buildFragmentCord builds a Cord from metric-produced chunks.
 func buildFragmentCord(parts []chunk.Chunk) Cord {
 	if len(parts) == 0 {
 		return Cord{}

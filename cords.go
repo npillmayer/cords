@@ -17,13 +17,15 @@ import (
 	"github.com/npillmayer/cords/chunk"
 )
 
-// Cord stores immutable text fragments in a persistent summarized B+ tree.
+// Cord stores immutable UTF-8 text fragments in a persistent summarized B+ tree.
 //
 // A cord created by
 //
 //	Cord{}
 //
 // is a valid object and behaves like the empty string.
+//
+// Methods that take or return positions use byte offsets.
 //
 // Due to their internal structure cords do have performance characteristics
 // differing from Go strings or byte arrays.
@@ -45,6 +47,9 @@ type Cord struct {
 }
 
 // FromString creates a cord from a Go string.
+//
+// The input string must be valid UTF-8. Invalid input triggers an internal
+// assertion panic, matching package invariants for stored text.
 func FromString(s string) Cord {
 	parts, err := splitToChunks([]byte(s))
 	assert(err == nil, "FromString requires valid UTF-8 input")
@@ -57,7 +62,7 @@ func FromString(s string) Cord {
 	return cordFromTree(tree)
 }
 
-// String returns the cord as a Go string. This may be an expensive operation,
+// String returns the complete cord as a Go string. This may be an expensive operation,
 // as it will allocate a buffer for all the bytes of the cord and collect all
 // fragments to a single continuous string.
 func (cord Cord) String() string {
@@ -74,14 +79,14 @@ func (cord Cord) String() string {
 	return bf.String()
 }
 
-// IsVoid returns true if cord is "".
+// IsVoid reports whether the cord has no bytes.
 func (cord Cord) IsVoid() bool {
 	tree, err := treeFromCord(cord)
 	assert(err == nil, "cord.IsVoid: cannot materialize tree")
 	return tree == nil || tree.IsEmpty()
 }
 
-// Len returns the length in bytes of a cord.
+// Len returns the cord length in bytes.
 func (cord Cord) Len() uint64 {
 	tree, err := treeFromCord(cord)
 	assert(err == nil, "cord.Len: cannot materialize tree")
@@ -101,7 +106,7 @@ func (cord Cord) height() int {
 	return tree.Height()
 }
 
-// RangeChunk returns an iterator over all chunks of the cord in logical order.
+// RangeChunk returns an iterator over all chunks in logical order.
 func (cord Cord) RangeChunk() iter.Seq[chunk.Chunk] {
 	return func(yield func(chunk.Chunk) bool) {
 		tree, err := treeFromCord(cord)
@@ -113,7 +118,10 @@ func (cord Cord) RangeChunk() iter.Seq[chunk.Chunk] {
 	}
 }
 
-// EachChunk iterates over all chunks of the cord with their starting byte offset.
+// EachChunk visits all chunks in logical order.
+//
+// The callback receives each chunk and its starting byte offset. Iteration stops
+// at the first callback error and returns that error to the caller.
 func (cord Cord) EachChunk(f func(chunk.Chunk, uint64) error) error {
 	tree, convErr := treeFromCord(cord)
 	assert(convErr == nil, "cord.EachChunk: cannot materialize tree")
