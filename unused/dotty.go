@@ -1,4 +1,4 @@
-package cords
+package unused
 
 import (
 	"fmt"
@@ -36,7 +36,6 @@ func (ids *nodeids) alloc(node *cordNode) int {
 
 // Cord2Dot outputs the internal structure of a Cord in Graphviz DOT format
 // (for debugging purposes). Outputs to writer `w`.
-//
 func Cord2Dot(text Cord, w io.Writer) {
 	io.WriteString(w, "strict digraph {\n")
 	io.WriteString(w, "\tnode [fontname=Arial,fontsize=12];\n")
@@ -82,7 +81,6 @@ func Cord2Dot(text Cord, w io.Writer) {
 // Dotty is a helper for testing. It writes the internal representation of a Cord
 // to an SVG image file in the current directory. If an error occurs, `t.Error(…)`
 // will be called and the test fails.
-//
 func Dotty(text Cord, t *testing.T) {
 	tmpfile, err := ioutil.TempFile(".", "cord.*.dot")
 	if err != nil {

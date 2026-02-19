@@ -1,38 +1,5 @@
 package cords
 
-/*
-BSD 3-Clause License
-
-Copyright (c) 2020–21, Norbert Pillmayer
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 // Metric is a metric to calculate on a cord. Sometimes it's helpful to find
 // information about a (large) text by collecting metrics from fragments and
 // assembling them. Cords naturally break up texts into smaller fragments,
@@ -65,7 +32,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // than it has for plain metrics. Combine has to focus on the bytes *between* the
 // already recognized spans of both the left and right sibling, and be able to
 // convert them to cord leafs.
-//
 type Metric interface {
 	Apply(frag []byte) MetricValue
 	Combine(leftSibling, rightSibling MetricValue, metric Metric) MetricValue
@@ -83,7 +49,6 @@ type Metric interface {
 // catamorphism, or we can re-align the leaf boundaries with the
 // continuity-boundaries of the metric. We'll go with the latter and build up
 // a tree which will the be somewhat decoupled from the text cord.
-//
 type MaterializedMetric interface {
 	Metric
 	Leafs(MetricValue, bool) []Leaf
@@ -109,14 +74,14 @@ type MaterializedMetric interface {
 // and right child node of a cord tree node will have to be combined.
 // The combination must be able to reprocess any unprocessed bytes.
 //
-//       --- denotes unprocessed bytes
-//       === denotes bytes already processed by the metric
+//	   --- denotes unprocessed bytes
+//	   === denotes bytes already processed by the metric
 //
-//    (a)  |-----========--|   &   |----==============|     combine two sibling fragments
+//	(a)  |-----========--|   &   |----==============|     combine two sibling fragments
 //
-//    (b)  |-----========    ------     ==============|     reprocess 6 bytes in between
+//	(b)  |-----========    ------     ==============|     reprocess 6 bytes in between
 //
-//    (c)  |-----============================|              combined intermediate fragment  or
+//	(c)  |-----============================|              combined intermediate fragment  or
 //
 // For an approachable discussion please refer to Raph Levien's “Rope Science” series
 // (https://xi-editor.io/docs/rope_science_01.html), or—less approachable—read up
@@ -127,7 +92,6 @@ type MaterializedMetric interface {
 // mitigated by helper types provided by this package. Clients usually will either create
 // metrics on top of pre-defined basic metrics or they may embed the MetricValueBase
 // helper type in their MetricValues.
-//
 type MetricValue interface {
 	Len() int                      // summed up length of text fragments
 	Unprocessed() ([]byte, []byte) // unprocessed bytes at either end
@@ -140,7 +104,6 @@ type MetricValue interface {
 // i and j are text positions with Go slice semantics.
 // If [i, j) does not specify a valid slice of the text, ErrIndexOutOfBounds will be
 // returned.
-//
 func ApplyMetric(cord Cord, i, j uint64, metric Metric) (MetricValue, error) {
 	if cord.IsVoid() {
 		return nil, nil
@@ -192,7 +155,6 @@ func applyMetric(node *cordNode, i, j uint64, metric Metric) MetricValue {
 // i and j are text positions with Go slice semantics.
 // If [i, j) does not specify a valid slice of the text, ErrIndexOutOfBounds will be
 // returned.
-//
 func ApplyMaterializedMetric(cord Cord, i, j uint64, metric MaterializedMetric) (MetricValue, Cord, error) {
 	if cord.IsVoid() {
 		return nil, Cord{}, nil
