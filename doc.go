@@ -15,6 +15,20 @@ Typical usage:
 	c2, _ := cords.Insert(c, cords.FromString(","), 5)
 	s, _ := c2.Report(0, c2.Len())
 
+Extension usage:
+
+	// ext implements cords.TextSegmentExtension[E]
+	ec, _ := cords.FromStringWithExtension("Hello\nWorld\n", ext)
+	total, _ := ec.Ext()
+	_ = total
+
+Extension builder usage:
+
+	b, _ := cords.NewBuilderWithExtension(ext)
+	_ = b.AppendString("Hello\n")
+	_ = b.AppendString("World\n")
+	ec = b.Cord()
+
 Package `chunk` contains the text-fragment type used by this package. Package
 `btree` contains the generic persistent summarized B+ tree implementation.
 */

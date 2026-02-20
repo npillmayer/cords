@@ -249,6 +249,39 @@ func TestCordBuilder(t *testing.T) {
 	}
 }
 
+func TestTextSegmentIteration(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
+
+	c := FromString("Hello\nWorld")
+	var got string
+	var totalBytes uint64
+	var prevPos uint64
+	first := true
+	err := c.EachTextSegment(func(seg TextSegment, pos uint64) error {
+		if !first && pos < prevPos {
+			t.Fatalf("segment positions must be monotonic: prev=%d now=%d", prevPos, pos)
+		}
+		first = false
+		prevPos = pos
+		if uint64(len(seg.Bytes())) != seg.ByteLen() {
+			t.Fatalf("segment byte length mismatch: len(Bytes)=%d ByteLen=%d", len(seg.Bytes()), seg.ByteLen())
+		}
+		got += seg.String()
+		totalBytes += seg.ByteLen()
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("EachTextSegment failed: %v", err)
+	}
+	if got != c.String() {
+		t.Fatalf("segment concat mismatch: got=%q want=%q", got, c.String())
+	}
+	if totalBytes != c.Len() {
+		t.Fatalf("segment byte sum mismatch: got=%d want=%d", totalBytes, c.Len())
+	}
+}
+
 func TestCordCutAndInsert(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
