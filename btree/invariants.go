@@ -6,7 +6,7 @@ import "fmt"
 //
 // This checker is intentionally strict and should be used in tests while the
 // implementation is evolving.
-func (t *Tree[I, S]) Check() error {
+func (t *Tree[I, S, E]) Check() error {
 	if t == nil {
 		return fmt.Errorf("%w: nil tree", ErrInvalidConfig)
 	}
@@ -34,12 +34,12 @@ func (t *Tree[I, S]) Check() error {
 //   - subtree height
 //
 // The function enforces occupancy rules and uniform child heights.
-func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height int, err error) {
+func (t *Tree[I, S, E]) checkNode(n treeNode[I, S, E], isRoot bool) (items int, height int, err error) {
 	if n == nil {
 		return 0, 0, fmt.Errorf("%w: nil node", ErrInvalidConfig)
 	}
 	if n.isLeaf() {
-		leaf := n.(*leafNode[I, S])
+		leaf := n.(*leafNode[I, S, E])
 		if leaf == nil {
 			return 0, 0, fmt.Errorf("%w: nil leaf node", ErrInvalidConfig)
 		}
@@ -62,7 +62,7 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 		}
 		return len(leaf.items), 1, nil
 	}
-	inner := n.(*innerNode[I, S])
+	inner := n.(*innerNode[I, S, E])
 	if err := t.checkInnerInvariants(inner); err != nil {
 		return 0, 0, err
 	}
@@ -104,7 +104,7 @@ func (t *Tree[I, S]) checkNode(n treeNode[I, S], isRoot bool) (items int, height
 }
 
 // checkLeafInvariants verifies fixed-array backing/view consistency for a leaf.
-func (t *Tree[I, S]) checkLeafInvariants(leaf *leafNode[I, S]) error {
+func (t *Tree[I, S, E]) checkLeafInvariants(leaf *leafNode[I, S, E]) error {
 	if leaf == nil {
 		return fmt.Errorf("%w: nil leaf node", ErrInvalidConfig)
 	}
@@ -124,7 +124,7 @@ func (t *Tree[I, S]) checkLeafInvariants(leaf *leafNode[I, S]) error {
 }
 
 // checkInnerInvariants verifies fixed-array backing/view consistency for internals.
-func (t *Tree[I, S]) checkInnerInvariants(inner *innerNode[I, S]) error {
+func (t *Tree[I, S, E]) checkInnerInvariants(inner *innerNode[I, S, E]) error {
 	if inner == nil {
 		return fmt.Errorf("%w: nil internal node", ErrInvalidConfig)
 	}

@@ -11,4 +11,6 @@ var (
 	ErrUnimplemented = errors.New("btree: operation not implemented")
 	// ErrInvalidDimension signals an invalid or missing dimension configuration.
 	ErrInvalidDimension = errors.New("btree: invalid dimension")
+	// ErrIncompatibleExtension signals that two trees have incompatible extension configs.
+	ErrIncompatibleExtension = errors.New("btree: incompatible extension")
 )

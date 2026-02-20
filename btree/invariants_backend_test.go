@@ -30,7 +30,7 @@ func TestFixedBackendDetectsChildViewDrift(t *testing.T) {
 	tree.height = 2
 
 	// Break fixed-storage backing invariant intentionally.
-	inner.children = append([]treeNode[TextChunk, TextSummary](nil), inner.children...)
+	inner.children = append([]treeNode[TextChunk, TextSummary, NO_EXT](nil), inner.children...)
 
 	err := tree.Check()
 	if err == nil {

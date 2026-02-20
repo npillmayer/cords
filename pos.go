@@ -53,7 +53,7 @@ func (cord Cord) PosFromByte(b uint64) (Pos, error) {
 		return Pos{runes: total.Chars, bytepos: b}, nil
 	}
 
-	byteCur, err := btree.NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.ByteDimension{})
+	byteCur, err := btree.NewCursor[chunk.Chunk, chunk.Summary, btree.NO_EXT, uint64](tree, chunk.ByteDimension{})
 	if err != nil {
 		return Pos{}, err
 	}
@@ -113,7 +113,7 @@ func (cord Cord) posFromRunes(r uint64) (Pos, error) {
 		return Pos{runes: r, bytepos: total.Bytes}, nil
 	}
 
-	charCur, err := btree.NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.CharDimension{})
+	charCur, err := btree.NewCursor[chunk.Chunk, chunk.Summary, btree.NO_EXT, uint64](tree, chunk.CharDimension{})
 	if err != nil {
 		return Pos{}, err
 	}
@@ -162,7 +162,7 @@ func (cord Cord) validatePos(p Pos) error {
 	return nil
 }
 
-func prefixSummaryBeforeItem(tree *btree.Tree[chunk.Chunk, chunk.Summary], itemIndex int) (chunk.Summary, error) {
+func prefixSummaryBeforeItem(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], itemIndex int) (chunk.Summary, error) {
 	return tree.PrefixSummary(itemIndex)
 }
 

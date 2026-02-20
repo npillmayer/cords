@@ -180,7 +180,7 @@ func (b *Builder) buildCord() Cord {
 	if len(parts) == 0 {
 		return Cord{}
 	}
-	cfg := btree.Config[chunk.Summary]{Monoid: chunk.Monoid{}}
+	cfg := btree.Config[chunk.Chunk, chunk.Summary, btree.NO_EXT]{Monoid: chunk.Monoid{}}
 	tree, err := btree.New[chunk.Chunk, chunk.Summary](cfg)
 	assert(err == nil, "builder: btree.New failed")
 	tree, err = tree.InsertAt(0, parts...)

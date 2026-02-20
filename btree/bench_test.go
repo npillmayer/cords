@@ -3,7 +3,7 @@ package btree
 import "testing"
 
 func BenchmarkInsertAtStub(b *testing.B) {
-	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
 		Monoid: TextMonoid{},
 	})
 	if err != nil {

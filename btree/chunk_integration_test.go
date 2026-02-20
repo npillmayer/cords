@@ -17,7 +17,7 @@ func mustChunk(t *testing.T, s string) chunk.Chunk {
 }
 
 func TestTreeWithChunkItemsAndSummaryDimensions(t *testing.T) {
-	tree, err := New[chunk.Chunk, chunk.Summary](Config[chunk.Summary]{
+	tree, err := New[chunk.Chunk, chunk.Summary](Config[chunk.Chunk, chunk.Summary, NO_EXT]{
 		Monoid: chunk.Monoid{},
 	})
 	if err != nil {
@@ -38,7 +38,7 @@ func TestTreeWithChunkItemsAndSummaryDimensions(t *testing.T) {
 		t.Fatalf("unexpected tree summary: %+v", sum)
 	}
 
-	byteCur, err := NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.ByteDimension{})
+	byteCur, err := NewCursor[chunk.Chunk, chunk.Summary, NO_EXT, uint64](tree, chunk.ByteDimension{})
 	if err != nil {
 		t.Fatalf("byte cursor create failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestTreeWithChunkItemsAndSummaryDimensions(t *testing.T) {
 		t.Fatalf("unexpected byte seek result idx=%d acc=%d", idx, acc)
 	}
 
-	charCur, err := NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.CharDimension{})
+	charCur, err := NewCursor[chunk.Chunk, chunk.Summary, NO_EXT, uint64](tree, chunk.CharDimension{})
 	if err != nil {
 		t.Fatalf("char cursor create failed: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestTreeWithChunkItemsAndSummaryDimensions(t *testing.T) {
 		t.Fatalf("unexpected char seek result idx=%d acc=%d", idx, acc)
 	}
 
-	lineCur, err := NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.LineDimension{})
+	lineCur, err := NewCursor[chunk.Chunk, chunk.Summary, NO_EXT, uint64](tree, chunk.LineDimension{})
 	if err != nil {
 		t.Fatalf("line cursor create failed: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestTreeWithChunkItemsAndSummaryDimensions(t *testing.T) {
 }
 
 func TestPrefixSummaryWithChunkItems(t *testing.T) {
-	tree, err := New[chunk.Chunk, chunk.Summary](Config[chunk.Summary]{
+	tree, err := New[chunk.Chunk, chunk.Summary](Config[chunk.Chunk, chunk.Summary, NO_EXT]{
 		Monoid: chunk.Monoid{},
 	})
 	if err != nil {

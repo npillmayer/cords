@@ -2,9 +2,9 @@ package btree
 
 import "testing"
 
-func makeTextTree(t *testing.T) *Tree[TextChunk, TextSummary] {
+func makeTextTree(t *testing.T) *Tree[TextChunk, TextSummary, NO_EXT] {
 	t.Helper()
-	tree, err := New[TextChunk, TextSummary](Config[TextSummary]{
+	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
 		Monoid: TextMonoid{},
 	})
 	if err != nil {

@@ -8,8 +8,8 @@ import (
 )
 
 // newChunkTree creates an empty rope tree with the chunk summary monoid config.
-func newChunkTree() (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
-	cfg := btree.Config[chunk.Summary]{Monoid: chunk.Monoid{}}
+func newChunkTree() (*btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], error) {
+	cfg := btree.Config[chunk.Chunk, chunk.Summary, btree.NO_EXT]{Monoid: chunk.Monoid{}}
 	return btree.New[chunk.Chunk, chunk.Summary](cfg)
 }
 
@@ -17,7 +17,7 @@ func newChunkTree() (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
 //
 // In the current architecture Cord is always tree-backed; this helper centralizes
 // that access and keeps call sites uniform.
-func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
+func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], error) {
 	if cord.tree != nil {
 		return cord.tree, nil
 	}
@@ -25,7 +25,7 @@ func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary], error) {
 }
 
 // cordFromTree wraps a tree as a Cord, normalizing empty trees to Cord{}.
-func cordFromTree(tree *btree.Tree[chunk.Chunk, chunk.Summary]) Cord {
+func cordFromTree(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT]) Cord {
 	if tree == nil || tree.IsEmpty() {
 		return Cord{}
 	}
@@ -74,7 +74,7 @@ func splitTree(cord Cord, i uint64) (Cord, Cord, error) {
 //
 // If i lands in the middle of a chunk, that chunk is split first (UTF-8 boundary
 // required), then both chunk parts are inserted on the corresponding sides.
-func splitTreeByByte(tree *btree.Tree[chunk.Chunk, chunk.Summary], i uint64) (*btree.Tree[chunk.Chunk, chunk.Summary], *btree.Tree[chunk.Chunk, chunk.Summary], error) {
+func splitTreeByByte(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], i uint64) (*btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], error) {
 	total := tree.Summary().Bytes
 	if i > total {
 		return nil, nil, ErrIndexOutOfBounds
@@ -93,7 +93,7 @@ func splitTreeByByte(tree *btree.Tree[chunk.Chunk, chunk.Summary], i uint64) (*b
 		}
 		return tree, empty, nil
 	}
-	cursor, err := btree.NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.ByteDimension{})
+	cursor, err := btree.NewCursor[chunk.Chunk, chunk.Summary, btree.NO_EXT, uint64](tree, chunk.ByteDimension{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -224,7 +224,7 @@ func indexTree(cord Cord, i uint64) (chunk.Chunk, uint64, error) {
 	if i >= tree.Summary().Bytes {
 		return chunk.Chunk{}, 0, ErrIndexOutOfBounds
 	}
-	cursor, err := btree.NewCursor[chunk.Chunk, chunk.Summary, uint64](tree, chunk.ByteDimension{})
+	cursor, err := btree.NewCursor[chunk.Chunk, chunk.Summary, btree.NO_EXT, uint64](tree, chunk.ByteDimension{})
 	if err != nil {
 		return chunk.Chunk{}, 0, err
 	}

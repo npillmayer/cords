@@ -43,7 +43,7 @@ import (
 // For use cases with many editing operations on large texts, cords have stable
 // performance and space characteristics.
 type Cord struct {
-	tree *btree.Tree[chunk.Chunk, chunk.Summary]
+	tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT]
 }
 
 // FromString creates a cord from a Go string.

@@ -1,24 +1,25 @@
 package btree
 
 // cloneNode clones a node for path-copy updates.
-func (t *Tree[I, S]) cloneNode(n treeNode[I, S]) treeNode[I, S] {
+func (t *Tree[I, S, E]) cloneNode(n treeNode[I, S, E]) treeNode[I, S, E] {
 	if n == nil {
 		return nil
 	}
 	switch n := n.(type) {
-	case *leafNode[I, S]:
+	case *leafNode[I, S, E]:
 		return t.cloneLeaf(n)
-	case *innerNode[I, S]:
+	case *innerNode[I, S, E]:
 		return t.cloneInner(n)
 	default:
 		panic("unknown tree node type")
 	}
 }
 
-func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
+func (t *Tree[I, S, E]) cloneLeaf(leaf *leafNode[I, S, E]) *leafNode[I, S, E] {
 	assert(leaf != nil, "cloneLeaf called with nil leaf")
-	cloned := &leafNode[I, S]{
+	cloned := &leafNode[I, S, E]{
 		summary: leaf.summary,
+		ext:     leaf.ext,
 		n:       leaf.n,
 	}
 	copy(cloned.itemStore[:int(cloned.n)], leaf.itemStore[:int(leaf.n)])
@@ -30,10 +31,11 @@ func (t *Tree[I, S]) cloneLeaf(leaf *leafNode[I, S]) *leafNode[I, S] {
 //
 // The returned node is independent and safe to mutate on the current path-copy
 // operation.
-func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
+func (t *Tree[I, S, E]) cloneInner(inner *innerNode[I, S, E]) *innerNode[I, S, E] {
 	assert(inner != nil, "cloneInner called with nil inner node")
-	cloned := &innerNode[I, S]{
+	cloned := &innerNode[I, S, E]{
 		summary: inner.summary,
+		ext:     inner.ext,
 		n:       inner.n,
 	}
 	copy(cloned.childStore[:int(cloned.n)], inner.childStore[:int(inner.n)])
@@ -45,34 +47,53 @@ func (t *Tree[I, S]) cloneInner(inner *innerNode[I, S]) *innerNode[I, S] {
 //
 // This is used after local structural edits. It does not recurse because child
 // summaries are already maintained by lower-level edits.
-func (t *Tree[I, S]) recomputeNodeSummary(n treeNode[I, S]) {
+func (t *Tree[I, S, E]) recomputeNodeSummary(n treeNode[I, S, E]) {
 	assert(n != nil, "recomputeNodeSummary called with nil node")
 	switch n := n.(type) {
-	case *leafNode[I, S]:
+	case *leafNode[I, S, E]:
 		t.recomputeLeafSummary(n)
-	case *innerNode[I, S]:
+	case *innerNode[I, S, E]:
 		t.recomputeInnerSummary(n)
 	default:
 		panic("unknown tree node type")
 	}
 }
 
-// recomputeLeafSummary rebuilds a leaf summary from item summaries.
-func (t *Tree[I, S]) recomputeLeafSummary(leaf *leafNode[I, S]) {
+// recomputeLeafSummary rebuilds a leaf summary (and extension, if configured)
+// from item summaries.
+func (t *Tree[I, S, E]) recomputeLeafSummary(leaf *leafNode[I, S, E]) {
 	assert(leaf != nil, "recomputeLeafSummary called with nil leaf")
 	leaf.summary = t.cfg.Monoid.Zero()
+	var zeroE E
+	leaf.ext = zeroE
+	if t.cfg.Extension != nil {
+		leaf.ext = t.cfg.Extension.Zero()
+	}
 	for _, item := range leaf.items {
 		leaf.summary = t.cfg.Monoid.Add(leaf.summary, item.Summary())
+		if t.cfg.Extension != nil {
+			right := t.cfg.Extension.FromItem(item, item.Summary())
+			leaf.ext = t.cfg.Extension.Add(leaf.ext, right)
+		}
 	}
 }
 
-// recomputeInnerSummary rebuilds an internal summary by folding child summaries.
-func (t *Tree[I, S]) recomputeInnerSummary(inner *innerNode[I, S]) {
+// recomputeInnerSummary rebuilds an internal summary (and extension, if
+// configured) by folding child summaries.
+func (t *Tree[I, S, E]) recomputeInnerSummary(inner *innerNode[I, S, E]) {
 	assert(inner != nil, "recomputeInnerSummary called with nil inner node")
 	inner.summary = t.cfg.Monoid.Zero()
+	var zeroE E
+	inner.ext = zeroE
+	if t.cfg.Extension != nil {
+		inner.ext = t.cfg.Extension.Zero()
+	}
 	for _, child := range inner.children {
 		if child != nil {
 			inner.summary = t.cfg.Monoid.Add(inner.summary, child.Summary())
+			if t.cfg.Extension != nil {
+				inner.ext = t.cfg.Extension.Add(inner.ext, child.Ext())
+			}
 		}
 	}
 }
@@ -99,7 +120,7 @@ func removeRange[T any](src []T, from, to int) []T {
 	return out
 }
 
-func (t *Tree[I, S]) insertChildAt(inner *innerNode[I, S], idx int, child treeNode[I, S]) {
+func (t *Tree[I, S, E]) insertChildAt(inner *innerNode[I, S, E], idx int, child treeNode[I, S, E]) {
 	assert(inner != nil, "insertChildAt called with nil inner node")
 	assert(idx >= 0 && idx <= len(inner.children), "insertChildAt index out of range")
 	n := len(inner.children)
@@ -116,14 +137,14 @@ func (t *Tree[I, S]) insertChildAt(inner *innerNode[I, S], idx int, child treeNo
 // removeChildAt removes one child pointer from an internal node at idx.
 //
 // It compacts the fixed backing store and refreshes summary.
-func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
+func (t *Tree[I, S, E]) removeChildAt(inner *innerNode[I, S, E], idx int) {
 	assert(inner != nil, "removeChildAt called with nil inner node")
 	assert(idx >= 0 && idx < len(inner.children), "removeChildAt index out of range")
 	n := len(inner.children)
 	if idx < n-1 {
 		copy(inner.childStore[idx:n-1], inner.childStore[idx+1:n])
 	}
-	var zeroNode treeNode[I, S]
+	var zeroNode treeNode[I, S, E]
 	inner.childStore[n-1] = zeroNode
 	inner.n = uint8(n - 1)
 	inner.children = inner.childStore[:n-1]
@@ -134,7 +155,7 @@ func (t *Tree[I, S]) removeChildAt(inner *innerNode[I, S], idx int) {
 //
 // The leaf may temporarily exceed normal occupancy (up to overflow storage),
 // which is resolved by higher-level split logic.
-func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...I) {
+func (t *Tree[I, S, E]) insertLeafItemsAt(leaf *leafNode[I, S, E], idx int, values ...I) {
 	assert(leaf != nil, "insertLeafItemsAt called with nil leaf")
 	assert(idx >= 0 && idx <= len(leaf.items), "insertLeafItemsAt index out of range")
 	if len(values) == 0 {
@@ -152,7 +173,7 @@ func (t *Tree[I, S]) insertLeafItemsAt(leaf *leafNode[I, S], idx int, values ...
 }
 
 // removeLeafItemsRange removes half-open interval [from,to) from a leaf.
-func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
+func (t *Tree[I, S, E]) removeLeafItemsRange(leaf *leafNode[I, S, E], from, to int) {
 	assert(leaf != nil, "removeLeafItemsRange called with nil leaf")
 	assert(from >= 0 && from <= to && to <= len(leaf.items), "removeLeafItemsRange bounds invalid")
 	if from == to {
@@ -172,12 +193,12 @@ func (t *Tree[I, S]) removeLeafItemsRange(leaf *leafNode[I, S], from, to int) {
 }
 
 // leafOverflow reports whether leaf exceeds the allowed non-overflow occupancy.
-func (t *Tree[I, S]) leafOverflow(leaf *leafNode[I, S]) bool {
+func (t *Tree[I, S, E]) leafOverflow(leaf *leafNode[I, S, E]) bool {
 	return leaf != nil && len(leaf.items) > MaxLeafItems
 }
 
 // leafUnderflow reports whether a non-root leaf violates minimum occupancy.
-func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
+func (t *Tree[I, S, E]) leafUnderflow(leaf *leafNode[I, S, E], isRoot bool) bool {
 	assert(leaf != nil, "leafUnderflow called with nil leaf")
 	if isRoot {
 		return false
@@ -186,12 +207,12 @@ func (t *Tree[I, S]) leafUnderflow(leaf *leafNode[I, S], isRoot bool) bool {
 }
 
 // innerOverflow reports whether internal node exceeds maximum children.
-func (t *Tree[I, S]) innerOverflow(inner *innerNode[I, S]) bool {
+func (t *Tree[I, S, E]) innerOverflow(inner *innerNode[I, S, E]) bool {
 	return inner != nil && len(inner.children) > MaxChildren
 }
 
 // innerUnderflow reports whether a non-root internal node is below min fill.
-func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
+func (t *Tree[I, S, E]) innerUnderflow(inner *innerNode[I, S, E], isRoot bool) bool {
 	assert(inner != nil, "innerUnderflow called with nil inner node")
 	if isRoot {
 		return false
@@ -203,7 +224,7 @@ func (t *Tree[I, S]) innerUnderflow(inner *innerNode[I, S], isRoot bool) bool {
 //
 // It returns the updated (left) leaf and optionally a promoted right sibling if
 // a split occurred.
-func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items ...I) (*leafNode[I, S], *leafNode[I, S], error) {
+func (t *Tree[I, S, E]) insertIntoLeafLocal(leaf *leafNode[I, S, E], index int, items ...I) (*leafNode[I, S, E], *leafNode[I, S, E], error) {
 	assert(leaf != nil, "insertIntoLeafLocal called with nil leaf")
 	assert(index >= 0 && index <= len(leaf.items), "insertIntoLeafLocal index out of range")
 	if len(items) == 0 {
@@ -223,7 +244,7 @@ func (t *Tree[I, S]) insertIntoLeafLocal(leaf *leafNode[I, S], index int, items 
 //
 // The split is midpoint-based and guarantees both outputs satisfy non-root
 // minimum occupancy.
-func (t *Tree[I, S]) splitLeaf(leaf *leafNode[I, S]) (*leafNode[I, S], *leafNode[I, S]) {
+func (t *Tree[I, S, E]) splitLeaf(leaf *leafNode[I, S, E]) (*leafNode[I, S, E], *leafNode[I, S, E]) {
 	assert(leaf != nil, "splitLeaf called with nil leaf")
 	n := len(leaf.items)
 	maxItems := MaxLeafItems
