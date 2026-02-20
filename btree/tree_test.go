@@ -364,6 +364,259 @@ func TestConcatAcceptsMatchingExtensionMagicID(t *testing.T) {
 	}
 }
 
+func TestTreeExtPresenceSemantics(t *testing.T) {
+	noExtTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid: TextMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected noExtTree New error: %v", err)
+	}
+	noExtTree, err = noExtTree.InsertAt(0, FromString("abc"))
+	if err != nil {
+		t.Fatalf("unexpected noExtTree insert error: %v", err)
+	}
+	if _, ok := noExtTree.Ext(); ok {
+		t.Fatalf("expected Ext() ok=false for tree without configured extension")
+	}
+
+	withExtTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:present"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected withExtTree New error: %v", err)
+	}
+	if _, ok := withExtTree.Ext(); ok {
+		t.Fatalf("expected Ext() ok=false for empty tree")
+	}
+	withExtTree, err = withExtTree.InsertAt(0, FromString("abc"))
+	if err != nil {
+		t.Fatalf("unexpected withExtTree insert error: %v", err)
+	}
+	ext, ok := withExtTree.Ext()
+	if !ok {
+		t.Fatalf("expected Ext() ok=true for non-empty tree with extension")
+	}
+	if ext != uint64(3) {
+		t.Fatalf("unexpected ext value: got %d want 3", ext)
+	}
+}
+
+func expectedByteExt(tree *Tree[TextChunk, TextSummary, uint64]) uint64 {
+	var sum uint64
+	tree.ForEachItem(func(item TextChunk) bool {
+		sum += item.Summary().Bytes
+		return true
+	})
+	return sum
+}
+
+func assertByteExtensionAccounting(t *testing.T, tree *Tree[TextChunk, TextSummary, uint64]) {
+	t.Helper()
+	if tree == nil {
+		t.Fatalf("tree must not be nil")
+	}
+	expected := expectedByteExt(tree)
+	prefix, err := tree.PrefixExt(tree.Len())
+	if err != nil {
+		t.Fatalf("PrefixExt(len) failed: %v", err)
+	}
+	if prefix != expected {
+		t.Fatalf("PrefixExt(len) mismatch: got %d want %d", prefix, expected)
+	}
+	ext, ok := tree.Ext()
+	if tree.IsEmpty() {
+		if ok {
+			t.Fatalf("empty tree must report Ext() as absent")
+		}
+		if prefix != 0 {
+			t.Fatalf("empty tree PrefixExt(len) must be 0, got %d", prefix)
+		}
+		return
+	}
+	if !ok {
+		t.Fatalf("non-empty tree with configured extension must report Ext() present")
+	}
+	if ext != expected {
+		t.Fatalf("Ext() mismatch: got %d want %d", ext, expected)
+	}
+	if ext != tree.Summary().Bytes {
+		t.Fatalf("Ext() should match byte summary for countingExt: ext=%d bytes=%d", ext, tree.Summary().Bytes)
+	}
+}
+
+func assertByteExtensionConsistent(t *testing.T, tree *Tree[TextChunk, TextSummary, uint64]) {
+	t.Helper()
+	if err := tree.Check(); err != nil {
+		t.Fatalf("tree invariants failed: %v", err)
+	}
+	assertByteExtensionAccounting(t, tree)
+}
+
+func TestExtensionConsistencyAcrossMutations(t *testing.T) {
+	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:bytes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected New error: %v", err)
+	}
+
+	for i := 0; i < 220; i++ {
+		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	assertByteExtensionConsistent(t, tree)
+
+	tree, err = tree.DeleteAt(0)
+	if err != nil {
+		t.Fatalf("DeleteAt(0) failed: %v", err)
+	}
+	assertByteExtensionConsistent(t, tree)
+
+	mid := tree.Len() / 2
+	tree, err = tree.DeleteAt(mid)
+	if err != nil {
+		t.Fatalf("DeleteAt(mid=%d) failed: %v", mid, err)
+	}
+	assertByteExtensionConsistent(t, tree)
+
+	if tree.Len() > 30 {
+		tree, err = tree.DeleteRange(10, 17)
+		if err != nil {
+			t.Fatalf("DeleteRange failed: %v", err)
+		}
+		assertByteExtensionConsistent(t, tree)
+	}
+
+	beforeSplit := collectTextItems(tree)
+	left, right, err := tree.SplitAt(tree.Len() / 2)
+	if err != nil {
+		t.Fatalf("SplitAt failed: %v", err)
+	}
+	assertByteExtensionAccounting(t, left)
+	assertByteExtensionAccounting(t, right)
+
+	combined, err := left.Concat(right)
+	if err != nil {
+		t.Fatalf("Concat after split failed: %v", err)
+	}
+	assertByteExtensionAccounting(t, combined)
+	got := collectTextItems(combined)
+	if len(got) != len(beforeSplit) {
+		t.Fatalf("concat length mismatch: got %d want %d", len(got), len(beforeSplit))
+	}
+	for i := range got {
+		if got[i] != beforeSplit[i] {
+			t.Fatalf("concat order mismatch at %d: got %q want %q", i, got[i], beforeSplit[i])
+		}
+	}
+}
+
+func TestExtensionConsistencyLeafBorrowAndMerge(t *testing.T) {
+	// Borrow scenario.
+	borrowTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:bytes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected New error: %v", err)
+	}
+	leftItems := make([]TextChunk, 0, Base+1)
+	rightItems := make([]TextChunk, 0, Base)
+	for i := 0; i < Base+1; i++ {
+		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+	}
+	for i := Base + 1; i < 2*Base+1; i++ {
+		rightItems = append(rightItems, FromString(strconv.Itoa(i)))
+	}
+	borrowTree.root = borrowTree.makeInternal(borrowTree.makeLeaf(leftItems), borrowTree.makeLeaf(rightItems))
+	borrowTree.height = 2
+	borrowed, err := borrowTree.DeleteAt(Base + 1)
+	if err != nil {
+		t.Fatalf("DeleteAt borrow case failed: %v", err)
+	}
+	assertByteExtensionConsistent(t, borrowed)
+
+	// Merge scenario.
+	mergeTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:bytes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected New error: %v", err)
+	}
+	mergeLeft := make([]TextChunk, 0, Base)
+	mergeRight := make([]TextChunk, 0, Base)
+	for i := 0; i < Base; i++ {
+		mergeLeft = append(mergeLeft, FromString(strconv.Itoa(i)))
+		mergeRight = append(mergeRight, FromString(strconv.Itoa(100+i)))
+	}
+	mergeTree.root = mergeTree.makeInternal(mergeTree.makeLeaf(mergeLeft), mergeTree.makeLeaf(mergeRight))
+	mergeTree.height = 2
+	merged, err := mergeTree.DeleteAt(0)
+	if err != nil {
+		t.Fatalf("DeleteAt merge case failed: %v", err)
+	}
+	assertByteExtensionConsistent(t, merged)
+}
+
+func TestExtensionConsistencyConcatDifferentHeights(t *testing.T) {
+	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:bytes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected left New error: %v", err)
+	}
+	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
+		Monoid:    TextMonoid{},
+		Extension: countingExt{id: "ext:bytes"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected right New error: %v", err)
+	}
+	for i := 0; i < 260; i++ {
+		left, err = left.InsertAt(left.Len(), FromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("left insert %d failed: %v", i, err)
+		}
+	}
+	for i := 0; i < 8; i++ {
+		right, err = right.InsertAt(right.Len(), FromString("r"+strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("right insert %d failed: %v", i, err)
+		}
+	}
+	if left.Height() <= right.Height() {
+		t.Fatalf("expected left tree to be taller (left=%d right=%d)", left.Height(), right.Height())
+	}
+	leftItems := collectTextItems(left)
+	rightItems := collectTextItems(right)
+	combined, err := left.Concat(right)
+	if err != nil {
+		t.Fatalf("Concat failed: %v", err)
+	}
+	assertByteExtensionConsistent(t, combined)
+	got := collectTextItems(combined)
+	wantLen := len(leftItems) + len(rightItems)
+	if len(got) != wantLen {
+		t.Fatalf("unexpected concat length: got %d want %d", len(got), wantLen)
+	}
+	for i := range leftItems {
+		if got[i] != leftItems[i] {
+			t.Fatalf("left-part mismatch at %d: got %q want %q", i, got[i], leftItems[i])
+		}
+	}
+	for i := range rightItems {
+		if got[len(leftItems)+i] != rightItems[i] {
+			t.Fatalf("right-part mismatch at %d: got %q want %q", i, got[len(leftItems)+i], rightItems[i])
+		}
+	}
+}
+
 func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
 	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
 		Monoid: TextMonoid{},

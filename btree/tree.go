@@ -50,7 +50,7 @@ func (t *Tree[I, S, E]) Clone() *Tree[I, S, E] {
 
 func (t *Tree[I, S, E]) Ext() (E, bool) {
 	var zero E
-	if t == nil || t.root == nil {
+	if t == nil || t.root == nil || t.cfg.Extension == nil {
 		return zero, false
 	}
 	return t.root.Ext(), true

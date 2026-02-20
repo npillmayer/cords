@@ -23,6 +23,13 @@ type ExtCursor[I SummarizedItem[S], S, E any, K any] struct {
 	dim  Dimension[E, K]
 }
 
+type seekOps[I SummarizedItem[S], S, E any, K any] struct {
+	zero     K
+	compare  func(K, K) int
+	addItem  func(K, I) K
+	addChild func(K, treeNode[I, S, E]) K
+}
+
 // NewCursor creates a cursor for a tree and a dimension.
 func NewCursor[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], dim Dimension[S, K]) (*Cursor[I, S, E, K], error) {
 	if tree == nil {
@@ -43,7 +50,7 @@ func NewExtCursor[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], dim
 		return nil, fmt.Errorf("%w: tree is nil", ErrInvalidConfig)
 	}
 	if tree.cfg.Extension == nil {
-		return nil, fmt.Errorf("%w: extension is nil", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: extension is nil", ErrExtensionUnavailable)
 	}
 	if dim == nil {
 		return nil, fmt.Errorf("%w: dimension is nil", ErrInvalidDimension)
@@ -60,22 +67,17 @@ func (c *Cursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error) {
 		var zero K
 		return 0, zero, fmt.Errorf("%w: cursor not initialized", ErrInvalidDimension)
 	}
-	zero := c.dim.Zero()
-	if c.dim.Compare(zero, target) >= 0 {
-		return 0, zero, nil
+	ops := seekOps[I, S, E, K]{
+		zero:    c.dim.Zero(),
+		compare: c.dim.Compare,
+		addItem: func(acc K, item I) K {
+			return c.dim.Add(acc, item.Summary())
+		},
+		addChild: func(acc K, child treeNode[I, S, E]) K {
+			return c.dim.Add(acc, child.Summary())
+		},
 	}
-	if c.tree.root == nil {
-		return 0, zero, nil
-	}
-	idx, reached, found, err := c.seekNode(c.tree.root, 0, zero, target)
-	if err != nil {
-		var z K
-		return 0, z, err
-	}
-	if found {
-		return idx, reached, nil
-	}
-	return c.tree.Len(), reached, nil
+	return seekWithOps(c.tree, target, ops)
 }
 
 // Seek finds the first item index where accumulated extension dimension reaches target.
@@ -86,16 +88,30 @@ func (c *ExtCursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error)
 	}
 	if c.tree.cfg.Extension == nil {
 		var zero K
-		return 0, zero, fmt.Errorf("%w: extension is nil", ErrInvalidConfig)
+		return 0, zero, fmt.Errorf("%w: extension is nil", ErrExtensionUnavailable)
 	}
-	zero := c.dim.Zero()
-	if c.dim.Compare(zero, target) >= 0 {
-		return 0, zero, nil
+	ops := seekOps[I, S, E, K]{
+		zero:    c.dim.Zero(),
+		compare: c.dim.Compare,
+		addItem: func(acc K, item I) K {
+			step := c.tree.cfg.Extension.FromItem(item, item.Summary())
+			return c.dim.Add(acc, step)
+		},
+		addChild: func(acc K, child treeNode[I, S, E]) K {
+			return c.dim.Add(acc, child.Ext())
+		},
 	}
-	if c.tree.root == nil {
-		return 0, zero, nil
+	return seekWithOps(c.tree, target, ops)
+}
+
+func seekWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], target K, ops seekOps[I, S, E, K]) (itemIndex int, acc K, err error) {
+	if ops.compare(ops.zero, target) >= 0 {
+		return 0, ops.zero, nil
 	}
-	idx, reached, found, err := c.seekNode(c.tree.root, 0, zero, target)
+	if tree.root == nil {
+		return 0, ops.zero, nil
+	}
+	idx, reached, found, err := seekNodeWithOps(tree, tree.root, 0, ops.zero, target, ops)
 	if err != nil {
 		var z K
 		return 0, z, err
@@ -103,21 +119,21 @@ func (c *ExtCursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error)
 	if found {
 		return idx, reached, nil
 	}
-	return c.tree.Len(), reached, nil
+	return tree.Len(), reached, nil
 }
 
-// seekNode descends to the first leaf position where accumulated dimension
+// seekNodeWithOps descends to the first leaf position where accumulated dimension
 // reaches target.
 //
 // `startIndex` and `acc` describe the prefix state before subtree n.
-func (c *Cursor[I, S, E, K]) seekNode(n treeNode[I, S, E], startIndex int, acc K, target K) (idx int, reached K, found bool, err error) {
-	assert(n != nil, "cursor seekNode called with nil node")
+func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], n treeNode[I, S, E], startIndex int, acc K, target K, ops seekOps[I, S, E, K]) (idx int, reached K, found bool, err error) {
+	assert(n != nil, "seekNodeWithOps called with nil node")
 	if n.isLeaf() {
 		leaf := n.(*leafNode[I, S, E])
 		cur := acc
 		for i, item := range leaf.items {
-			next := c.dim.Add(cur, item.Summary())
-			if c.dim.Compare(next, target) >= 0 {
+			next := ops.addItem(cur, item)
+			if ops.compare(next, target) >= 0 {
 				return startIndex + i, next, true, nil
 			}
 			cur = next
@@ -128,43 +144,13 @@ func (c *Cursor[I, S, E, K]) seekNode(n treeNode[I, S, E], startIndex int, acc K
 	curIdx := startIndex
 	curAcc := acc
 	for _, child := range inner.children {
-		assert(child != nil, "cursor seekNode encountered nil child")
-		nextAcc := c.dim.Add(curAcc, child.Summary())
-		if c.dim.Compare(nextAcc, target) >= 0 {
-			return c.seekNode(child, curIdx, curAcc, target)
+		assert(child != nil, "seekNodeWithOps encountered nil child")
+		nextAcc := ops.addChild(curAcc, child)
+		if ops.compare(nextAcc, target) >= 0 {
+			return seekNodeWithOps(tree, child, curIdx, curAcc, target, ops)
 		}
 		curAcc = nextAcc
-		curIdx += c.tree.countItems(child)
-	}
-	return curIdx, curAcc, false, nil
-}
-
-func (c *ExtCursor[I, S, E, K]) seekNode(n treeNode[I, S, E], startIndex int, acc K, target K) (idx int, reached K, found bool, err error) {
-	assert(n != nil, "ext cursor seekNode called with nil node")
-	if n.isLeaf() {
-		leaf := n.(*leafNode[I, S, E])
-		cur := acc
-		for i, item := range leaf.items {
-			step := c.tree.cfg.Extension.FromItem(item, item.Summary())
-			next := c.dim.Add(cur, step)
-			if c.dim.Compare(next, target) >= 0 {
-				return startIndex + i, next, true, nil
-			}
-			cur = next
-		}
-		return startIndex + len(leaf.items), cur, false, nil
-	}
-	inner := n.(*innerNode[I, S, E])
-	curIdx := startIndex
-	curAcc := acc
-	for _, child := range inner.children {
-		assert(child != nil, "ext cursor seekNode encountered nil child")
-		nextAcc := c.dim.Add(curAcc, child.Ext())
-		if c.dim.Compare(nextAcc, target) >= 0 {
-			return c.seekNode(child, curIdx, curAcc, target)
-		}
-		curAcc = nextAcc
-		curIdx += c.tree.countItems(child)
+		curIdx += tree.countItems(child)
 	}
 	return curIdx, curAcc, false, nil
 }

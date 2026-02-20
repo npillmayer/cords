@@ -13,4 +13,7 @@ var (
 	ErrInvalidDimension = errors.New("btree: invalid dimension")
 	// ErrIncompatibleExtension signals that two trees have incompatible extension configs.
 	ErrIncompatibleExtension = errors.New("btree: incompatible extension")
+	// ErrExtensionUnavailable signals that an extension-specific API was used
+	// without an extension configured for the tree.
+	ErrExtensionUnavailable = errors.New("btree: extension unavailable")
 )

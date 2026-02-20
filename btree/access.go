@@ -67,7 +67,7 @@ func (t *Tree[I, S, E]) PrefixExt(itemIndex int) (E, error) {
 		return zero, ErrInvalidConfig
 	}
 	if t.cfg.Extension == nil {
-		return zero, ErrInvalidConfig
+		return zero, ErrExtensionUnavailable
 	}
 	if t.root == nil {
 		if itemIndex == 0 {

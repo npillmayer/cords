@@ -1,6 +1,9 @@
 package btree
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 type extBytes struct{}
 
@@ -211,8 +214,12 @@ func TestExtCursorRequiresConfiguredExtension(t *testing.T) {
 	}
 	if _, err := NewExtCursor[TextChunk, TextSummary, uint64, uint64](tree, Uint64Dimension{}); err == nil {
 		t.Fatalf("expected ext cursor creation to fail without configured extension")
+	} else if !errors.Is(err, ErrExtensionUnavailable) {
+		t.Fatalf("expected ErrExtensionUnavailable, got %v", err)
 	}
 	if _, err := tree.PrefixExt(0); err == nil {
 		t.Fatalf("expected PrefixExt to fail without configured extension")
+	} else if !errors.Is(err, ErrExtensionUnavailable) {
+		t.Fatalf("expected ErrExtensionUnavailable, got %v", err)
 	}
 }
