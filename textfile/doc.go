@@ -1,7 +1,9 @@
 /*
-Package textfile provides a convenient and efficient API for handling content of large texts as strings.
-Texts are loaded into memory as leaf nodes of a cord data structure. The cord allows for concurrent
-operations on text fragements and stable performance characterstics for large texts.
+Package textfile provides API helpers to load UTF-8 text files as cords.
+
+The current implementation is aligned with the chunk/sum-tree cord core and
+uses a bounded asynchronous prefetch pipeline internally while preserving a
+synchronous `Load` API.
 
 _________________________________________________________________________
 
