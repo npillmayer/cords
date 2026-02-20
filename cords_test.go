@@ -67,6 +67,29 @@ func TestCordLength1(t *testing.T) {
 	}
 }
 
+func TestCordSummaryCounts(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords")
+	defer teardown()
+
+	c := FromString("a\nä\n")
+	s := c.Summary()
+	if s.Bytes != c.Len() {
+		t.Fatalf("summary bytes mismatch: got=%d want=%d", s.Bytes, c.Len())
+	}
+	if s.Chars != c.CharCount() {
+		t.Fatalf("summary chars mismatch: got=%d want=%d", s.Chars, c.CharCount())
+	}
+	if s.Lines != c.LineCount() {
+		t.Fatalf("summary lines mismatch: got=%d want=%d", s.Lines, c.LineCount())
+	}
+	if s.Chars != 4 {
+		t.Fatalf("unexpected char count: got=%d want=4", s.Chars)
+	}
+	if s.Lines != 2 {
+		t.Fatalf("unexpected line count: got=%d want=2", s.Lines)
+	}
+}
+
 func TestRotateLeft(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()

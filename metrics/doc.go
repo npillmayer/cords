@@ -1,21 +1,7 @@
 /*
-Package metrics provides some pre-manufactured metrics on texts.
+Package metrics provides focused text-analysis helpers on top of cords.
 
-_________________________________________________________________________
-
-# BSD 3-Clause License
-
-# Copyright (c) 2020–21, Norbert Pillmayer
-
-Please refer to the LICENSE file for details.
+The legacy generic metric-combine framework has been removed; this package now
+contains direct, purpose-built analyzers that operate on immutable cord ranges.
 */
 package metrics
-
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer writes to trace with key 'cords'
-func tracer() tracing.Trace {
-	return tracing.Select("cords")
-}

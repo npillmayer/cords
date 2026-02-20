@@ -7,7 +7,7 @@ Replace or complement the current binary-tree rope core with a rope-specific B+ 
 - preserves immutable/persistent semantics (copy-on-write),
 - supports efficient positional text edits at scale,
 - allows explicit control over internal node metadata,
-- maps cleanly to the existing `cords` API (`Concat`, `Split`, `Insert`, `Cut`, `Substr`, `Reader`, metrics).
+- maps cleanly to the existing `cords` API (`Concat`, `Split`, `Insert`, `Cut`, `Substr`, `Reader`, summary/dimension queries).
 
 ## Why Build Our Own
 
@@ -15,7 +15,7 @@ Generic Go B-tree libraries are excellent containers, but they hide internal nod
 For a rope, we need direct control over:
 
 - per-child byte-weight prefix sums,
-- optional metric aggregates per subtree,
+- optional extension aggregates per subtree,
 - chunking policy and leaf storage,
 - path-copy update mechanics for persistence.
 
@@ -111,18 +111,18 @@ Keep public API mostly stable:
 
 `Leaf` interface can remain, though a chunk type optimized for byte slices may improve performance.
 
-## Metrics Integration Plan
+## Summary/Extension Integration Plan
 
 Phase 1:
 
-- Keep current metric traversal behavior by walking leaves.
-- Do not precompute internal metric aggregates yet.
+- Use built-in summary fields (`Bytes`, `Chars`, `Lines`) for core counts.
+- Expose prefix/seek operations through dimensions and cursors.
 
 Phase 2:
 
-- Add optional per-child aggregate caches.
-- Update aggregates incrementally during split/merge/path-copy.
-- Speed up `ApplyMetric` for range queries and materialized metrics.
+- Add optional extension aggregates where clients need domain-specific summaries.
+- Update extension aggregates incrementally during split/merge/path-copy.
+- Speed up extension-based range queries through cached subtree extension summaries.
 
 ## Phased Implementation Plan
 
@@ -138,8 +138,8 @@ Phase 2:
 4. Persistence hardening
 - Strict path-copy semantics + sharing tests.
 
-5. Metrics compatibility
-- Adapt existing metric API traversal to new leaf iteration.
+5. Summary/extension compatibility
+- Keep summary and extension aggregation correct across all edit operations.
 
 6. Optimize and tune
 - Chunk-size tuning, borrow/merge heuristics, benchmark-guided cleanup.
@@ -310,7 +310,7 @@ This section compares the **current** `btree/` implementation with Zed's model.
 2. Define path-copy invariants explicitly before delete/rebalance logic lands.
 3. Upgrade cursor API toward richer target+bias semantics.
 4. Add efficient positional dimensions needed by rope API (bytes first).
-5. Re-evaluate adding `Context` when metrics/styled-text operations start.
+5. Re-evaluate adding `Context` when extension/styled-text operations start.
 
 Scope note:
 

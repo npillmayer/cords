@@ -96,6 +96,26 @@ func (cord Cord) Len() uint64 {
 	return tree.Summary().Bytes
 }
 
+// Summary returns aggregate byte/rune/line counts for the cord.
+func (cord Cord) Summary() chunk.Summary {
+	tree, err := treeFromCord(cord)
+	assert(err == nil, "cord.Summary: cannot materialize tree")
+	if tree == nil {
+		return chunk.Summary{}
+	}
+	return tree.Summary()
+}
+
+// CharCount returns the number of UTF-8 runes in the cord.
+func (cord Cord) CharCount() uint64 {
+	return cord.Summary().Chars
+}
+
+// LineCount returns the number of newline characters in the cord.
+func (cord Cord) LineCount() uint64 {
+	return cord.Summary().Lines
+}
+
 // height returns the total height of a cord's tree.
 func (cord Cord) height() int {
 	tree, err := treeFromCord(cord)

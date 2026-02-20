@@ -2,7 +2,7 @@
 
 ## Scope
 
-This review covers the root `cords` package only (top-level files in the module root), excluding sub-packages such as `metrics/`, `styled/`, and `textfile/`.
+This review covers the root `cords` package only (top-level files in the module root), excluding sub-packages such as `styled/` and `textfile/`.
 
 ## Purpose Of The Package
 
@@ -12,7 +12,7 @@ The package positions itself as:
 
 - A persistent (copy-on-write) text structure.
 - A better fit than contiguous strings for editing-heavy use cases.
-- A host for composable text metrics that can be computed over fragments.
+- A host for summarized text queries and extension-aware dimensions.
 
 ## Core Data Model
 
@@ -43,7 +43,7 @@ Main entry points are:
 - Construction: `FromString`, `NewBuilder`, `Builder.Append`, `Builder.Prepend`, `Builder.Cord`.
 - Editing: `Concat`, `Insert`, `Split`, `Cut`, `Substr`.
 - Access: `Len`, `IsVoid`, `Index`, `Report`, `String`, `Reader`, `FragmentCount`, `EachLeaf`, `RangeLeaf`.
-- Metrics: `ApplyMetric`, `ApplyMaterializedMetric` via `Metric`, `MaterializedMetric`, `MetricValue`.
+- Summary/positioning: `Summary`, `Len`, `Pos`, cursors, and extension queries.
 - Debug: `Cord2Dot`, `Dotty`.
 
 The API is intentionally byte-oriented, not rune/grapheme-oriented.
@@ -52,13 +52,12 @@ The API is intentionally byte-oriented, not rune/grapheme-oriented.
 
 Primary extension hooks:
 
-- `Leaf` interface for custom fragment representations (not only plain strings).
-- Metric framework:
-  - `Metric` for fold-like analysis over text fragments.
-  - `MaterializedMetric` for analysis that also emits a span cord.
-  - `MetricValue` contract with unprocessed boundary bytes support.
+- `TextSegment` as a stable read-only segment view for client code.
+- `CordEx[E]` and `TextSegmentExtension[E]` for extension aggregation.
+- Dimension-based cursors over summaries/extensions for positioning and navigation.
 
-Design implication: clients can adapt both storage format (leaf level) and analysis behavior (metric level) without changing core rope algorithms.
+Design implication: clients can adapt analysis behavior through extensions and dimensions
+without changing core rope algorithms.
 
 ## Efficiency Considerations
 
@@ -73,7 +72,7 @@ Notable implementation details affecting cost:
 - Balancing occurs after concatenation and split, improving asymptotic behavior under repeated edits.
 - The root-left wrapper invariant simplifies length accounting but adds structural indirection.
 - `Reader.Read` repeatedly calls substring traversal; good for streaming, but each read still walks the tree for that slice.
-- Everything is byte-counted; Unicode-safe semantic operations (runes/graphemes) are delegated to higher layers or custom metrics.
+- Everything is byte-counted; Unicode-safe semantic operations (runes/graphemes) are delegated to higher layers or custom dimensions/extensions.
 
 ## Correctness And Robustness Notes
 
