@@ -21,16 +21,28 @@ func pipeFor[I SummarizedItem[S], S, E any](tree *Tree[I, S, E], conds ...bool) 
 	return p
 }
 
-func pipeCall[I SummarizedItem[S], S, E any](
-	p pipeline[I, S, E],
-	f func() error,
-) error {
+// We have to circumvent that Go does not allow generic member functions
+
+func (p *pipeline[I, S, E]) call(f func() error) error {
 	//
 	if p.err != nil {
 		return p.err
 	}
-	err := f()
-	return err
+	p.err = f()
+	return p.err
+}
+
+func pipeCall[I SummarizedItem[S], S, E, C any](
+	p pipeline[I, S, E],
+	f func() (C, error),
+) (C, error) {
+	//
+	var c C
+	if p.err != nil {
+		return c, p.err
+	}
+	c, p.err = f()
+	return c, p.err
 }
 
 func pipeCall1[I SummarizedItem[S], S, E, A, C any](
@@ -43,23 +55,36 @@ func pipeCall1[I SummarizedItem[S], S, E, A, C any](
 	if p.err != nil {
 		return c, p.err
 	}
-	c, err := f(a)
-	return c, err
+	c, p.err = f(a)
+	return c, p.err
 }
 
 func pipeCall2[I SummarizedItem[S], S, E, A, B, C any](
 	p pipeline[I, S, E],
 	f func(A, B) (C, error),
-	a A,
-	b B,
+	a A, b B,
 ) (C, error) {
 	//
 	var c C
 	if p.err != nil {
 		return c, p.err
 	}
-	c, err := f(a, b)
-	return c, err
+	c, p.err = f(a, b)
+	return c, p.err
+}
+
+func pipeCall3[I SummarizedItem[S], S, E, A, B, C, D any](
+	p pipeline[I, S, E],
+	f func(A, B, C) (D, error),
+	a A, b B, c C,
+) (D, error) {
+	//
+	var d D
+	if p.err != nil {
+		return d, p.err
+	}
+	d, p.err = f(a, b, c)
+	return d, p.err
 }
 
 func (p *pipeline[I, S, E]) itemOrElse(fallback I) I {

@@ -13,7 +13,7 @@ func TestPipelineSimple(t *testing.T) {
 	tree := buildTextTree(t, 60)
 	var chunk textChunk
 	p := pipeFor(tree)
-	p.err = pipeCall(p, p.tree.Check)
+	p.err = p.call(p.tree.Check)
 	t.Logf("error: %v", p.err)
 	p.tree, p.err = pipeCall1(p, p.tree.DeleteAt, 3)
 	p.item, p.err = pipeCall1(p, p.tree.At, 3)
