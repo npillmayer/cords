@@ -35,56 +35,56 @@ func (p *pipeline[I, S, E]) call(f func() error) error {
 func pipeCall[I SummarizedItem[S], S, E, C any](
 	p pipeline[I, S, E],
 	f func() (C, error),
-) (C, error) {
+) C {
 	//
 	var c C
 	if p.err != nil {
-		return c, p.err
+		return c
 	}
 	c, p.err = f()
-	return c, p.err
+	return c
 }
 
 func pipeCall1[I SummarizedItem[S], S, E, A, C any](
 	p pipeline[I, S, E],
 	f func(A) (C, error),
 	a A,
-) (C, error) {
+) C {
 	//
 	var c C
 	if p.err != nil {
-		return c, p.err
+		return c
 	}
 	c, p.err = f(a)
-	return c, p.err
+	return c
 }
 
 func pipeCall2[I SummarizedItem[S], S, E, A, B, C any](
 	p pipeline[I, S, E],
 	f func(A, B) (C, error),
 	a A, b B,
-) (C, error) {
+) C {
 	//
 	var c C
 	if p.err != nil {
-		return c, p.err
+		return c
 	}
 	c, p.err = f(a, b)
-	return c, p.err
+	return c
 }
 
 func pipeCall3[I SummarizedItem[S], S, E, A, B, C, D any](
 	p pipeline[I, S, E],
 	f func(A, B, C) (D, error),
 	a A, b B, c C,
-) (D, error) {
+) D {
 	//
 	var d D
 	if p.err != nil {
-		return d, p.err
+		return d
 	}
 	d, p.err = f(a, b, c)
-	return d, p.err
+	return d
 }
 
 func (p *pipeline[I, S, E]) itemOrElse(fallback I) I {

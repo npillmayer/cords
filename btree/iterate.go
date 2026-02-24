@@ -55,7 +55,8 @@ type where[I any] struct {
 func (t *Tree[I, S, E]) forEachItemRange(fn func(I, int) bool, from, to int) (int, error) {
 	w := where[I]{acc: 0, from: from, to: to, fn: fn}
 	p := pipeFor(t, fn != nil, from < to)
-	return pipeCall3(p, t.traverseItems, t.root, &w, t.height)
+	acc := pipeCall3(p, t.traverseItems, t.root, &w, t.height)
+	return acc, p.err
 }
 
 // traverseItems traverses the tree in-order, returning items in the range [from,to).
