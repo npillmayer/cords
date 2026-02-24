@@ -12,20 +12,20 @@ type countingExt struct {
 
 func (e countingExt) MagicID() string                            { return e.id }
 func (e countingExt) Zero() uint64                               { return 0 }
-func (e countingExt) FromItem(_ TextChunk, s TextSummary) uint64 { return s.Bytes }
-func (e countingExt) Extend(_ TextSummary)                       {}
+func (e countingExt) FromItem(_ textChunk, s textSummary) uint64 { return s.Bytes }
+func (e countingExt) Extend(_ textSummary)                       {}
 func (e countingExt) Add(left, right uint64) uint64              { return left + right }
 
 func TestNewRejectsInvalidConfig(t *testing.T) {
-	_, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{})
+	_, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{})
 	if err == nil {
-		t.Fatalf("expected invalid Config[TextChunk, error, got nil")
+		t.Fatalf("expected invalid Config[textChunk, error, got nil")
 	}
 }
 
 func TestNewRejectsExtensionWithEmptyMagicID(t *testing.T) {
-	_, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	_, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: ""},
 	})
 	if !errors.Is(err, ErrInvalidConfig) {
@@ -34,8 +34,8 @@ func TestNewRejectsExtensionWithEmptyMagicID(t *testing.T) {
 }
 
 func TestNewStoresMonoidConfig(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -47,8 +47,8 @@ func TestNewStoresMonoidConfig(t *testing.T) {
 }
 
 func TestCheckEmptyTree(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -62,15 +62,15 @@ func TestCheckEmptyTree(t *testing.T) {
 }
 
 func TestCheckManualLeafRoot(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	tree.root = tree.makeLeaf([]TextChunk{
-		FromString("hello"),
-		FromString(" world\n"),
+	tree.root = tree.makeLeaf([]textChunk{
+		fromString("hello"),
+		fromString(" world\n"),
 	})
 	tree.height = 1
 	if err := tree.Check(); err != nil {
@@ -86,33 +86,33 @@ func TestCheckManualLeafRoot(t *testing.T) {
 }
 
 func TestCursorRequiresDimension(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = NewCursor[TextChunk, TextSummary, NO_EXT, uint64](tree, nil)
+	_, err = NewCursor[textChunk, textSummary, NO_EXT, uint64](tree, nil)
 	if err == nil {
 		t.Fatalf("expected dimension error, got nil")
 	}
 }
 
-func collectTextItems[E any](tree *Tree[TextChunk, TextSummary, E]) []string {
+func collectTextItems[E any](tree *Tree[textChunk, textSummary, E]) []string {
 	if tree == nil || tree.root == nil {
 		return nil
 	}
 	var out []string
-	var walk func(treeNode[TextChunk, TextSummary, E])
-	walk = func(n treeNode[TextChunk, TextSummary, E]) {
+	var walk func(treeNode[textChunk, textSummary, E])
+	walk = func(n treeNode[textChunk, textSummary, E]) {
 		if n.isLeaf() {
-			leaf := n.(*leafNode[TextChunk, TextSummary, E])
+			leaf := n.(*leafNode[textChunk, textSummary, E])
 			for _, item := range leaf.items {
 				out = append(out, string(item))
 			}
 			return
 		}
-		inner := n.(*innerNode[TextChunk, TextSummary, E])
+		inner := n.(*innerNode[textChunk, textSummary, E])
 		for _, child := range inner.children {
 			walk(child)
 		}
@@ -122,8 +122,8 @@ func collectTextItems[E any](tree *Tree[TextChunk, TextSummary, E]) []string {
 }
 
 func TestInsertAtNoOpReturnsSameTree(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -138,17 +138,17 @@ func TestInsertAtNoOpReturnsSameTree(t *testing.T) {
 }
 
 func TestInsertAtBuildsTreeAndPreservesOriginal(t *testing.T) {
-	base, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	t1, err := base.InsertAt(0, FromString("a"), FromString("b"), FromString("c"))
+	t1, err := base.InsertAt(0, fromString("a"), fromString("b"), fromString("c"))
 	if err != nil {
 		t.Fatalf("unexpected insert error: %v", err)
 	}
-	t2, err := t1.InsertAt(1, FromString("X"))
+	t2, err := t1.InsertAt(1, fromString("X"))
 	if err != nil {
 		t.Fatalf("unexpected insert error: %v", err)
 	}
@@ -178,15 +178,15 @@ func TestInsertAtBuildsTreeAndPreservesOriginal(t *testing.T) {
 }
 
 func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// With fixed degree 12, a few hundred items trigger internal split/root growth.
 	for i := 0; i < 200; i++ {
-		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -209,14 +209,14 @@ func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
 }
 
 func TestSplitAtKeepsOrderAndPersistence(t *testing.T) {
-	base, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 9; i++ {
-		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		base, err = base.InsertAt(base.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -252,25 +252,25 @@ func TestSplitAtKeepsOrderAndPersistence(t *testing.T) {
 }
 
 func TestConcatRejectsIncompatibleExtensionMagicID(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:left"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected left New error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:right"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected right New error: %v", err)
 	}
-	left, err = left.InsertAt(0, FromString("a"))
+	left, err = left.InsertAt(0, fromString("a"))
 	if err != nil {
 		t.Fatalf("left insert failed: %v", err)
 	}
-	right, err = right.InsertAt(0, FromString("b"))
+	right, err = right.InsertAt(0, fromString("b"))
 	if err != nil {
 		t.Fatalf("right insert failed: %v", err)
 	}
@@ -281,24 +281,24 @@ func TestConcatRejectsIncompatibleExtensionMagicID(t *testing.T) {
 }
 
 func TestConcatRejectsNilVsNonNilExtension(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid: TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected left New error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:present"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected right New error: %v", err)
 	}
-	left, err = left.InsertAt(0, FromString("a"))
+	left, err = left.InsertAt(0, fromString("a"))
 	if err != nil {
 		t.Fatalf("left insert failed: %v", err)
 	}
-	right, err = right.InsertAt(0, FromString("b"))
+	right, err = right.InsertAt(0, fromString("b"))
 	if err != nil {
 		t.Fatalf("right insert failed: %v", err)
 	}
@@ -309,14 +309,14 @@ func TestConcatRejectsNilVsNonNilExtension(t *testing.T) {
 }
 
 func TestConcatRejectsIncompatibleExtensionWithEmptyTree(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid: TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected left New error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:present"},
 	})
 	if err != nil {
@@ -329,25 +329,25 @@ func TestConcatRejectsIncompatibleExtensionWithEmptyTree(t *testing.T) {
 }
 
 func TestConcatAcceptsMatchingExtensionMagicID(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:same"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected left New error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:same"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected right New error: %v", err)
 	}
-	left, err = left.InsertAt(0, FromString("a"))
+	left, err = left.InsertAt(0, fromString("a"))
 	if err != nil {
 		t.Fatalf("left insert failed: %v", err)
 	}
-	right, err = right.InsertAt(0, FromString("b"))
+	right, err = right.InsertAt(0, fromString("b"))
 	if err != nil {
 		t.Fatalf("right insert failed: %v", err)
 	}
@@ -365,13 +365,13 @@ func TestConcatAcceptsMatchingExtensionMagicID(t *testing.T) {
 }
 
 func TestTreeExtPresenceSemantics(t *testing.T) {
-	noExtTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid: TextMonoid{},
+	noExtTree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected noExtTree New error: %v", err)
 	}
-	noExtTree, err = noExtTree.InsertAt(0, FromString("abc"))
+	noExtTree, err = noExtTree.InsertAt(0, fromString("abc"))
 	if err != nil {
 		t.Fatalf("unexpected noExtTree insert error: %v", err)
 	}
@@ -379,8 +379,8 @@ func TestTreeExtPresenceSemantics(t *testing.T) {
 		t.Fatalf("expected Ext() ok=false for tree without configured extension")
 	}
 
-	withExtTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	withExtTree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:present"},
 	})
 	if err != nil {
@@ -389,7 +389,7 @@ func TestTreeExtPresenceSemantics(t *testing.T) {
 	if _, ok := withExtTree.Ext(); ok {
 		t.Fatalf("expected Ext() ok=false for empty tree")
 	}
-	withExtTree, err = withExtTree.InsertAt(0, FromString("abc"))
+	withExtTree, err = withExtTree.InsertAt(0, fromString("abc"))
 	if err != nil {
 		t.Fatalf("unexpected withExtTree insert error: %v", err)
 	}
@@ -402,16 +402,16 @@ func TestTreeExtPresenceSemantics(t *testing.T) {
 	}
 }
 
-func expectedByteExt(tree *Tree[TextChunk, TextSummary, uint64]) uint64 {
+func expectedByteExt(tree *Tree[textChunk, textSummary, uint64]) uint64 {
 	var sum uint64
-	tree.ForEachItem(func(item TextChunk) bool {
+	tree.ForEachItem(func(item textChunk) bool {
 		sum += item.Summary().Bytes
 		return true
 	})
 	return sum
 }
 
-func assertByteExtensionAccounting(t *testing.T, tree *Tree[TextChunk, TextSummary, uint64]) {
+func assertByteExtensionAccounting(t *testing.T, tree *Tree[textChunk, textSummary, uint64]) {
 	t.Helper()
 	if tree == nil {
 		t.Fatalf("tree must not be nil")
@@ -445,7 +445,7 @@ func assertByteExtensionAccounting(t *testing.T, tree *Tree[TextChunk, TextSumma
 	}
 }
 
-func assertByteExtensionConsistent(t *testing.T, tree *Tree[TextChunk, TextSummary, uint64]) {
+func assertByteExtensionConsistent(t *testing.T, tree *Tree[textChunk, textSummary, uint64]) {
 	t.Helper()
 	if err := tree.Check(); err != nil {
 		t.Fatalf("tree invariants failed: %v", err)
@@ -454,8 +454,8 @@ func assertByteExtensionConsistent(t *testing.T, tree *Tree[TextChunk, TextSumma
 }
 
 func TestExtensionConsistencyAcrossMutations(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:bytes"},
 	})
 	if err != nil {
@@ -463,7 +463,7 @@ func TestExtensionConsistencyAcrossMutations(t *testing.T) {
 	}
 
 	for i := 0; i < 220; i++ {
-		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -517,20 +517,20 @@ func TestExtensionConsistencyAcrossMutations(t *testing.T) {
 
 func TestExtensionConsistencyLeafBorrowAndMerge(t *testing.T) {
 	// Borrow scenario.
-	borrowTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	borrowTree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:bytes"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected New error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, Base+1)
-	rightItems := make([]TextChunk, 0, Base)
+	leftItems := make([]textChunk, 0, Base+1)
+	rightItems := make([]textChunk, 0, Base)
 	for i := 0; i < Base+1; i++ {
-		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+		leftItems = append(leftItems, fromString(strconv.Itoa(i)))
 	}
 	for i := Base + 1; i < 2*Base+1; i++ {
-		rightItems = append(rightItems, FromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, fromString(strconv.Itoa(i)))
 	}
 	borrowTree.root = borrowTree.makeInternal(borrowTree.makeLeaf(leftItems), borrowTree.makeLeaf(rightItems))
 	borrowTree.height = 2
@@ -541,18 +541,18 @@ func TestExtensionConsistencyLeafBorrowAndMerge(t *testing.T) {
 	assertByteExtensionConsistent(t, borrowed)
 
 	// Merge scenario.
-	mergeTree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	mergeTree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:bytes"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected New error: %v", err)
 	}
-	mergeLeft := make([]TextChunk, 0, Base)
-	mergeRight := make([]TextChunk, 0, Base)
+	mergeLeft := make([]textChunk, 0, Base)
+	mergeRight := make([]textChunk, 0, Base)
 	for i := 0; i < Base; i++ {
-		mergeLeft = append(mergeLeft, FromString(strconv.Itoa(i)))
-		mergeRight = append(mergeRight, FromString(strconv.Itoa(100+i)))
+		mergeLeft = append(mergeLeft, fromString(strconv.Itoa(i)))
+		mergeRight = append(mergeRight, fromString(strconv.Itoa(100+i)))
 	}
 	mergeTree.root = mergeTree.makeInternal(mergeTree.makeLeaf(mergeLeft), mergeTree.makeLeaf(mergeRight))
 	mergeTree.height = 2
@@ -564,28 +564,28 @@ func TestExtensionConsistencyLeafBorrowAndMerge(t *testing.T) {
 }
 
 func TestExtensionConsistencyConcatDifferentHeights(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:bytes"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected left New error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: "ext:bytes"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected right New error: %v", err)
 	}
 	for i := 0; i < 260; i++ {
-		left, err = left.InsertAt(left.Len(), FromString(strconv.Itoa(i)))
+		left, err = left.InsertAt(left.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("left insert %d failed: %v", i, err)
 		}
 	}
 	for i := 0; i < 8; i++ {
-		right, err = right.InsertAt(right.Len(), FromString("r"+strconv.Itoa(i)))
+		right, err = right.InsertAt(right.Len(), fromString("r"+strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("right insert %d failed: %v", i, err)
 		}
@@ -618,26 +618,26 @@ func TestExtensionConsistencyConcatDifferentHeights(t *testing.T) {
 }
 
 func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
-	left, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	left, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 5; i++ {
-		left, err = left.InsertAt(left.Len(), FromString(strconv.Itoa(i)))
+		left, err = left.InsertAt(left.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("left insert %d failed: %v", i, err)
 		}
 	}
 	for i := 5; i < 9; i++ {
-		right, err = right.InsertAt(right.Len(), FromString(strconv.Itoa(i)))
+		right, err = right.InsertAt(right.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("right insert %d failed: %v", i, err)
 		}
@@ -662,14 +662,14 @@ func TestConcatKeepsInputsAndProducesCombinedOrder(t *testing.T) {
 }
 
 func TestDeleteAtKeepsOrderAndPersistence(t *testing.T) {
-	base, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 9; i++ {
-		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		base, err = base.InsertAt(base.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -698,14 +698,14 @@ func TestDeleteAtKeepsOrderAndPersistence(t *testing.T) {
 }
 
 func TestDeleteRangeKeepsOrderAndPersistence(t *testing.T) {
-	base, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 10; i++ {
-		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		base, err = base.InsertAt(base.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -734,14 +734,14 @@ func TestDeleteRangeKeepsOrderAndPersistence(t *testing.T) {
 }
 
 func TestDeleteRangeSingleEqualsDeleteAt(t *testing.T) {
-	base, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 9; i++ {
-		base, err = base.InsertAt(base.Len(), FromString(strconv.Itoa(i)))
+		base, err = base.InsertAt(base.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
@@ -767,13 +767,13 @@ func TestDeleteRangeSingleEqualsDeleteAt(t *testing.T) {
 }
 
 func TestDeleteAtBounds(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	tree, err = tree.InsertAt(0, FromString("a"), FromString("b"))
+	tree, err = tree.InsertAt(0, fromString("a"), fromString("b"))
 	if err != nil {
 		t.Fatalf("unexpected insert error: %v", err)
 	}
@@ -786,13 +786,13 @@ func TestDeleteAtBounds(t *testing.T) {
 }
 
 func TestDeleteRangeBoundsAndNoOp(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	tree, err = tree.InsertAt(0, FromString("a"), FromString("b"), FromString("c"))
+	tree, err = tree.InsertAt(0, fromString("a"), fromString("b"), fromString("c"))
 	if err != nil {
 		t.Fatalf("unexpected insert error: %v", err)
 	}
@@ -818,17 +818,17 @@ func TestDeleteRangeBoundsAndNoOp(t *testing.T) {
 }
 
 func TestDeleteRecursiveRebalancesUnderflowAtParent(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, Base)
-	rightItems := make([]TextChunk, 0, Base)
+	leftItems := make([]textChunk, 0, Base)
+	rightItems := make([]textChunk, 0, Base)
 	for i := 0; i < Base; i++ {
-		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
-		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
+		leftItems = append(leftItems, fromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, fromString(strconv.Itoa(100+i)))
 	}
 	left := tree.makeLeaf(leftItems)
 	right := tree.makeLeaf(rightItems)
@@ -842,24 +842,24 @@ func TestDeleteRecursiveRebalancesUnderflowAtParent(t *testing.T) {
 	if needsRebalance {
 		t.Fatalf("expected root-level rebalance to resolve underflow")
 	}
-	updatedInner, ok := updated.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	updatedInner, ok := updated.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(updatedInner.children) != 1 {
 		t.Fatalf("expected merged root with a single child after rebalance")
 	}
 }
 
 func TestDeleteAtLeafMergeAndRootCollapse(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, Base)
-	rightItems := make([]TextChunk, 0, Base)
+	leftItems := make([]textChunk, 0, Base)
+	rightItems := make([]textChunk, 0, Base)
 	for i := 0; i < Base; i++ {
-		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
-		rightItems = append(rightItems, FromString(strconv.Itoa(100+i)))
+		leftItems = append(leftItems, fromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, fromString(strconv.Itoa(100+i)))
 	}
 	tree.root = tree.makeInternal(tree.makeLeaf(leftItems), tree.makeLeaf(rightItems))
 	tree.height = 2
@@ -884,19 +884,19 @@ func TestDeleteAtLeafMergeAndRootCollapse(t *testing.T) {
 }
 
 func TestDeleteAtLeafBorrow(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	leftItems := make([]TextChunk, 0, Base+1)
-	rightItems := make([]TextChunk, 0, Base)
+	leftItems := make([]textChunk, 0, Base+1)
+	rightItems := make([]textChunk, 0, Base)
 	for i := 0; i < Base+1; i++ {
-		leftItems = append(leftItems, FromString(strconv.Itoa(i)))
+		leftItems = append(leftItems, fromString(strconv.Itoa(i)))
 	}
 	for i := Base + 1; i < 2*Base+1; i++ {
-		rightItems = append(rightItems, FromString(strconv.Itoa(i)))
+		rightItems = append(rightItems, fromString(strconv.Itoa(i)))
 	}
 	tree.root = tree.makeInternal(tree.makeLeaf(leftItems), tree.makeLeaf(rightItems))
 	tree.height = 2
@@ -908,12 +908,12 @@ func TestDeleteAtLeafBorrow(t *testing.T) {
 	if err := deleted.Check(); err != nil {
 		t.Fatalf("DeleteAt borrow result is invalid: %v", err)
 	}
-	root, ok := deleted.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	root, ok := deleted.root.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(root.children) != 2 {
 		t.Fatalf("expected internal root with 2 children")
 	}
-	l, lok := root.children[0].(*leafNode[TextChunk, TextSummary, NO_EXT])
-	r, rok := root.children[1].(*leafNode[TextChunk, TextSummary, NO_EXT])
+	l, lok := root.children[0].(*leafNode[textChunk, textSummary, NO_EXT])
+	r, rok := root.children[1].(*leafNode[textChunk, textSummary, NO_EXT])
 	if !lok || !rok {
 		t.Fatalf("expected leaf children")
 	}
@@ -930,19 +930,19 @@ func TestDeleteAtLeafBorrow(t *testing.T) {
 }
 
 func TestDeleteAtInnerMerge(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary, NO_EXT] {
-		children := make([]treeNode[TextChunk, TextSummary, NO_EXT], 0, leafCount)
+	makeInner := func(start int, leafCount int) *innerNode[textChunk, textSummary, NO_EXT] {
+		children := make([]treeNode[textChunk, textSummary, NO_EXT], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, Base)
+			items := make([]textChunk, 0, Base)
 			for j := 0; j < Base; j++ {
-				items = append(items, FromString(strconv.Itoa(cur)))
+				items = append(items, fromString(strconv.Itoa(cur)))
 				cur++
 			}
 			children = append(children, tree.makeLeaf(items))
@@ -970,19 +970,19 @@ func TestDeleteAtInnerMerge(t *testing.T) {
 }
 
 func TestDeleteAtInnerBorrow(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary, NO_EXT] {
-		children := make([]treeNode[TextChunk, TextSummary, NO_EXT], 0, leafCount)
+	makeInner := func(start int, leafCount int) *innerNode[textChunk, textSummary, NO_EXT] {
+		children := make([]treeNode[textChunk, textSummary, NO_EXT], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, Base)
+			items := make([]textChunk, 0, Base)
 			for j := 0; j < Base; j++ {
-				items = append(items, FromString(strconv.Itoa(cur)))
+				items = append(items, fromString(strconv.Itoa(cur)))
 				cur++
 			}
 			children = append(children, tree.makeLeaf(items))
@@ -1005,12 +1005,12 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 	if deleted.Height() != 3 {
 		t.Fatalf("expected height 3 after inner borrow, got %d", deleted.Height())
 	}
-	root, ok := deleted.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	root, ok := deleted.root.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(root.children) != 2 {
 		t.Fatalf("expected root with 2 internal children")
 	}
-	leftAfter, lok := root.children[0].(*innerNode[TextChunk, TextSummary, NO_EXT])
-	rightAfter, rok := root.children[1].(*innerNode[TextChunk, TextSummary, NO_EXT])
+	leftAfter, lok := root.children[0].(*innerNode[textChunk, textSummary, NO_EXT])
+	rightAfter, rok := root.children[1].(*innerNode[textChunk, textSummary, NO_EXT])
 	if !lok || !rok {
 		t.Fatalf("expected internal children after inner borrow")
 	}
@@ -1020,19 +1020,19 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 }
 
 func TestDeleteAtCascadingUnderflow(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	makeInner := func(start int, leafCount int) *innerNode[TextChunk, TextSummary, NO_EXT] {
-		children := make([]treeNode[TextChunk, TextSummary, NO_EXT], 0, leafCount)
+	makeInner := func(start int, leafCount int) *innerNode[textChunk, textSummary, NO_EXT] {
+		children := make([]treeNode[textChunk, textSummary, NO_EXT], 0, leafCount)
 		cur := start
 		for i := 0; i < leafCount; i++ {
-			items := make([]TextChunk, 0, Base)
+			items := make([]textChunk, 0, Base)
 			for j := 0; j < Base; j++ {
-				items = append(items, FromString(strconv.Itoa(cur)))
+				items = append(items, fromString(strconv.Itoa(cur)))
 				cur++
 			}
 			children = append(children, tree.makeLeaf(items))
@@ -1072,14 +1072,14 @@ func TestDeleteAtCascadingUnderflow(t *testing.T) {
 }
 
 func TestDeleteAtToEmptyTreeNormalizesRoot(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for _, s := range []string{"a", "b", "c", "d", "e"} {
-		tree, err = tree.InsertAt(tree.Len(), FromString(s))
+		tree, err = tree.InsertAt(tree.Len(), fromString(s))
 		if err != nil {
 			t.Fatalf("insert failed: %v", err)
 		}
@@ -1102,14 +1102,14 @@ func TestDeleteAtToEmptyTreeNormalizesRoot(t *testing.T) {
 }
 
 func TestDeleteRangeWholeTreeToEmpty(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for _, s := range []string{"x", "y", "z"} {
-		tree, err = tree.InsertAt(tree.Len(), FromString(s))
+		tree, err = tree.InsertAt(tree.Len(), fromString(s))
 		if err != nil {
 			t.Fatalf("insert failed: %v", err)
 		}
@@ -1127,19 +1127,19 @@ func TestDeleteRangeWholeTreeToEmpty(t *testing.T) {
 }
 
 func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 20; i++ {
-		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
 	}
-	root, ok := tree.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	root, ok := tree.root.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(root.children) < 2 {
 		t.Fatalf("expected an internal root with at least 2 children")
 	}
@@ -1148,7 +1148,7 @@ func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("split failed: %v", err)
 	}
-	leftRoot, ok := left.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	leftRoot, ok := left.root.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(leftRoot.children) < 1 {
 		t.Fatalf("expected left root to be internal with children")
 	}
@@ -1157,20 +1157,20 @@ func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 	}
 }
 
-func buildTreeWithRootChildren(t *testing.T, startValue int, minRootChildren int) *Tree[TextChunk, TextSummary, NO_EXT] {
+func buildTreeWithRootChildren(t *testing.T, startValue int, minRootChildren int) *Tree[textChunk, textSummary, NO_EXT] {
 	t.Helper()
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 10000; i++ {
-		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(startValue+i)))
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(startValue+i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}
-		root, ok := tree.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+		root, ok := tree.root.(*innerNode[textChunk, textSummary, NO_EXT])
 		if ok && tree.Height() == 2 && len(root.children) >= minRootChildren {
 			return tree
 		}
@@ -1196,7 +1196,7 @@ func TestConcatSharesRootsWhenJoinCannotMergeTopLevel(t *testing.T) {
 	if combined.Height() != 3 {
 		t.Fatalf("expected combined height 3, got %d", combined.Height())
 	}
-	root, ok := combined.root.(*innerNode[TextChunk, TextSummary, NO_EXT])
+	root, ok := combined.root.(*innerNode[textChunk, textSummary, NO_EXT])
 	if !ok || len(root.children) != 2 {
 		t.Fatalf("expected new root with two children")
 	}
@@ -1210,14 +1210,14 @@ func TestConcatSharesRootsWhenJoinCannotMergeTopLevel(t *testing.T) {
 
 func TestConcatDifferentHeightsKeepsOrder(t *testing.T) {
 	left := buildTreeWithRootChildren(t, 0, Base+1) // height 2
-	right, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	right, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for _, s := range []string{"x", "y", "z"} {
-		right, err = right.InsertAt(right.Len(), FromString(s))
+		right, err = right.InsertAt(right.Len(), fromString(s))
 		if err != nil {
 			t.Fatalf("right insert failed: %v", err)
 		}
@@ -1245,14 +1245,14 @@ func TestConcatDifferentHeightsKeepsOrder(t *testing.T) {
 }
 
 func TestSplitAtStructuralOnlyAcrossAllBoundaries(t *testing.T) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for i := 0; i < 120; i++ {
-		tree, err = tree.InsertAt(tree.Len(), FromString(strconv.Itoa(i)))
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
 		}

@@ -3,8 +3,8 @@ package btree
 import "testing"
 
 func BenchmarkInsertAtStub(b *testing.B) {
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, NO_EXT]{
-		Monoid: TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
 	})
 	if err != nil {
 		b.Fatalf("setup failed: %v", err)

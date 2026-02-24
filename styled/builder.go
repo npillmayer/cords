@@ -2,6 +2,7 @@ package styled
 
 import (
 	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/chunk"
 )
 
 // TextBuilder is for building styled text from style runs.
@@ -41,17 +42,18 @@ func (b TextBuilder) Text() *Text {
 
 // Append appends a text fragement represented by a cord leaf at the end
 // of the text to build.
-func (b *TextBuilder) Append(leaf cords.Leaf, style Style) error {
+func (b *TextBuilder) Append(chunk *chunk.Chunk, style Style) error {
 	if b.done {
 		return cords.ErrCordCompleted
 	}
-	if leaf == nil || leaf.Weight() == 0 {
+	if chunk == nil || chunk.Len() == 0 {
 		return nil
 	}
-	b.cordBuilder.Append(leaf)
+	b.cordBuilder.AppendChunk(*chunk)
 	//T().Infof("Append leaf = %v (%d)", leaf, leaf.Weight())
-	b.styles = append(b.styles, styleSpan{style: style, span: toSpan(b.length, b.length+leaf.Weight())})
-	b.length += leaf.Weight()
+	var len uint64 = uint64(chunk.Len())
+	b.styles = append(b.styles, styleSpan{style: style, span: toSpan(b.length, b.length+len)})
+	b.length += len
 	return nil
 }
 

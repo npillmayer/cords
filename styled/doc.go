@@ -19,7 +19,13 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// tracer writes to trace with key 'cords'
+// tracer writes to trace with key 'styles'
 func tracer() tracing.Trace {
-	return tracing.Select("cords")
+	return tracing.Select("styles")
+}
+
+func assert(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
 }

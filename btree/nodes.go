@@ -32,6 +32,10 @@ func (l *leafNode[I, S, E]) isLeaf() bool { return true }
 func (l *leafNode[I, S, E]) Summary() S   { return l.summary }
 func (n *leafNode[I, S, E]) Ext() E       { return n.ext }
 
+func (l *leafNode[I, S, E]) String() string {
+	return fmt.Sprintf("[%d items]", l.n)
+}
+
 type innerNode[I SummarizedItem[S], S, E any] struct {
 	summary S
 	ext     E
@@ -47,6 +51,10 @@ type innerNode[I SummarizedItem[S], S, E any] struct {
 func (n *innerNode[I, S, E]) isLeaf() bool { return false }
 func (n *innerNode[I, S, E]) Summary() S   { return n.summary }
 func (n *innerNode[I, S, E]) Ext() E       { return n.ext }
+
+func (n *innerNode[I, S, E]) String() string {
+	return fmt.Sprintf("[%d kids]", n.n)
+}
 
 // SummarizedItem ties a leaf item to its summary type at compile time.
 type SummarizedItem[S any] interface {

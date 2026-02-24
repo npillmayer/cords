@@ -14,10 +14,10 @@ import (
 //   - Replay a specific saved failing input:
 //     go test ./btree -run 'FuzzExtensionRandomizedProperty/<id>'
 
-func newExtTextTree(t *testing.T, id string) *Tree[TextChunk, TextSummary, uint64] {
+func newExtTextTree(t *testing.T, id string) *Tree[textChunk, textSummary, uint64] {
 	t.Helper()
-	tree, err := New[TextChunk, TextSummary](Config[TextChunk, TextSummary, uint64]{
-		Monoid:    TextMonoid{},
+	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, uint64]{
+		Monoid:    textMonoid{},
 		Extension: countingExt{id: id},
 	})
 	if err != nil {
@@ -43,7 +43,7 @@ func expectedBytesFromModel(model []string) uint64 {
 	return sum
 }
 
-func assertTreeMatchesModelAndExtension(t *testing.T, tree *Tree[TextChunk, TextSummary, uint64], model []string) {
+func assertTreeMatchesModelAndExtension(t *testing.T, tree *Tree[textChunk, textSummary, uint64], model []string) {
 	t.Helper()
 
 	got := collectTextItems(tree)
@@ -90,7 +90,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 	tree := newExtTextTree(t, "ext:bytes")
 	model := make([]string, 0, 64)
 
-	for i := 0; i < steps; i++ {
+	for range steps {
 		switch r.Intn(5) {
 		case 0:
 			pos := 0
@@ -99,7 +99,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			}
 			token := randomToken(r)
 			var err error
-			tree, err = tree.InsertAt(pos, FromString(token))
+			tree, err = tree.InsertAt(pos, fromString(token))
 			if err != nil {
 				t.Fatalf("InsertAt failed: %v", err)
 			}
@@ -151,7 +151,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			for j := 0; j < n; j++ {
 				token := randomToken(r)
 				var err error
-				other, err = other.InsertAt(other.Len(), FromString(token))
+				other, err = other.InsertAt(other.Len(), fromString(token))
 				if err != nil {
 					t.Fatalf("other InsertAt failed: %v", err)
 				}

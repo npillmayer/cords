@@ -48,9 +48,10 @@ func ParagraphFromText(text *Text, from, to uint64, embBidi bidi.Direction,
 		para.text = text
 	} else {
 		var err error
-		if para.text, err = Section(text, from, to); err != nil {
-			return nil, err
-		}
+		// if para.text, err = Section(text, from, to); err != nil {
+		// 	return nil, err
+		// }
+		return nil, err
 	}
 	para.levels = bidi.ResolveParagraph(para.text.Raw().Reader(), m, bidi.DefaultDirection(embBidi), bidi.IgnoreParagraphSeparators(true))
 	return para, nil
@@ -95,21 +96,35 @@ func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos, lengt
 	if t == nil {
 		return nil
 	}
-	err := cords.Cord(t.styles()).EachLeaf(func(leaf cords.Leaf, i uint64) error {
-		length := leaf.Weight()
-		content, err := t.Raw().Report(i, length)
-		if err != nil {
-			return err
-		}
-		st := leaf.(*styleLeaf).style
-		return f(content, st, i+para.Offset, length)
-	})
-	return err
+	// runs := t.styles()
+	// err := runs.ForEachItem(func(leaf cords.Leaf, i uint64) error {
+	// 	length := leaf.Weight()
+	// 	content, err := t.Raw().Report(i, length)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	st := leaf.(*styleLeaf).style
+	// 	return f(content, st, i+para.Offset, length)
+	// })
+	// return err
+	return nil
 }
+
+// TODO
+//
+// func (para *Paragraph) Range() iter.Seq2[int, Run] {
+// 	    return func(yield func(int, Run) bool) {
+//         for v := range s.m {
+//             if !yield(v) {
+//                 return
+//             }
+//         }
+// }
 
 // StyleRuns returns a slice of style runs for a styled text.
 func (para *Paragraph) StyleRuns() []StyleChange {
-	return para.text.styleRuns(para.Offset)
+	//return para.text.styleRuns(para.Offset)
+	return nil
 }
 
 // Reader returns an io.Reader for the raw text of the paragraph (without styles).
@@ -132,14 +147,14 @@ func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	text := &Text{
 		text: line,
 	}
-	if !cords.Cord(para.text.runs).IsVoid() {
-		lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
-		if err != nil {
-			return nil, nil, err
-		}
-		para.text.runs = runs(pStyles)
-		text.runs = runs(lineStyles)
-	}
+	// if !cords.Cord(para.text.runs).IsVoid() {
+	// 	lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	para.text.runs = runs(pStyles)
+	// 	text.runs = runs(lineStyles)
+	// }
 	var lineLev *bidi.ResolvedLevels
 	lineLev, para.levels = para.levels.Split(pos, true)
 	tracer().Infof("para.levels = %v", para.levels)

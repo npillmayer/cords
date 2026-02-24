@@ -21,7 +21,12 @@ func treeFromCord(cord Cord) (*btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_E
 	if cord.tree != nil {
 		return cord.tree, nil
 	}
-	return newChunkTree()
+	tree, err := newChunkTree()
+	if err != nil {
+		return nil, err
+	}
+	cord.tree = tree
+	return tree, nil
 }
 
 // cordFromTree wraps a tree as a Cord, normalizing empty trees to Cord{}.

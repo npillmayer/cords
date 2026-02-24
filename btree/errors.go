@@ -7,6 +7,8 @@ var (
 	ErrInvalidConfig = errors.New("btree: invalid configuration")
 	// ErrIndexOutOfBounds signals an invalid positional index.
 	ErrIndexOutOfBounds = errors.New("btree: index out of bounds")
+	// ErrIllegalArguments signals an invalid argument.
+	ErrIllegalArguments = errors.New("btree: illegal arguments")
 	// ErrUnimplemented marks API stubs that are intentionally not implemented yet.
 	ErrUnimplemented = errors.New("btree: operation not implemented")
 	// ErrInvalidDimension signals an invalid or missing dimension configuration.

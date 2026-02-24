@@ -38,8 +38,8 @@ func (t *Tree[I, S, E]) Config() Config[I, S, E] {
 
 // Clone returns a shallow clone of the tree root container.
 //
-// Node contents are shared intentionally; mutating operations will use path-copy
-// semantics once implemented.
+// Node contents are shared intentionally. Public mutating operations preserve
+// persistence by path-copying only touched nodes on the edited spine.
 func (t *Tree[I, S, E]) Clone() *Tree[I, S, E] {
 	if t == nil {
 		return nil
@@ -48,6 +48,11 @@ func (t *Tree[I, S, E]) Clone() *Tree[I, S, E] {
 	return &cloned
 }
 
+// Ext returns the tree-wide extension aggregate and true if an extension is
+// configured and the tree is non-empty.
+//
+// For nil/empty trees or trees without configured extension, Ext returns the
+// zero value of E and false.
 func (t *Tree[I, S, E]) Ext() (E, bool) {
 	var zero E
 	if t == nil || t.root == nil || t.cfg.Extension == nil {
@@ -109,6 +114,8 @@ func (t *Tree[I, S, E]) InsertAt(index int, items ...I) (*Tree[I, S, E], error) 
 // DeleteAt removes one item at index and returns a new tree.
 //
 // Delete uses recursive path-copy with sibling borrow/merge rebalancing.
+// While delete coverage is broad, unresolved occupancy repair still reports
+// ErrUnimplemented.
 func (t *Tree[I, S, E]) DeleteAt(index int) (*Tree[I, S, E], error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
@@ -165,6 +172,9 @@ func (t *Tree[I, S, E]) DeleteRange(index, count int) (*Tree[I, S, E], error) {
 }
 
 // SplitAt splits a tree at an item index and returns left and right trees.
+//
+// The operation is persistent: only nodes on the split seam are rebuilt,
+// untouched subtrees are shared between input and outputs.
 func (t *Tree[I, S, E]) SplitAt(index int) (*Tree[I, S, E], *Tree[I, S, E], error) {
 	if t == nil {
 		return nil, nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
@@ -206,6 +216,10 @@ func (t *Tree[I, S, E]) SplitAt(index int) (*Tree[I, S, E], *Tree[I, S, E], erro
 }
 
 // Concat concatenates another tree and returns a new tree.
+//
+// Concat requires extension compatibility: both trees must expose identical
+// extension MagicID values (including both empty). The join is structural and
+// path-copy based; untouched subtrees are shared.
 func (t *Tree[I, S, E]) Concat(other *Tree[I, S, E]) (*Tree[I, S, E], error) {
 	if t == nil || other == nil {
 		return nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
@@ -364,8 +378,9 @@ func (t *Tree[I, S, E]) concatSameHeight(left, right treeNode[I, S, E], height i
 
 // countItems returns the total number of leaf items under n.
 //
-// This is intentionally recursive and simple for now; we can replace it with
-// cached subtree sizes later if profiling shows it on hot paths.
+// TODO:
+// This is intentionally recursive and simple for now; we need to replace it
+// with cached subtree sizes later.
 func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int {
 	if n == nil {
 		return 0

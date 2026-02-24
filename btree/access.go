@@ -140,7 +140,7 @@ func (t *Tree[I, S, E]) prefixExtNode(n treeNode[I, S, E], height int, remaining
 			return zero, ErrIndexOutOfBounds
 		}
 		sum := acc
-		for i := 0; i < remaining; i++ {
+		for i := range remaining {
 			item := leaf.items[i]
 			right := t.cfg.Extension.FromItem(item, item.Summary())
 			sum = t.cfg.Extension.Add(sum, right)
