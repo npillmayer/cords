@@ -1,81 +1,154 @@
 # styled package scan
 
-Date: 2026-02-20
+Date: 2026-02-25
 
 ## Scope
 
-This scan covers package `styled` and sub-packages:
+This scan covers package `styled` only.
 
-- `styled`
-- `styled/formatter`
-- `styled/inline`
-- `styled/itemized`
+Explicitly out of scope for this document: `styled/formatter`, `styled/inline`, `styled/itemized`.
 
-## Build status (current)
+## Build/test status (current)
 
 Command:
 
 ```sh
-GOCACHE=/tmp/go-build go test ./styled/...
+go test ./styled -count=1
 ```
 
-Result: **build fails**.
+Result: **passes**.
 
-Primary compiler errors are API incompatibilities with current `cords`:
+## Status vs target architecture
 
-- `undefined: cords.Leaf` (`styled/builder.go:44`, `styled/styles.go:250`, `styled/styles.go:269`, `styled/paragraph.go:98`)
-- missing `Builder.Append` method (`styled/builder.go:51`)
-- missing `Cord.EachLeaf` method (`styled/styles.go:68`, `styled/styles.go:137`, `styled/paragraph.go:98`)
-- invalid type assertion because `Cord.Index` returns `chunk.Chunk` now (`styled/styles.go:55`)
+Target architecture:
 
-Because `styled` root fails to compile, `styled/formatter`, `styled/inline`, and `styled/itemized` also fail transitively.
+- `Text` stores raw text as a `cords.Cord`.
+- Styling metadata is stored separately as run segments (`Runs`) in a btree.
+- Text and runs must stay synchronized across text manipulations.
 
-## Documentation findings
+Current implementation status:
 
-### Top-level docs
+- `Text` already has the intended data split:
+  - raw: `text cords.Cord`
+  - styles: `runs Runs`
+- `Runs` is now btree-backed:
+  - `btree.Tree[Run, Summary, btree.NO_EXT]`
+- style lookup (`StyleAt`) uses btree cursor seek over run-length summaries.
+- style application (`Text.Style` / `Runs.Style`) rewrites only the affected run window and merges adjacent equal styles.
 
-- `styled/doc.go` says only “Work in progress” and has no API guidance for current architecture (`styled/doc.go:2-7`).
-- `styled/ReadMe.md` is only a warning and does not document intended stable semantics (`styled/ReadMe.md:1-3`).
+## What is working
 
-### Sub-package docs
+1. Core run model is migrated to btree.
+2. Initial styling (`initialStyle`) creates a full run partition over text length.
+3. Incremental restyling (`Runs.Style`) replaces affected runs and keeps invariants.
+4. `StyleAt` returns `(style, offsetWithinRun)` and is test-covered.
+5. Regression tests in `styled/styles_test.go` cover:
+   - basic styling,
+   - merge of adjacent equal styles,
+   - empty-span no-op,
+   - whole-text styling,
+   - `StyleAt` behavior and bounds.
+6. `TextBuilder.Append` has been migrated to chunk-based append (`AppendChunk`).
 
-- `styled/formatter/doc.go` has substantial conceptual material and good intent, but still marks package/API as unstable (`styled/formatter/doc.go:70-74`).
-- `styled/inline/doc.go` and `styled/itemized/doc.go` are mostly license boilerplate with little practical usage/migration detail (`styled/inline/doc.go:1-7`, `styled/itemized/doc.go:1-3`).
-- No document in `styled/` explains migration from legacy leaf-based ropes to current chunk/btree cords.
+## Missing pieces for synchronization
 
-## Code findings
+The central migration gap is still present: `Text` has no complete editing API that updates both raw text and style runs together.
 
-### 1) Core migration blockers in `styled/`
+### Missing run operations (needed as primitives)
 
-- `TextBuilder` still depends on old leaf-based append:
-  - signature `Append(leaf cords.Leaf, ...)` (`styled/builder.go:44`)
-  - call to removed `b.cordBuilder.Append(leaf)` (`styled/builder.go:51`)
-- style-run storage uses `type runs cords.Cord` plus synthetic `styleLeaf` implementing old leaf interface (`styled/styles.go:152`, `styled/styles.go:224-269`).
-- iteration depends on removed `EachLeaf` API (`styled/styles.go:68`, `styled/styles.go:137`, `styled/paragraph.go:98`).
-- `StyleAt` logic assumes index returns interface-like leaf type and performs incompatible assertion (`styled/styles.go:51-56`).
+1. split runs at byte position (`Runs.SplitAt`-like primitive)
+2. concat runs with boundary merge (`Runs.Concat`-like primitive)
+3. extract subsection of runs (`Runs.Section`-like primitive)
+4. adjust runs for inserted/deleted text ranges (insert/delete helpers at run level)
 
-### 2) Additional correctness issues (independent of migration)
+Without these, synchronized implementations of text-edit operations are not practical.
 
-- `TextBuilder.Text()` has a value receiver, so `b.done = true` mutates only a copy (`styled/builder.go:29-31`).
-- `inline.Style.Equals` always returns `false` (`styled/inline/styles.go:88-90`).
-- `itemized.Iterator.Style()` panics on substring error (`styled/itemized/items.go:109-112`) instead of propagating error.
-- `ConsoleFixedWidth.Postamble()` writes `Preamble` bytes, not `Postamble` (`styled/formatter/console.go:186-188`).
-- `HTML.Postamble()` writes `"<pre>"` instead of closing `"</pre>"` (`styled/formatter/html.go:118-123`).
-- `HTMLStyle.Add()` recursively calls itself (`styled/formatter/html.go:209-210`).
-- `TestVTE` is a hard-coded failing TODO (`styled/formatter/fmt_test.go:66`).
+### Missing/disabled Text & Paragraph APIs
 
-### 3) Areas that still make conceptual sense
+1. `Text.Section` is commented out.
+2. `Text.StyleRuns` is commented out.
+3. `Text.EachStyleRun` is commented out.
+4. `Paragraph.EachStyleRun` is stubbed and returns `nil`.
+5. `Paragraph.StyleRuns` is stubbed and returns `nil`.
+6. `ParagraphFromText` cannot construct sub-paragraphs yet (`Section` path disabled).
+7. `Paragraph.WrapAt` currently splits raw text only; style-run split/sync is not implemented.
 
-- Separation of concerns is still clear in design:
-  - `styled.Text` holds raw text plus style runs (`styled/styles.go:11-15`)
-  - `styled.Paragraph` adds bidi/layout preparation (`styled/paragraph.go:10-31`)
-  - `formatter` models output-target abstraction (`styled/formatter/format.go:59-69`)
-  - `itemized` provides style-run iteration API (`styled/itemized/items.go:41-48`)
-- The package intent (immutable text + overlays of style runs + bidi-aware formatting) remains coherent.
+## Consistency risks in current state
 
-## Summary assessment
+1. Raw-text operations inside `Paragraph` can diverge from style runs because run-sync logic is not wired (`WrapAt` path).
+2. Legacy code artifacts from pre-btree implementation (`styleLeaf` and large commented blocks) increase maintenance noise and can obscure current behavior.
 
-- **Intent quality:** high.
-- **Current implementation compatibility with new cords:** low.
-- **Documentation quality for current state:** low-to-medium.
-- **Technical debt concentration:** mostly in `styled` root API coupling to removed leaf primitives.
+## Proposed next batches
+
+1. Introduce run-level structural operations (`SplitAt`, `Concat`, `Section`, range adjust helpers).
+2. Implement text-edit APIs on `Text` that always update raw cord and runs atomically.
+3. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
+4. Rework `ParagraphFromText` and `WrapAt` to use run-level split/concat primitives.
+5. Remove obsolete `styleLeaf` legacy scaffolding after replacement APIs are in place.
+
+## Summary
+
+`styled` has successfully migrated core style storage and lookup to btree, and styling operations now work with tests. The remaining refactoring work is primarily about synchronized text editing and paragraph operations, which require dedicated run-structure primitives first.
+
+## Decision Record: Run-Coalescing Strategy
+
+Invariant to preserve after every `Runs` operation:
+
+1. no zero-length runs,
+2. no adjacent runs with equal `Style`,
+3. total run length equals owning text length (when attached to a `Text`).
+
+Two implementation styles were considered:
+
+1. pre-coalesce (analyze/adjust replacement scope before writing), as in current `Runs.Style(...)`;
+2. post-repair (perform operation first, then coalesce).
+
+Trade-off assessment:
+
+1. pre-coalesce can minimize writes, but pushes complex seam logic into every operator implementation;
+2. full-tree post-repair is cleaner conceptually but too expensive to run after each operation;
+3. local post-repair around changed seams keeps APIs clean and has near-constant repair work per operation.
+
+Decision:
+
+Adopt **local seam-repair after mutation** as the default strategy for new `Runs` primitives.  
+Do not do full-tree coalescing by default.
+
+## Implementation Plan: First Primitive `Runs.SplitAt(pos)`
+
+Goal: split a `Runs` value by byte position `pos` into `(left, right)` such that:
+
+1. `left` covers `[0,pos)`,
+2. `right` covers `[pos,total)`,
+3. both outputs satisfy the run invariant,
+4. `left + right` reconstructs the original run stream.
+
+Step plan:
+
+1. Define API and contract:
+   - `func (runs Runs) SplitAt(pos uint64) (Runs, Runs, error)`.
+   - bounds: `0 <= pos <= totalRunLength`.
+   - edge cases: `pos=0`, `pos=total`, empty runs.
+2. Add tests first in `styled/styles_test.go`:
+   - split at 0 and end,
+   - split exactly at run boundary,
+   - split inside one run (run must be divided),
+   - split across multi-run structures,
+   - reconstruction check via planned `Concat` seam helper or test-local run concatenation,
+   - invariant checks for both outputs.
+3. Implement length/bounds pre-check using run summary length.
+4. Reuse cursor seek (`StyleDimension`) to locate the run containing `pos-1` or seam boundary logic for exact boundary.
+5. Build left/right replacement around seam:
+   - if split is mid-run, create two fragments of that run;
+   - if split is at boundary, no fragment split needed.
+6. Construct result trees with minimal edits:
+   - either via tree-level split + seam patch, or via range replacement using current helpers.
+7. Run local seam-repair on both outputs near their boundary nodes:
+   - left tail and right head only.
+8. Assert/verify invariants in debug path:
+   - no zero-length runs,
+   - no adjacent equal-style runs,
+   - length conservation (`len(left)+len(right)==len(original)`).
+9. Keep helper abstractions reusable for next operators:
+   - `repairAround(tree, leftIndex)` or equivalent seam merge helper.
+10. After `SplitAt` lands and tests pass, implement `Runs.Concat` next using the same seam-repair helper.

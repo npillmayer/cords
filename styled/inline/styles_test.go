@@ -4,33 +4,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestTextSimple(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//
-	// teardown := gotestconfig.QuickConfig(t)
-	// defer teardown()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t)
+	defer teardown()
 	//
 	s := ItalicsStyle
 	t.Logf("italics=%v", styleString(s))
 	s = s.Add(MarkedStyle)
 	t.Logf("combined=%v", s.String())
-	//t.Fail()
 }
 
 func TestHTMLSimple(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
-	//
-	// teardown := gotestconfig.QuickConfig(t)
-	// defer teardown()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := gotestingadapter.QuickConfig(t)
+	defer teardown()
 	//
 	input := strings.NewReader("The quick <strong>brown</strong> fox <em>jumps</em> over the lazy dog")
 	text, err := TextFromHTML(input)

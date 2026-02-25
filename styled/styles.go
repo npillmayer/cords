@@ -19,8 +19,8 @@ func TextFromString(s string) *Text {
 }
 
 // TextFromCord creates a stylable text from a cord.
-func TextFromCord(text cords.Cord) *Text {
-	t := &Text{
+func TextFromCord(text cords.Cord) Text {
+	t := Text{
 		text: text,
 		runs: Runs{},
 	}
@@ -95,7 +95,7 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 func (t *Text) Style(sty Style, from, to uint64) (*Text, error) {
 	var err error
 	if t.runs.tree == nil || t.runs.tree.IsEmpty() {
-		t.runs, err = applyStyle(t.text.Len(), sty, from, to)
+		t.runs, err = initialStyle(t.text.Len(), sty, from, to)
 		return t, err
 	}
 	t.runs, err = t.runs.Style(t.text.Len(), sty, from, to)
@@ -180,18 +180,18 @@ func equals(s1, s2 Style) bool {
 
 // Runs hold information about style-formats which have been applied to a text.
 // There is no automatic synchronization between the text and the style-formats.
-type runs cords.Cord
+//type runs cords.Cord
 
 // String returns an informational string for these Runs. Clients must not rely
 // on the format of the string.
-func (r runs) String() string {
-	return cords.Cord(r).String()
-}
+// func (r runs) String() string {
+// 	return cords.Cord(r).String()
+// }
 
 // Len returns the overall length in bytes for these Runs.
-func (r runs) Len() uint64 {
-	return (cords.Cord(r)).Len()
-}
+// func (r runs) Len() uint64 {
+// 	return (cords.Cord(r)).Len()
+// }
 
 // Style represents a styling-format which can be applied to a run of text.
 type Style interface {
@@ -199,13 +199,11 @@ type Style interface {
 	String() string          // return some kind of identifying string
 }
 
-// applyStyle applies a style to a range [from,to) of characters. Returns a style set.
+// initialStyle applies a style to a range [from,to) of characters. Returns a style set.
 // Given range boundaries will silently be restricted to valid text positions without
 // flagging an error. This may result in the style not being applied due to an invalid
 // range.
-//
-// TODO: rename this to "initialStyle"
-func applyStyle(textlen uint64, sty Style, from, to uint64) (Runs, error) {
+func initialStyle(textlen uint64, sty Style, from, to uint64) (Runs, error) {
 	runs, err := newRuns()
 	if err != nil {
 		tracer().Errorf("styled runs: failed to create new runs")
@@ -254,7 +252,7 @@ func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error)
 		return runs, nil
 	}
 	if runs.tree == nil || runs.tree.IsEmpty() {
-		return applyStyle(textlen, sty, from, to)
+		return initialStyle(textlen, sty, from, to)
 	}
 	cursor, err := btree.NewCursor(runs.tree, StyleDimension{})
 	if err != nil {

@@ -11,21 +11,22 @@ import (
 // InnerText creates a styled text for the textual content of an HTML element and all
 // its descendents. It resembles the text produced by
 //
-//      document.getElementById("myNode").innerText
+//	document.getElementById("myNode").innerText
 //
 // in JavaScript, except that `InnerText` cannot respect CSS styling (including
 // properties changing the visibility of the node's descendents).
 // Therefore the resulting styled text is limited to inline span elements like
-//    <strong> … </strong>
-//    <i> … </i>
+//
+//	<strong> … </strong>
+//	<i> … </i>
+//
 // etc. Clients should provide a paragraph-like element.
 //
 // The fragment organization of the resulting styled text will reflect the hierarchy of
 // the element node's descendents.
-//
-func InnerText(n *html.Node) (*styled.Text, error) {
+func InnerText(n *html.Node) (styled.Text, error) {
 	if n == nil {
-		return nil, cords.ErrIllegalArguments
+		return styled.Text{}, cords.ErrIllegalArguments
 	}
 	b := styled.NewTextBuilder()
 	collectText(n, PlainStyle, b)
@@ -41,7 +42,7 @@ func collectText(n *html.Node, style Style, b *styled.TextBuilder) {
 		}
 	} else if n.Type == html.TextNode {
 		T().Debugf("styled inline text = %s (%v)", n.Data, style)
-		b.Append(cords.StringLeaf(n.Data), style)
+		b.AppendString(n.Data, style)
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		collectText(c, style, b)
@@ -50,10 +51,10 @@ func collectText(n *html.Node, style Style, b *styled.TextBuilder) {
 
 // TextFromHTML creates a styled.Text from the textual content of an HTML fragment.
 // The HTML fragment should reflect the content of a paragraph-like element.
-func TextFromHTML(input io.Reader) (*styled.Text, error) {
+func TextFromHTML(input io.Reader) (styled.Text, error) {
 	nodes, err := html.ParseFragment(input, nil)
 	if err != nil {
-		return nil, err
+		return styled.Text{}, err
 	}
 	b := styled.NewTextBuilder()
 	for _, n := range nodes {

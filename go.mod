@@ -4,7 +4,6 @@ go 1.25.6
 
 require (
 	github.com/fatih/color v1.10.0
-	github.com/guiguan/caster v0.0.0-20191104051807-3736c4464f38
 	github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff
 	github.com/npillmayer/uax v0.1.0
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781

@@ -22,7 +22,7 @@ func TestInitialStyle(t *testing.T) {
 	t.Logf("string='%s', length=%d", text, text.Len())
 	// style the text
 	bold := teststyle("bold")
-	runs, err := applyStyle(text.Len(), bold, 6, text.Len())
+	runs, err := initialStyle(text.Len(), bold, 6, text.Len())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestBasicStyleCursor(t *testing.T) {
 	//
 	text := TextFromString("Hello World, how are you?")
 	bold := teststyle("bold")
-	runs, err := applyStyle(text.text.Len(), bold, 6, 15)
+	runs, err := initialStyle(text.text.Len(), bold, 6, 15)
 	if err != nil {
 		t.Fatal(err)
 	}

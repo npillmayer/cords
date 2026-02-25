@@ -8,7 +8,7 @@ import (
 // TextBuilder is for building styled text from style runs.
 type TextBuilder struct {
 	cordBuilder cords.Builder
-	text        *Text
+	text        Text
 	length      uint64
 	done        bool
 	styles      []styleSpan
@@ -27,7 +27,7 @@ func NewTextBuilder() *TextBuilder {
 // Text returns the styled text which this builder is holding up to now.
 // It is illegal to continue adding fragments after `Text` has been called,
 // but `Text` may be called multiple times.
-func (b TextBuilder) Text() *Text {
+func (b *TextBuilder) Text() Text {
 	b.done = true
 	b.text = TextFromCord(b.cordBuilder.Cord())
 	if b.text.Raw().IsVoid() {
