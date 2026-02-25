@@ -1,5 +1,21 @@
 package styled
 
+import "github.com/npillmayer/cords"
+
+// We create a couple of monadic helpers to make error-handling easier on the eye.
+// The boilerplate code in this file is a bit cumbersome, but application of the
+// pipeline functions will read rather easily.
+//
+// Use in this manner:
+//
+//	p := pipeFor(myruns, myArg != 0)
+//	thing1 := pipeCall2(p, someFunc, param1, param2)
+//	p.item := pipeCall1(p, anotherFunc, param)
+//	item := p.itemOrElse(defaultVal)
+//	return item, p.err
+//
+// The pipe... calls are wildly type-parameterized, but using them should be
+// straightforward.
 type pipeline struct {
 	runs    Runs
 	run     Run
@@ -150,4 +166,33 @@ func (p *pipeline) runsOrElse(fallback Runs) Runs {
 		return fallback
 	}
 	return p.runs
+}
+
+// ---------------------------------------------------------------------------
+
+type textPipeline struct {
+	text *Text
+	raw  cords.Cord
+	err  error
+}
+
+func textPipeFor(text *Text, conds ...bool) textPipeline {
+	p := textPipeline{text: text}
+	if text == nil {
+		p.err = ErrVoidText
+		return p
+	}
+	for _, cond := range conds {
+		if !cond {
+			p.err = ErrIllegalArguments
+		}
+	}
+	return p
+}
+
+func (p *textPipeline) rawOrElse(fallback cords.Cord) cords.Cord {
+	if p.err != nil {
+		return fallback
+	}
+	return p.raw
 }

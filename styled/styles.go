@@ -35,10 +35,10 @@ func (t *Text) Raw() cords.Cord {
 // StyleAt returns the style at byte position pos of the styled text.
 func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 	if t == nil || pos >= t.Raw().Len() {
-		return nil, pos, cords.ErrIndexOutOfBounds
+		return nil, pos, ErrIndexOutOfBounds
 	}
 	if t.runs.tree == nil || t.runs.tree.IsEmpty() {
-		return nil, pos, cords.ErrIndexOutOfBounds
+		return nil, pos, ErrIndexOutOfBounds
 	}
 	r := t.runs
 	cursor, err := btree.NewCursor(r.tree, StyleDimension{})
@@ -47,12 +47,12 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 	assert(err == nil, "cursor cannot be unsuccessful")
 	if !found || run.length == 0 || acc < run.length {
 		return nil, pos, fmt.Errorf("%w: internal inconsistency: dimension broken?",
-			cords.ErrIndexOutOfBounds)
+			ErrIndexOutOfBounds)
 	}
 	runStart := acc - run.length
 	if pos < runStart || pos >= acc {
 		return nil, pos, fmt.Errorf("%w: internal inconsistency: dimension broken?",
-			cords.ErrIndexOutOfBounds)
+			ErrIndexOutOfBounds)
 	}
 	tracer().Debugf("item index: %d", idx)
 	return run.style, pos - runStart, nil

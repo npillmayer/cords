@@ -199,7 +199,7 @@ func TestStyleAtBounds(t *testing.T) {
 	if _, err := text.Style(bold, 0, text.Raw().Len()); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := text.StyleAt(text.Raw().Len()); !errors.Is(err, cords.ErrIndexOutOfBounds) {
+	if _, _, err := text.StyleAt(text.Raw().Len()); !errors.Is(err, ErrIndexOutOfBounds) {
 		t.Fatalf("expected ErrIndexOutOfBounds at text end, got %v", err)
 	}
 }
@@ -209,7 +209,7 @@ func TestStyleAtWithoutStyleRuns(t *testing.T) {
 	defer teardown()
 
 	text := TextFromString("abc")
-	if _, _, err := text.StyleAt(0); !errors.Is(err, cords.ErrIndexOutOfBounds) {
+	if _, _, err := text.StyleAt(0); !errors.Is(err, ErrIndexOutOfBounds) {
 		t.Fatalf("expected ErrIndexOutOfBounds without style runs, got %v", err)
 	}
 }

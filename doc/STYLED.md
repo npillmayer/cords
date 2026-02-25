@@ -33,6 +33,7 @@ Current implementation status:
   - styles: `runs Runs`
 - `Runs` is now btree-backed:
   - `btree.Tree[Run, Summary, btree.NO_EXT]`
+- run-operator API error semantics are now package-local (`styled.ErrIndexOutOfBounds`, `styled.ErrIllegalArguments`, `styled.ErrVoidRuns`) instead of forwarding `cords` errors.
 - style lookup (`StyleAt`) uses btree cursor seek over run-length summaries.
 - style application (`Text.Style` / `Runs.Style`) rewrites only the affected run window and merges adjacent equal styles.
 
@@ -48,30 +49,37 @@ Current implementation status:
    - `Runs.Section(from, to)`
    - `Runs.DeleteRange(from, to)`
    - `Runs.InsertAt(pos, n, sty)`
-6. Regression tests in `styled/styles_test.go` cover:
+6. Run operations have been reworked to use internal pipeline helpers (`styled/monad.go`) for composing operation steps.
+7. Regression tests in `styled/styles_test.go` cover:
    - basic styling,
    - merge of adjacent equal styles,
    - empty-span no-op,
    - whole-text styling,
    - `StyleAt` behavior and bounds.
-7. Dedicated operator tests in `styled/run_ops_test.go` cover:
+8. Dedicated operator tests in `styled/run_ops_test.go` cover:
    - split edge/boundary/in-run/bounds behavior,
    - concat seam merge + non-merge + empty cases,
    - section whole/empty/range/bounds behavior,
    - delete-range no-op/bounds/range/edge/full-delete behavior,
    - insert no-op/bounds/seam-merge/in-run behavior.
-8. `TextBuilder.Append` has been migrated to chunk-based append (`AppendChunk`).
+9. Synchronized text-edit operations in `styled/text_ops.go` are implemented:
+   - `Text.DeleteRange(from, to)` updates raw text and run metadata consistently,
+   - `Text.InsertAt(pos, insertion, sty)` handles styled and unstyled insertions,
+   - `Text.Concat(other)` concatenates raw text and run trees, including seam merge.
+10. Dedicated tests in `styled/text_ops_test.go` cover `Text.DeleteRange`, `Text.InsertAt`, and `Text.Concat` including bounds/no-op/error paths and run/text synchronization invariants.
+11. `TextBuilder.Append` has been migrated to chunk-based append (`AppendChunk`).
 
 ## Missing pieces for synchronization
 
-The central migration gap is still present: `Text` has no complete editing API that updates both raw text and style runs together.
+The central migration gap has narrowed: core synchronized edits on `Text` are now in place (`DeleteRange`, `InsertAt`, `Concat`), but sectioning/iteration and paragraph-level synchronization are still incomplete.
 
 ### Remaining run-operation gaps
 
 1. optional normalization/repair helper abstraction shared by all run mutations (currently implicit in operator logic)
 2. explicit policy documentation for inserted-run style semantics (currently implemented as caller-provided style)
+3. clarify and document error-contract mapping for each run op (`ErrIllegalArguments` vs `ErrIndexOutOfBounds`).
 
-These are refinement tasks; the main remaining blocker is wiring synchronized edit operations at `Text`/`Paragraph` level.
+These are refinement tasks; the main remaining blockers are section/iteration APIs and paragraph-level synchronization.
 
 ### Missing/disabled Text & Paragraph APIs
 
@@ -86,19 +94,21 @@ These are refinement tasks; the main remaining blocker is wiring synchronized ed
 ## Consistency risks in current state
 
 1. Raw-text operations inside `Paragraph` can diverge from style runs because run-sync logic is not wired (`WrapAt` path).
-2. Legacy code artifacts from pre-btree implementation (`styleLeaf` and large commented blocks) increase maintenance noise and can obscure current behavior.
+2. `Text.Concat` currently materializes plain runs when one side is styled and the other side is unstyled; this is correct for synchronization but should be documented as canonical semantics for mixed styled/unstyled concatenation.
+3. Legacy code artifacts from pre-btree implementation (`styleLeaf` and large commented blocks) increase maintenance noise and can obscure current behavior.
+4. Pipeline-based error propagation (`styled/monad.go`) is now central to run ops; negative/error-path coverage should be expanded to lock behavior.
 
 ## Proposed next batches
 
-1. Implement synchronized text-edit APIs on `Text` (insert/delete-range) that update raw cord and runs atomically.
-2. Implement `Text.Section` using `Runs.Section`.
-3. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
-4. Rework `ParagraphFromText` and `WrapAt` to use `Runs.Section`/split/concat and maintain style sync.
+1. Implement `Text.Section` using raw-cord slicing plus `Runs.Section`.
+2. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
+3. Rework `ParagraphFromText` and `WrapAt` to use run primitives (`Section`/`SplitAt`/`Concat`) and maintain style sync.
+4. Define and document canonical semantics for unstyled runs (`ErrVoidRuns`) across all `Text` operations.
 5. Remove obsolete `styleLeaf` legacy scaffolding after replacement APIs are in place.
 
 ## Summary
 
-`styled` has successfully migrated core style storage, lookup, and the basic run operator set (`SplitAt`, `Concat`, `Section`, `DeleteRange`, `InsertAt`) to btree, with dedicated tests. The remaining refactoring work is primarily synchronized `Text`/`Paragraph` editing and API re-enablement on top of these primitives.
+`styled` has successfully migrated core style storage, lookup, run operators, and synchronized `Text` editing (`DeleteRange`, `InsertAt`, `Concat`) to the btree-based model, with dedicated tests. Remaining refactoring work is now centered on section/iteration APIs and paragraph-level style synchronization.
 
 ## Decision Record: Run-Coalescing Strategy
 
@@ -134,7 +144,10 @@ Completed since previous scan:
 4. `Runs.DeleteRange(from, to)` implemented and test-covered.
 5. `Runs.InsertAt(pos, n, sty)` implemented and test-covered.
 6. Run-operation tests moved into dedicated file `styled/run_ops_test.go`.
+7. Run ops were reworked to use internal pipeline helpers and package-local error values.
+8. Synchronized `Text` edit operations were implemented and tested (`DeleteRange`, `InsertAt`, `Concat` in `styled/text_ops.go` / `styled/text_ops_test.go`).
 
 Immediate next integration target:
 
-1. synchronized raw-text edit operations on `Text` (insert/delete-range) using the run primitives.
+1. `Text.Section` and style-run reporting/iteration APIs (`StyleRuns`, `EachStyleRun`).
+2. paragraph synchronization (`ParagraphFromText`/`WrapAt`) on top of run primitives.
