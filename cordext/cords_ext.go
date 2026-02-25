@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 
+	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/btree"
 	"github.com/npillmayer/cords/chunk"
 )
@@ -18,7 +19,7 @@ type TextSegmentExtension[E any] interface {
 	// Zero returns the neutral element of extension aggregation.
 	Zero() E
 	// FromSegment projects one text segment into extension space.
-	FromSegment(TextSegment) E
+	FromSegment(cords.TextSegment) E
 	// Add combines two extension summaries.
 	Add(E, E) E
 }

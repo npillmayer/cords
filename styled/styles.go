@@ -244,150 +244,31 @@ func initialStyle(textlen uint64, sty Style, from, to uint64) (Runs, error) {
 	return runs, nil
 }
 
-// Style adds a style to (possibly already existing) styles for a given range
-// and returns the unified style set (in btree format).
-func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error) {
-	spn := toSpan(from, to).contained(textlen)
-	if spn.void() || textlen == 0 {
-		return runs, nil
-	}
-	if runs.tree == nil || runs.tree.IsEmpty() {
-		return initialStyle(textlen, sty, from, to)
-	}
-	cursor, err := btree.NewCursor(runs.tree, StyleDimension{})
-	if err != nil {
-		return runs, err
-	}
-	iL, leftRun, leftStart, _, err1 := seekRunForByte(runs.tree, cursor, spn.l)
-	iR, rightRun, _, rightEnd, err2 := seekRunForByte(runs.tree, cursor, spn.r-1)
-	if err1 != nil || err2 != nil {
-		return runs, err1
-	}
-
-	repl := make([]Run, 0, 3)
-	if spn.l > leftStart {
-		repl = append(repl, Run{
-			length: spn.l - leftStart,
-			style:  leftRun.style,
-		})
-	}
-	repl = append(repl, Run{
-		length: spn.len(),
-		style:  sty,
-	})
-	if spn.r < rightEnd {
-		repl = append(repl, Run{
-			length: rightEnd - spn.r,
-			style:  rightRun.style,
-		})
-	}
-	repl = normalizeRunList(repl)
-	assert(len(repl) > 0, "impossible: normalized run is void")
-
-	tree, err := runs.tree.DeleteRange(iL, iR-iL+1)
-	assert(err == nil, "internal inconsistency")
-	tree, err = tree.InsertAt(iL, repl...)
-	assert(err == nil, "internal inconsistency")
-
-	leftCanMerge := spn.l == leftStart
-	rightCanMerge := spn.r == rightEnd
-	insertCount := len(repl)
-	leftMerged := false
-	if leftCanMerge {
-		if tree, leftMerged, err = mergeAdjacentRuns(tree, iL-1); err != nil {
-			return runs, err
-		}
-	}
-	if rightCanMerge {
-		rightPairLeft := iL + insertCount - 1
-		if leftMerged {
-			rightPairLeft--
-		}
-		if tree, _, err = mergeAdjacentRuns(tree, rightPairLeft); err != nil {
-			return runs, err
-		}
-	}
-	assert(tree.Summary().length() == textlen, "internal inconsistency")
-	return Runs{tree: tree}, nil
-}
-
-func normalizeRunList(source []Run) []Run {
-	assert(len(source) > 0, "impossible void run list")
-	out := make([]Run, 0, len(source))
-	for _, run := range source {
-		if run.length == 0 {
-			continue
-		}
-		n := len(out)
-		if n > 0 && equals(out[n-1].style, run.style) {
-			out[n-1].length += run.length
-			continue
-		}
-		out = append(out, run)
-	}
-	return out
-}
-
-func seekRunForByte(
-	tree *btree.Tree[Run, Summary, btree.NO_EXT],
-	cursor *btree.Cursor[Run, Summary, btree.NO_EXT, uint64],
-	pos uint64,
-) (index int, run Run, runStart uint64, runEnd uint64, err error) {
-	index, runEnd, err = cursor.Seek(pos + 1)
-	assert(err == nil, "internal inconsistency")
-	assert(index >= 0 && index < tree.Len(), "run lookup index out of range")
-	run, err = tree.At(index)
-	assert(err == nil, "internal inconsistency")
-	runStart = runEnd - run.length
-	assert(pos >= runStart && pos < runEnd, "run lookup mismatch")
-	return index, run, runStart, runEnd, nil
-}
-
-func mergeAdjacentRuns(
-	tree *btree.Tree[Run, Summary, btree.NO_EXT],
-	left int,
-) (*btree.Tree[Run, Summary, btree.NO_EXT], bool, error) {
-	assert(tree != nil && left >= 0 && left+1 < tree.Len(), "internal inconsistency")
-	a, err := tree.At(left)
-	assert(err == nil, "internal inconsistency")
-	b, err := tree.At(left + 1)
-	assert(err == nil, "internal inconsistency")
-	if !equals(a.style, b.style) {
-		return tree, false, nil
-	}
-	merged := Run{length: a.length + b.length, style: a.style}
-	tree, err = tree.DeleteRange(left, 2)
-	assert(err == nil, "internal inconsistency")
-	tree, err = tree.InsertAt(left, merged)
-	assert(err == nil, "internal inconsistency")
-	return tree, true, nil
-}
-
 // --- Styled Leaf -----------------------------------------------------------
 
-type styleLeaf struct {
-	style  Style  // applied styles
-	length uint64 // length of this style run in bytes
-}
+// type styleLeaf struct {
+// 	style  Style  // applied styles
+// 	length uint64 // length of this style run in bytes
+// }
 
 // length of the style leaf run in bytes
-func (sl styleLeaf) Weight() uint64 {
-	return sl.length
-}
+// func (sl styleLeaf) Weight() uint64 {
+// 	return sl.length
+// }
 
 // produce the leaf fragment as a string; will produce the identifying string of the
 // enclosed format.
-func (sl styleLeaf) String() string {
-	if sl.style == nil {
-		return "[no style]"
-	}
-	return sl.style.String()
-}
+// func (sl styleLeaf) String() string {
+// 	if sl.style == nil {
+// 		return "[no style]"
+// 	}
+// 	return sl.style.String()
+// }
 
 // substring [i:j], not applicable
-func (sl styleLeaf) Substring(uint64, uint64) []byte {
-	return []byte(sl.String())
-}
+// func (sl styleLeaf) Substring(uint64, uint64) []byte {
+// 	return []byte(sl.String())
+// }
 
 // split into 2 leafs at position i, resulting in two equal styles with different
 // length < |sl|.
@@ -403,12 +284,12 @@ func (sl styleLeaf) Substring(uint64, uint64) []byte {
 // 	return left, right
 // }
 
-func makeStyleLeaf(sty Style, spn span) *styleLeaf {
-	return &styleLeaf{
-		style:  sty,
-		length: spn.r - spn.l,
-	}
-}
+// func makeStyleLeaf(sty Style, spn span) *styleLeaf {
+// 	return &styleLeaf{
+// 		style:  sty,
+// 		length: spn.r - spn.l,
+// 	}
+// }
 
 //var _ cords.Leaf = &styleLeaf{}
 

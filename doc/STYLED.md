@@ -42,26 +42,36 @@ Current implementation status:
 2. Initial styling (`initialStyle`) creates a full run partition over text length.
 3. Incremental restyling (`Runs.Style`) replaces affected runs and keeps invariants.
 4. `StyleAt` returns `(style, offsetWithinRun)` and is test-covered.
-5. Regression tests in `styled/styles_test.go` cover:
+5. Primitive run operators are implemented in `styled/run_ops.go`:
+   - `Runs.SplitAt(pos)`
+   - `Runs.Concat(other)`
+   - `Runs.Section(from, to)`
+   - `Runs.DeleteRange(from, to)`
+   - `Runs.InsertAt(pos, n, sty)`
+6. Regression tests in `styled/styles_test.go` cover:
    - basic styling,
    - merge of adjacent equal styles,
    - empty-span no-op,
    - whole-text styling,
    - `StyleAt` behavior and bounds.
-6. `TextBuilder.Append` has been migrated to chunk-based append (`AppendChunk`).
+7. Dedicated operator tests in `styled/run_ops_test.go` cover:
+   - split edge/boundary/in-run/bounds behavior,
+   - concat seam merge + non-merge + empty cases,
+   - section whole/empty/range/bounds behavior,
+   - delete-range no-op/bounds/range/edge/full-delete behavior,
+   - insert no-op/bounds/seam-merge/in-run behavior.
+8. `TextBuilder.Append` has been migrated to chunk-based append (`AppendChunk`).
 
 ## Missing pieces for synchronization
 
 The central migration gap is still present: `Text` has no complete editing API that updates both raw text and style runs together.
 
-### Missing run operations (needed as primitives)
+### Remaining run-operation gaps
 
-1. split runs at byte position (`Runs.SplitAt`-like primitive)
-2. concat runs with boundary merge (`Runs.Concat`-like primitive)
-3. extract subsection of runs (`Runs.Section`-like primitive)
-4. adjust runs for inserted/deleted text ranges (insert/delete helpers at run level)
+1. optional normalization/repair helper abstraction shared by all run mutations (currently implicit in operator logic)
+2. explicit policy documentation for inserted-run style semantics (currently implemented as caller-provided style)
 
-Without these, synchronized implementations of text-edit operations are not practical.
+These are refinement tasks; the main remaining blocker is wiring synchronized edit operations at `Text`/`Paragraph` level.
 
 ### Missing/disabled Text & Paragraph APIs
 
@@ -80,15 +90,15 @@ Without these, synchronized implementations of text-edit operations are not prac
 
 ## Proposed next batches
 
-1. Introduce run-level structural operations (`SplitAt`, `Concat`, `Section`, range adjust helpers).
-2. Implement text-edit APIs on `Text` that always update raw cord and runs atomically.
+1. Implement synchronized text-edit APIs on `Text` (insert/delete-range) that update raw cord and runs atomically.
+2. Implement `Text.Section` using `Runs.Section`.
 3. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
-4. Rework `ParagraphFromText` and `WrapAt` to use run-level split/concat primitives.
+4. Rework `ParagraphFromText` and `WrapAt` to use `Runs.Section`/split/concat and maintain style sync.
 5. Remove obsolete `styleLeaf` legacy scaffolding after replacement APIs are in place.
 
 ## Summary
 
-`styled` has successfully migrated core style storage and lookup to btree, and styling operations now work with tests. The remaining refactoring work is primarily about synchronized text editing and paragraph operations, which require dedicated run-structure primitives first.
+`styled` has successfully migrated core style storage, lookup, and the basic run operator set (`SplitAt`, `Concat`, `Section`, `DeleteRange`, `InsertAt`) to btree, with dedicated tests. The remaining refactoring work is primarily synchronized `Text`/`Paragraph` editing and API re-enablement on top of these primitives.
 
 ## Decision Record: Run-Coalescing Strategy
 
@@ -114,41 +124,17 @@ Decision:
 Adopt **local seam-repair after mutation** as the default strategy for new `Runs` primitives.  
 Do not do full-tree coalescing by default.
 
-## Implementation Plan: First Primitive `Runs.SplitAt(pos)`
+## Progress update on run primitives
 
-Goal: split a `Runs` value by byte position `pos` into `(left, right)` such that:
+Completed since previous scan:
 
-1. `left` covers `[0,pos)`,
-2. `right` covers `[pos,total)`,
-3. both outputs satisfy the run invariant,
-4. `left + right` reconstructs the original run stream.
+1. `Runs.SplitAt(pos)` implemented and test-covered.
+2. `Runs.Concat(other)` implemented with seam coalescing and test-covered.
+3. `Runs.Section(from, to)` implemented via `SplitAt` composition and test-covered.
+4. `Runs.DeleteRange(from, to)` implemented and test-covered.
+5. `Runs.InsertAt(pos, n, sty)` implemented and test-covered.
+6. Run-operation tests moved into dedicated file `styled/run_ops_test.go`.
 
-Step plan:
+Immediate next integration target:
 
-1. Define API and contract:
-   - `func (runs Runs) SplitAt(pos uint64) (Runs, Runs, error)`.
-   - bounds: `0 <= pos <= totalRunLength`.
-   - edge cases: `pos=0`, `pos=total`, empty runs.
-2. Add tests first in `styled/styles_test.go`:
-   - split at 0 and end,
-   - split exactly at run boundary,
-   - split inside one run (run must be divided),
-   - split across multi-run structures,
-   - reconstruction check via planned `Concat` seam helper or test-local run concatenation,
-   - invariant checks for both outputs.
-3. Implement length/bounds pre-check using run summary length.
-4. Reuse cursor seek (`StyleDimension`) to locate the run containing `pos-1` or seam boundary logic for exact boundary.
-5. Build left/right replacement around seam:
-   - if split is mid-run, create two fragments of that run;
-   - if split is at boundary, no fragment split needed.
-6. Construct result trees with minimal edits:
-   - either via tree-level split + seam patch, or via range replacement using current helpers.
-7. Run local seam-repair on both outputs near their boundary nodes:
-   - left tail and right head only.
-8. Assert/verify invariants in debug path:
-   - no zero-length runs,
-   - no adjacent equal-style runs,
-   - length conservation (`len(left)+len(right)==len(original)`).
-9. Keep helper abstractions reusable for next operators:
-   - `repairAround(tree, leftIndex)` or equivalent seam merge helper.
-10. After `SplitAt` lands and tests pass, implement `Runs.Concat` next using the same seam-repair helper.
+1. synchronized raw-text edit operations on `Text` (insert/delete-range) using the run primitives.
