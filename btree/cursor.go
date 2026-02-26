@@ -237,7 +237,9 @@ func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E],
 			return seekNodeWithOps(tree, child, curIdx, curAcc, target, ops)
 		}
 		curAcc = nextAcc
-		curIdx += tree.countItems(child)
+		// todo remove
+		// curIdx += tree.countItems(child)
+		curIdx += child.Weight()
 	}
 	return curIdx, curAcc, false, nil
 }
@@ -276,7 +278,9 @@ func seekNodeItemWithOps[I SummarizedItem[S], S, E any, K any](
 			return seekNodeItemWithOps(tree, child, curIdx, curAcc, target, ops)
 		}
 		curAcc = nextAcc
-		curIdx += tree.countItems(child)
+		// todo remove
+		// curIdx += tree.countItems(child)
+		curIdx += child.Weight()
 	}
 	return curIdx, zeroI, curAcc, false, nil
 }

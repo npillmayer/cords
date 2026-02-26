@@ -94,6 +94,7 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 	}
 	inner := n.(*innerNode[I, S, E])
 	for _, child := range inner.children {
+		// todo remove
 		//itemcnt := t.countItems(child)
 		itemcnt := child.Weight()
 		if w.acc+itemcnt >= w.from { // child contains items in range

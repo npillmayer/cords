@@ -29,7 +29,9 @@ func (t *Tree[I, S, E]) atNode(n treeNode[I, S, E], height int, index int64) (I,
 	remaining := index
 	for _, child := range inner.children {
 		childItems := child.Weight()
+		// todo remove
 		//childItems := t.countItems(child)
+		assert(childItems == t.countItems(child), "child weight mismatch")
 		if remaining < childItems {
 			return t.atNode(child, height-1, remaining)
 		}
@@ -113,8 +115,10 @@ func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remai
 	sum := acc
 	rem := remaining
 	for _, child := range inner.children {
+		// todo remove
 		//childItems := t.countItems(child)
 		childItems := child.Weight()
+		assert(childItems == t.countItems(child), "child weight mismatch")
 		if rem >= childItems {
 			sum = t.cfg.Monoid.Add(sum, child.Summary())
 			rem -= childItems
@@ -157,7 +161,10 @@ func (t *Tree[I, S, E]) prefixExtNode(n treeNode[I, S, E], height int, remaining
 	sum := acc
 	rem := remaining
 	for _, child := range inner.children {
-		childItems := t.countItems(child)
+		// todo remove
+		//childItems := t.countItems(child)
+		childItems := child.Weight()
+		assert(childItems == t.countItems(child), "child weight mismatch")
 		if rem >= childItems {
 			sum = t.cfg.Extension.Add(sum, child.Ext())
 			rem -= childItems

@@ -71,7 +71,10 @@ func (t *Tree[I, S, E]) Len() int64 {
 	if t == nil || t.root == nil {
 		return 0
 	}
-	return t.countItems(t.root)
+	assert(t.countItems(t.root) == t.root.Weight(), "btree: weight not set for root node")
+	// todo substitute
+	//return t.countItems(t.root)
+	return t.root.Weight()
 }
 
 // Height returns the tree height, where 0 means empty and 1 means a leaf root.
@@ -395,7 +398,9 @@ func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int64 {
 	var total int64 = 0
 	for _, child := range n.(*innerNode[I, S, E]).children {
 		total += t.countItems(child)
+		assert(t.countItems(child) == child.Weight(), "child weight mismatch")
 	}
+	assert(total == n.Weight(), "node weight mismatch")
 	return total
 }
 
@@ -408,7 +413,10 @@ func (t *Tree[I, S, E]) splitNodePathCopy(n treeNode[I, S, E], height int, index
 		assert(index == 0, "splitNodePathCopy called with nil node and non-zero index")
 		return nil, nil, nil
 	}
-	total := t.countItems(n)
+	// todo remove
+	//total := t.countItems(n)
+	total := n.Weight()
+	assert(t.countItems(n) == total, "child weight mismatch")
 	assert(index >= 0 && index <= total, "splitNodePathCopy index out of bounds")
 	if index == 0 {
 		return nil, n, nil
@@ -708,8 +716,10 @@ func (t *Tree[I, S, E]) locateChildForInsert(inner *innerNode[I, S, E], index in
 	assert(index >= 0, "locateChildForInsert called with negative index")
 	remaining := index
 	for i, child := range inner.children {
-		childItems := t.countItems(child)
-		assert(childItems == child.Weight(), "child weight mismatch")
+		// todo substitute
+		//childItems := t.countItems(child)
+		childItems := child.Weight()
+		assert(childItems == t.countItems(child), "child weight mismatch")
 		if remaining <= childItems {
 			return i, remaining, nil
 		}
@@ -733,8 +743,10 @@ func (t *Tree[I, S, E]) locateChildForDelete(inner *innerNode[I, S, E], index in
 	}
 	remaining := index
 	for i, child := range inner.children {
-		childItems := t.countItems(child)
-		assert(childItems == child.Weight(), "child weight mismatch")
+		// todo substitute
+		//childItems := t.countItems(child)
+		childItems := child.Weight()
+		assert(childItems == t.countItems(child), "child weight mismatch")
 		if remaining < childItems {
 			return i, remaining, nil
 		}

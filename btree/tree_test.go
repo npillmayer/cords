@@ -1055,7 +1055,9 @@ func TestDeleteAtInnerBorrow(t *testing.T) {
 	rightInner := makeInner(100, Base)
 	tree.root = tree.makeInternal(leftInner, rightInner)
 	tree.height = 3
-	rightStart := tree.countItems(leftInner)
+	// todo remove
+	//rightStart := tree.countItems(leftInner)
+	rightStart := leftInner.Weight()
 
 	deleted, err := tree.DeleteAt(rightStart)
 	if err != nil {
@@ -1195,7 +1197,7 @@ func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
@@ -1205,7 +1207,10 @@ func TestSplitAtSharesUntouchedSubtree(t *testing.T) {
 	if !ok || len(root.children) < 2 {
 		t.Fatalf("expected an internal root with at least 2 children")
 	}
-	splitIndex := tree.countItems(root.children[0]) + 1 // force split into 2nd root child
+	// todo remove this
+	inx := tree.countItems(root.children[0]) + 1 // force split into 2nd root child
+	splitIndex := root.children[0].Weight() + 1  // force split into 2nd root child
+	assert(inx == splitIndex, "countItems not replaced successfully")
 	left, _, err := tree.SplitAt(splitIndex)
 	if err != nil {
 		t.Fatalf("split failed: %v", err)
