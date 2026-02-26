@@ -378,7 +378,7 @@ func (t *Tree[I, S, E]) concatSameHeight(left, right treeNode[I, S, E], height i
 
 // countItems returns the total number of leaf items under n.
 //
-// TODO:
+// TODO: Cached subtree sizes for better performance.
 // This is intentionally recursive and simple for now; we need to replace it
 // with cached subtree sizes later.
 func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int {

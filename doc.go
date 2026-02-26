@@ -17,14 +17,14 @@ Typical usage:
 
 Extension usage:
 
-	// ext implements cords.TextSegmentExtension[E]
-	ec, _ := cords.FromStringWithExtension("Hello\nWorld\n", ext)
+	// ext implements cordext.TextSegmentExtension[E]
+	ec, _ := cordext.FromStringWithExtension("Hello\nWorld\n", ext)
 	total, _ := ec.Ext()
 	_ = total
 
 Extension builder usage:
 
-	b, _ := cords.NewBuilderWithExtension(ext)
+	b, _ := cordext.NewBuilderWithExtension(ext)
 	_ = b.AppendString("Hello\n")
 	_ = b.AppendString("World\n")
 	ec = b.Cord()

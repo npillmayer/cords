@@ -1,4 +1,4 @@
-package cords
+package cordext
 
 import (
 	"errors"
@@ -51,10 +51,9 @@ func TestCordWithExtensionAggregatesNewlines(t *testing.T) {
 	defer teardown()
 
 	text := strings.Repeat("ab\n", 50)
-	base := FromString(text)
-	cord, err := WithExtension(base, newlineExt{})
+	cord, err := FromStringWithExtension(text, newlineExt{})
 	if err != nil {
-		t.Fatalf("WithExtension failed: %v", err)
+		t.Fatalf("FromStringWithExtension failed: %v", err)
 	}
 	if cord.String() != text {
 		t.Fatalf("string mismatch: got=%q want=%q", cord.String(), text)
@@ -66,9 +65,6 @@ func TestCordWithExtensionAggregatesNewlines(t *testing.T) {
 	want := uint64(strings.Count(text, "\n"))
 	if ext != want {
 		t.Fatalf("newline extension mismatch: got=%d want=%d", ext, want)
-	}
-	if cord.AsCord().String() != text {
-		t.Fatalf("AsCord string mismatch: got=%q want=%q", cord.AsCord().String(), text)
 	}
 }
 

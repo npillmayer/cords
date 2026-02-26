@@ -1,4 +1,4 @@
-package cords
+package cordext
 
 import (
 	"errors"

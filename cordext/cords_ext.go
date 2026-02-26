@@ -1,11 +1,10 @@
-package cords
+package cordext
 
 import (
 	"bytes"
 	"fmt"
 	"iter"
 
-	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/btree"
 	"github.com/npillmayer/cords/chunk"
 )
@@ -19,7 +18,7 @@ type TextSegmentExtension[E any] interface {
 	// Zero returns the neutral element of extension aggregation.
 	Zero() E
 	// FromSegment projects one text segment into extension space.
-	FromSegment(cords.TextSegment) E
+	FromSegment(TextSegment) E
 	// Add combines two extension summaries.
 	Add(E, E) E
 }
@@ -40,7 +39,7 @@ func (a textSegmentExtensionAdapter[E]) FromItem(c chunk.Chunk, s chunk.Summary)
 // CordEx stores immutable UTF-8 text fragments in a persistent summarized tree
 // with an extension summary E.
 //
-// Use FromStringWithExtension or WithExtension to construct configured values.
+// Use FromStringWithExtension to construct configured values.
 // A zero-value CordEx has no extension config and is only useful as an empty value.
 type CordEx[E any] struct {
 	tree *btree.Tree[chunk.Chunk, chunk.Summary, E]
@@ -62,31 +61,6 @@ func FromStringWithExtension[E any](s string, ext TextSegmentExtension[E]) (Cord
 		if err != nil {
 			return CordEx[E]{}, err
 		}
-	}
-	return cordExFromTree(tree, ext), nil
-}
-
-// WithExtension creates an extension-enabled snapshot from a Cord.
-func WithExtension[E any](cord Cord, ext TextSegmentExtension[E]) (CordEx[E], error) {
-	base, err := treeFromCord(cord)
-	if err != nil {
-		return CordEx[E]{}, err
-	}
-	tree, err := newChunkTreeEx(ext)
-	if err != nil {
-		return CordEx[E]{}, err
-	}
-	if base == nil || base.IsEmpty() {
-		return cordExFromTree(tree, ext), nil
-	}
-	parts := make([]chunk.Chunk, 0, base.Len())
-	base.ForEachItem(func(c chunk.Chunk) bool {
-		parts = append(parts, c)
-		return true
-	})
-	tree, err = tree.InsertAt(0, parts...)
-	if err != nil {
-		return CordEx[E]{}, err
 	}
 	return cordExFromTree(tree, ext), nil
 }
@@ -124,24 +98,6 @@ func newEmptyLike[E any](tree *btree.Tree[chunk.Chunk, chunk.Summary, E]) (*btre
 // Extension returns the configured extension implementation.
 func (cord CordEx[E]) Extension() TextSegmentExtension[E] {
 	return cord.ext
-}
-
-// AsCord drops extension state and returns a plain Cord snapshot.
-func (cord CordEx[E]) AsCord() Cord {
-	if cord.tree == nil || cord.tree.IsEmpty() {
-		return Cord{}
-	}
-	cfg := btree.Config[chunk.Chunk, chunk.Summary, btree.NO_EXT]{Monoid: chunk.Monoid{}}
-	tree, err := btree.New[chunk.Chunk, chunk.Summary](cfg)
-	assert(err == nil, "cord.AsCord: cannot create base tree")
-	parts := make([]chunk.Chunk, 0, cord.tree.Len())
-	cord.tree.ForEachItem(func(c chunk.Chunk) bool {
-		parts = append(parts, c)
-		return true
-	})
-	tree, err = tree.InsertAt(0, parts...)
-	assert(err == nil, "cord.AsCord: cannot insert chunks")
-	return cordFromTree(tree)
 }
 
 // String returns the complete cord as a Go string.
