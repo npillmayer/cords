@@ -69,7 +69,7 @@ func (runs Runs) SplitAt(pos uint64) (Runs, Runs, error) {
 	if pos > runStart && pos < runEnd {
 		leftFrag := Run{length: pos - runStart, style: run.style}
 		rightFrag := Run{length: runEnd - pos, style: run.style}
-		ins2 := func(i int, l, r Run) (*btree.Tree[Run, Summary, btree.NO_EXT], error) {
+		ins2 := func(i int64, l, r Run) (*btree.Tree[Run, Summary, btree.NO_EXT], error) {
 			return tree.InsertAt(i, l, r)
 		}
 		tree = pipeCall2(p, tree.DeleteRange, idx, 1)
@@ -235,7 +235,7 @@ func (runs Runs) InsertAt(pos, n uint64, sty Style) (Runs, error) {
 		// 	return Runs{}, err
 		// }
 		run := Run{length: n, style: sty}
-		ins1 := func(i int, r Run) (*btree.Tree[Run, Summary, btree.NO_EXT], error) {
+		ins1 := func(i int64, r Run) (*btree.Tree[Run, Summary, btree.NO_EXT], error) {
 			return p.runs.tree.InsertAt(i, r)
 		}
 		p.runs.tree = pipeCall2(p, ins1, 0, run)
@@ -327,7 +327,7 @@ func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error)
 
 	leftCanMerge := spn.l == leftStart
 	rightCanMerge := spn.r == rightEnd
-	insertCount := len(repl)
+	insertCount := int64(len(repl))
 	leftMerged := false
 	if leftCanMerge {
 		if tree, leftMerged, err = mergeAdjacentRuns(tree, iL-1); err != nil {
@@ -368,7 +368,7 @@ func seekRunForByte(
 	tree *btree.Tree[Run, Summary, btree.NO_EXT],
 	cursor *btree.Cursor[Run, Summary, btree.NO_EXT, uint64],
 	pos uint64,
-) (index int, run Run, runStart uint64, runEnd uint64, err error) {
+) (index int64, run Run, runStart, runEnd uint64, err error) {
 	index, runEnd, err = cursor.Seek(pos + 1)
 	assert(err == nil, "internal inconsistency")
 	assert(index >= 0 && index < tree.Len(), "run lookup index out of range")
@@ -381,7 +381,7 @@ func seekRunForByte(
 
 func mergeAdjacentRuns(
 	tree *btree.Tree[Run, Summary, btree.NO_EXT],
-	left int,
+	left int64,
 ) (*btree.Tree[Run, Summary, btree.NO_EXT], bool, error) {
 	assert(tree != nil && left >= 0 && left+1 < tree.Len(), "internal inconsistency")
 	a, err := tree.At(left)

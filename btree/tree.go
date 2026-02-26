@@ -67,7 +67,7 @@ func (t *Tree[I, S, E]) IsEmpty() bool {
 }
 
 // Len returns the number of items in the tree.
-func (t *Tree[I, S, E]) Len() int {
+func (t *Tree[I, S, E]) Len() int64 {
 	if t == nil || t.root == nil {
 		return 0
 	}
@@ -91,7 +91,7 @@ func (t *Tree[I, S, E]) Summary() S {
 }
 
 // InsertAt inserts items at an item index and returns a new tree.
-func (t *Tree[I, S, E]) InsertAt(index int, items ...I) (*Tree[I, S, E], error) {
+func (t *Tree[I, S, E]) InsertAt(index int64, items ...I) (*Tree[I, S, E], error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
 	}
@@ -104,7 +104,7 @@ func (t *Tree[I, S, E]) InsertAt(index int, items ...I) (*Tree[I, S, E], error) 
 	}
 	cloned := t.Clone()
 	for i, item := range items {
-		if err := cloned.insertOneAt(index+i, item); err != nil {
+		if err := cloned.insertOneAt(index+int64(i), item); err != nil {
 			return nil, err
 		}
 	}
@@ -116,7 +116,7 @@ func (t *Tree[I, S, E]) InsertAt(index int, items ...I) (*Tree[I, S, E], error) 
 // Delete uses recursive path-copy with sibling borrow/merge rebalancing.
 // While delete coverage is broad, unresolved occupancy repair still reports
 // ErrUnimplemented.
-func (t *Tree[I, S, E]) DeleteAt(index int) (*Tree[I, S, E], error) {
+func (t *Tree[I, S, E]) DeleteAt(index int64) (*Tree[I, S, E], error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
 	}
@@ -124,6 +124,7 @@ func (t *Tree[I, S, E]) DeleteAt(index int) (*Tree[I, S, E], error) {
 	if index < 0 || index >= size {
 		return nil, ErrIndexOutOfBounds
 	}
+	tracer().Debugf("btree: about to delete i=%d of 0..%d", index, size-1)
 	cloned := t.Clone()
 	needsRebalance, err := cloned.deleteOneAt(index)
 	if err != nil {
@@ -132,6 +133,8 @@ func (t *Tree[I, S, E]) DeleteAt(index int) (*Tree[I, S, E], error) {
 	if needsRebalance {
 		return nil, fmt.Errorf("%w: delete rebalance could not be resolved", ErrUnimplemented)
 	}
+	size = cloned.Len()
+	tracer().Debugf("btree: deleted i=%d => 0..%d", index, size-1)
 	return cloned, nil
 }
 
@@ -139,7 +142,7 @@ func (t *Tree[I, S, E]) DeleteAt(index int) (*Tree[I, S, E], error) {
 //
 // This implementation is intentionally compositional: split at range start,
 // delete from the right fragment, then concat.
-func (t *Tree[I, S, E]) DeleteRange(index, count int) (*Tree[I, S, E], error) {
+func (t *Tree[I, S, E]) DeleteRange(index, count int64) (*Tree[I, S, E], error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
 	}
@@ -175,7 +178,7 @@ func (t *Tree[I, S, E]) DeleteRange(index, count int) (*Tree[I, S, E], error) {
 //
 // The operation is persistent: only nodes on the split seam are rebuilt,
 // untouched subtrees are shared between input and outputs.
-func (t *Tree[I, S, E]) SplitAt(index int) (*Tree[I, S, E], *Tree[I, S, E], error) {
+func (t *Tree[I, S, E]) SplitAt(index int64) (*Tree[I, S, E], *Tree[I, S, E], error) {
 	if t == nil {
 		return nil, nil, fmt.Errorf("%w: nil tree", ErrInvalidConfig)
 	}
@@ -381,14 +384,15 @@ func (t *Tree[I, S, E]) concatSameHeight(left, right treeNode[I, S, E], height i
 // TODO: Cached subtree sizes for better performance.
 // This is intentionally recursive and simple for now; we need to replace it
 // with cached subtree sizes later.
-func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int {
+func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int64 {
 	if n == nil {
 		return 0
 	}
 	if n.isLeaf() {
-		return len(n.(*leafNode[I, S, E]).items)
+		return n.Weight()
+		//return len(n.(*leafNode[I, S, E]).items)
 	}
-	total := 0
+	var total int64 = 0
 	for _, child := range n.(*innerNode[I, S, E]).children {
 		total += t.countItems(child)
 	}
@@ -399,7 +403,7 @@ func (t *Tree[I, S, E]) countItems(n treeNode[I, S, E]) int {
 //
 // Only nodes on the split seam are rebuilt; untouched siblings are shared.
 // This is the structural primitive used by public SplitAt.
-func (t *Tree[I, S, E]) splitNodePathCopy(n treeNode[I, S, E], height, index int) (treeNode[I, S, E], treeNode[I, S, E], error) {
+func (t *Tree[I, S, E]) splitNodePathCopy(n treeNode[I, S, E], height int, index int64) (treeNode[I, S, E], treeNode[I, S, E], error) {
 	if n == nil {
 		assert(index == 0, "splitNodePathCopy called with nil node and non-zero index")
 		return nil, nil, nil
@@ -516,13 +520,13 @@ func (t *Tree[I, S, E]) normalizeRoot() {
 // The receiver is expected to be a private clone when called from public APIs.
 // Returns needsRebalance only if recursive delete could not resolve occupancy
 // (currently treated as unimplemented in public DeleteAt).
-func (t *Tree[I, S, E]) deleteOneAt(index int) (needsRebalance bool, err error) {
+func (t *Tree[I, S, E]) deleteOneAt(index int64) (needsRebalance bool, err error) {
 	assert(t.root != nil, "deleteOneAt called on empty tree")
 	updated, needsRebalance, err := t.deleteRecursive(t.root, t.height, index, true)
 	if err != nil {
 		return false, err
 	}
-	t.root = normalizeNode[I, S, E](updated)
+	t.root = normalizeNode[I](updated)
 	t.normalizeRoot()
 	t.assertDeleteRootNormalized()
 	return needsRebalance, nil
@@ -557,14 +561,16 @@ func (t *Tree[I, S, E]) assertDeleteRootNormalized() {
 //
 // The algorithm is path-copy and mirrors insertion unwind structure.
 func (t *Tree[I, S, E]) deleteRecursive(
-	n treeNode[I, S, E], height, index int, isRoot bool,
-) (updated treeNode[I, S, E], needsRebalance bool, err error) {
+	n treeNode[I, S, E], height int, index int64, isRoot bool) (
+	updated treeNode[I, S, E], needsRebalance bool, err error) {
+	//
 	assert(n != nil, "deleteRecursive called with nil node")
 	assert(height > 0, "deleteRecursive called with invalid height")
 	if height == 1 {
 		leaf, ok := n.(*leafNode[I, S, E])
 		assert(ok, "deleteRecursive expected leaf at height 1")
-		if index < 0 || index >= len(leaf.items) {
+		//if index < 0 || index >= len(leaf.items) {
+		if index < 0 || index >= leaf.Weight() {
 			return nil, false, ErrIndexOutOfBounds
 		}
 		cloned := t.cloneLeaf(leaf)
@@ -618,7 +624,7 @@ func (t *Tree[I, S, E]) deleteRecursive(
 // insertOneAt inserts one item into this tree in place.
 //
 // Like deleteOneAt, callers should use a private clone to preserve persistence.
-func (t *Tree[I, S, E]) insertOneAt(index int, item I) error {
+func (t *Tree[I, S, E]) insertOneAt(index int64, item I) error {
 	if t.root == nil {
 		t.root = t.makeLeaf([]I{item})
 		t.height = 1
@@ -641,16 +647,18 @@ func (t *Tree[I, S, E]) insertOneAt(index int, item I) error {
 // insertRecursive inserts one item into subtree n and propagates split results.
 //
 // The returned promoted sibling is non-nil only when the updated subtree split.
-func (t *Tree[I, S, E]) insertRecursive(n treeNode[I, S, E], height, index int, item I) (treeNode[I, S, E], treeNode[I, S, E], error) {
+func (t *Tree[I, S, E]) insertRecursive(n treeNode[I, S, E], height int, index int64, item I) (treeNode[I, S, E], treeNode[I, S, E], error) {
 	assert(n != nil, "insertRecursive called with nil node")
 	assert(height > 0, "insertRecursive called with invalid height")
 	if height == 1 {
 		leaf, ok := n.(*leafNode[I, S, E])
 		assert(ok, "insertRecursive expected leaf at height 1")
 		left, right, err := t.insertIntoLeafLocal(leaf, index, item)
-		if err != nil {
-			assert(false, err.Error())
-		}
+		assert(err == nil, "insert into leaf failed")
+		// todo remove
+		// if err != nil {
+		// 	assert(false, err.Error())
+		// }
 		return left, normalizeNode[I, S, E](right), nil
 	}
 
@@ -658,13 +666,17 @@ func (t *Tree[I, S, E]) insertRecursive(n treeNode[I, S, E], height, index int, 
 	assert(ok, "insertRecursive expected internal node")
 	cloned := t.cloneInner(inner)
 	slot, localIndex, err := t.locateChildForInsert(cloned, index)
-	if err != nil {
-		assert(false, err.Error())
-	}
+	assert(err == nil, "locate child for insert failed")
+	// todo remove
+	// if err != nil {
+	// 	assert(false, err.Error())
+	// }
 	updatedChild, promotedChild, err := t.insertRecursive(cloned.children[slot], height-1, localIndex, item)
-	if err != nil {
-		assert(false, err.Error())
-	}
+	assert(err == nil, "insert into child failed")
+	// todo remove
+	// if err != nil {
+	// 	assert(false, err.Error())
+	// }
 	promotedChild = normalizeNode[I, S, E](promotedChild)
 	cloned.children[slot] = updatedChild
 	if promotedChild != nil {
@@ -676,9 +688,11 @@ func (t *Tree[I, S, E]) insertRecursive(n treeNode[I, S, E], height, index int, 
 		return cloned, nil, nil
 	}
 	left, right, err := t.splitInner(cloned)
-	if err != nil {
-		assert(false, err.Error())
-	}
+	assert(err == nil, "split inner failed")
+	// todo remove
+	// if err != nil {
+	// 	assert(false, err.Error())
+	// }
 	return left, normalizeNode[I, S, E](right), nil
 }
 
@@ -686,13 +700,16 @@ func (t *Tree[I, S, E]) insertRecursive(n treeNode[I, S, E], height, index int, 
 //
 // It uses `remaining <= childItems` so boundary indices land in the left child,
 // matching insertion semantics at child seams.
-func (t *Tree[I, S, E]) locateChildForInsert(inner *innerNode[I, S, E], index int) (childSlot int, localIndex int, err error) {
+func (t *Tree[I, S, E]) locateChildForInsert(inner *innerNode[I, S, E], index int64) (
+	childSlot int, localIndex int64, err error) {
+	//
 	assert(inner != nil, "locateChildForInsert called with nil inner node")
 	assert(len(inner.children) > 0, "locateChildForInsert called with empty children")
 	assert(index >= 0, "locateChildForInsert called with negative index")
 	remaining := index
 	for i, child := range inner.children {
 		childItems := t.countItems(child)
+		assert(childItems == child.Weight(), "child weight mismatch")
 		if remaining <= childItems {
 			return i, remaining, nil
 		}
@@ -706,7 +723,9 @@ func (t *Tree[I, S, E]) locateChildForInsert(inner *innerNode[I, S, E], index in
 //
 // It uses `remaining < childItems` so each absolute index is owned by exactly
 // one child.
-func (t *Tree[I, S, E]) locateChildForDelete(inner *innerNode[I, S, E], index int) (childSlot int, localIndex int, err error) {
+func (t *Tree[I, S, E]) locateChildForDelete(inner *innerNode[I, S, E], index int64) (
+	childSlot int, localIndex int64, err error) {
+	//
 	assert(inner != nil, "locateChildForDelete called with nil inner node")
 	assert(len(inner.children) > 0, "locateChildForDelete called with empty children")
 	if index < 0 {
@@ -715,6 +734,7 @@ func (t *Tree[I, S, E]) locateChildForDelete(inner *innerNode[I, S, E], index in
 	remaining := index
 	for i, child := range inner.children {
 		childItems := t.countItems(child)
+		assert(childItems == child.Weight(), "child weight mismatch")
 		if remaining < childItems {
 			return i, remaining, nil
 		}
@@ -782,8 +802,9 @@ func (t *Tree[I, S, E]) rebalanceLeafChild(parent *innerNode[I, S, E], slot int)
 			}
 			leftClone := t.cloneLeaf(left)
 			parent.children[slot-1] = leftClone
-			borrowed := leftClone.items[len(leftClone.items)-1]
-			t.removeLeafItemsRange(leftClone, len(leftClone.items)-1, len(leftClone.items))
+			l_w := int64(len(leftClone.items))
+			borrowed := leftClone.items[l_w-1]
+			t.removeLeafItemsRange(leftClone, l_w-1, l_w)
 			t.insertLeafItemsAt(child, 0, borrowed)
 			t.recomputeLeafSummary(leftClone)
 			t.recomputeLeafSummary(child)
@@ -800,7 +821,8 @@ func (t *Tree[I, S, E]) rebalanceLeafChild(parent *innerNode[I, S, E], slot int)
 			parent.children[slot+1] = rightClone
 			borrowed := rightClone.items[0]
 			t.removeLeafItemsRange(rightClone, 0, 1)
-			t.insertLeafItemsAt(child, len(child.items), borrowed)
+			l_w := int64(len(child.items))
+			t.insertLeafItemsAt(child, l_w, borrowed)
 			t.recomputeLeafSummary(rightClone)
 			t.recomputeLeafSummary(child)
 			t.recomputeInnerSummary(parent)

@@ -19,6 +19,7 @@ func (t *Tree[I, S, E]) makeLeaf(items []I) *leafNode[I, S, E] {
 	for _, item := range leaf.items {
 		leaf.summary = t.cfg.Monoid.Add(leaf.summary, item.Summary())
 	}
+	tracer().Debugf("btree: created leaf %v with %d items", leaf, len(leaf.items))
 	return leaf
 }
 
@@ -38,7 +39,10 @@ func (t *Tree[I, S, E]) makeInternal(children ...treeNode[I, S, E]) *innerNode[I
 		}
 	}
 	for _, child := range inner.children {
+		inner.weight += child.Weight()
 		inner.summary = t.cfg.Monoid.Add(inner.summary, child.Summary())
 	}
+	tracer().Debugf("btree: created internal node %v with %d children", inner, len(inner.children))
+	assert(inner.weight >= int64(len(inner.children)), "tree weight not set correctly")
 	return inner
 }

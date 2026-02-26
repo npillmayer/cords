@@ -162,7 +162,7 @@ func (cord Cord) validatePos(p Pos) error {
 	return nil
 }
 
-func prefixSummaryBeforeItem(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], itemIndex int) (chunk.Summary, error) {
+func prefixSummaryBeforeItem(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT], itemIndex int64) (chunk.Summary, error) {
 	return tree.PrefixSummary(itemIndex)
 }
 

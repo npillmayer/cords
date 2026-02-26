@@ -178,7 +178,7 @@ func (cord CordEx[E]) Ext() (E, bool) {
 }
 
 // PrefixExt returns the aggregated extension value for chunk range [0,itemIndex).
-func (cord CordEx[E]) PrefixExt(itemIndex int) (E, error) {
+func (cord CordEx[E]) PrefixExt(itemIndex int64) (E, error) {
 	tree, err := treeFromCordEx(cord)
 	if err != nil {
 		var zero E

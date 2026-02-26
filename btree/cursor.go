@@ -66,7 +66,7 @@ func NewExtCursor[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], dim
 // For target <= Zero() or an empty tree, Seek returns (0, Zero(), nil). If the
 // target is beyond the total accumulated dimension, Seek returns (Len(), total,
 // nil).
-func (c *Cursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error) {
+func (c *Cursor[I, S, E, K]) Seek(target K) (itemIndex int64, acc K, err error) {
 	if c == nil || c.tree == nil || c.dim == nil {
 		var zero K
 		return 0, zero, fmt.Errorf("%w: cursor not initialized", ErrInvalidDimension)
@@ -88,7 +88,7 @@ func (c *Cursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error) {
 //
 // Returns found=false when target is at/before Zero(), when the tree is empty,
 // or when target is beyond the total accumulated dimension.
-func (c *Cursor[I, S, E, K]) SeekItem(target K) (itemIndex int, item I, acc K, found bool, err error) {
+func (c *Cursor[I, S, E, K]) SeekItem(target K) (itemIndex int64, item I, acc K, found bool, err error) {
 	if c == nil || c.tree == nil || c.dim == nil {
 		var zeroI I
 		var zeroK K
@@ -112,7 +112,7 @@ func (c *Cursor[I, S, E, K]) SeekItem(target K) (itemIndex int, item I, acc K, f
 // For target <= Zero() or an empty tree, Seek returns (0, Zero(), nil). If the
 // target is beyond the total accumulated extension dimension, Seek returns
 // (Len(), total, nil).
-func (c *ExtCursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error) {
+func (c *ExtCursor[I, S, E, K]) Seek(target K) (itemIndex int64, acc K, err error) {
 	if c == nil || c.tree == nil || c.dim == nil {
 		var zero K
 		return 0, zero, fmt.Errorf("%w: cursor not initialized", ErrInvalidDimension)
@@ -139,7 +139,7 @@ func (c *ExtCursor[I, S, E, K]) Seek(target K) (itemIndex int, acc K, err error)
 //
 // Returns found=false when target is at/before Zero(), when the tree is empty,
 // or when target is beyond the total accumulated extension dimension.
-func (c *ExtCursor[I, S, E, K]) SeekItem(target K) (itemIndex int, item I, acc K, found bool, err error) {
+func (c *ExtCursor[I, S, E, K]) SeekItem(target K) (itemIndex int64, item I, acc K, found bool, err error) {
 	if c == nil || c.tree == nil || c.dim == nil {
 		var zeroI I
 		var zeroK K
@@ -164,7 +164,9 @@ func (c *ExtCursor[I, S, E, K]) SeekItem(target K) (itemIndex int, item I, acc K
 	return seekItemWithOps(c.tree, target, ops)
 }
 
-func seekWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], target K, ops seekOps[I, S, E, K]) (itemIndex int, acc K, err error) {
+func seekWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], target K,
+	ops seekOps[I, S, E, K]) (itemIndex int64, acc K, err error) {
+	//
 	if tree.root == nil {
 		return 0, ops.zero, nil
 	}
@@ -182,7 +184,10 @@ func seekWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], targ
 	return tree.Len(), reached, nil
 }
 
-func seekItemWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], target K, ops seekOps[I, S, E, K]) (itemIndex int, item I, acc K, found bool, err error) {
+func seekItemWithOps[I SummarizedItem[S], S, E any, K any](
+	tree *Tree[I, S, E], target K, ops seekOps[I, S, E, K]) (
+	itemIndex int64, item I, acc K, found bool, err error) {
+	//
 	var zeroI I
 	if tree.root == nil {
 		return 0, zeroI, ops.zero, false, nil
@@ -205,7 +210,10 @@ func seekItemWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], 
 // reaches target.
 //
 // `startIndex` and `acc` describe the prefix state before subtree n.
-func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], n treeNode[I, S, E], startIndex int, acc K, target K, ops seekOps[I, S, E, K]) (idx int, reached K, found bool, err error) {
+func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E],
+	n treeNode[I, S, E], startIndex int64, acc K, target K, ops seekOps[I, S, E, K]) (
+	idx int64, reached K, found bool, err error) {
+	//
 	assert(n != nil, "seekNodeWithOps called with nil node")
 	if n.isLeaf() {
 		leaf := n.(*leafNode[I, S, E])
@@ -213,11 +221,11 @@ func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], 
 		for i, item := range leaf.items {
 			next := ops.addItem(cur, item)
 			if ops.compare(next, target) >= 0 {
-				return startIndex + i, next, true, nil
+				return startIndex + int64(i), next, true, nil
 			}
 			cur = next
 		}
-		return startIndex + len(leaf.items), cur, false, nil
+		return startIndex + int64(len(leaf.items)), cur, false, nil
 	}
 	inner := n.(*innerNode[I, S, E])
 	curIdx := startIndex
@@ -238,7 +246,10 @@ func seekNodeWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], 
 // reaches target.
 //
 // `startIndex` and `acc` describe the prefix state before subtree n.
-func seekNodeItemWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, E], n treeNode[I, S, E], startIndex int, acc K, target K, ops seekOps[I, S, E, K]) (idx int, item I, reached K, found bool, err error) {
+func seekNodeItemWithOps[I SummarizedItem[S], S, E any, K any](
+	tree *Tree[I, S, E], n treeNode[I, S, E], startIndex int64, acc K, target K, ops seekOps[I, S, E, K]) (
+	idx int64, item I, reached K, found bool, err error) {
+	//
 	assert(n != nil, "seekNodeItemWithOps called with nil node")
 	var zeroI I
 	if n.isLeaf() {
@@ -247,11 +258,13 @@ func seekNodeItemWithOps[I SummarizedItem[S], S, E any, K any](tree *Tree[I, S, 
 		for i, entry := range leaf.items {
 			next := ops.addItem(cur, entry)
 			if ops.compare(next, target) >= 0 {
-				return startIndex + i, entry, next, true, nil
+				return startIndex + int64(i), entry, next, true, nil
 			}
 			cur = next
 		}
-		return startIndex + len(leaf.items), zeroI, cur, false, nil
+		// remove this
+		//return startIndex + len(leaf.items), zeroI, cur, false, nil
+		return startIndex + leaf.Weight(), zeroI, cur, false, nil
 	}
 	inner := n.(*innerNode[I, S, E])
 	curIdx := startIndex

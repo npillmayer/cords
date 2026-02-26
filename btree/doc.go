@@ -42,9 +42,9 @@ package btree
 
 import "github.com/npillmayer/schuko/tracing"
 
-// tracer traces with key 'cords'.
+// tracer traces with key 'cords.btree'.
 func tracer() tracing.Trace {
-	return tracing.Select("cords")
+	return tracing.Select("cords.btree")
 }
 
 func assert(condition bool, msg string) {

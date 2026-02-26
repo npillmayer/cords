@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 type countingExt struct {
@@ -34,7 +36,7 @@ func TestNewRejectsExtensionWithEmptyMagicID(t *testing.T) {
 }
 
 func TestNewStoresMonoidConfig(t *testing.T) {
-	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
@@ -47,7 +49,7 @@ func TestNewStoresMonoidConfig(t *testing.T) {
 }
 
 func TestCheckEmptyTree(t *testing.T) {
-	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
@@ -62,7 +64,7 @@ func TestCheckEmptyTree(t *testing.T) {
 }
 
 func TestCheckManualLeafRoot(t *testing.T) {
-	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
@@ -122,7 +124,7 @@ func collectTextItems[E any](tree *Tree[textChunk, textSummary, E]) []string {
 }
 
 func TestInsertAtNoOpReturnsSameTree(t *testing.T) {
-	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
@@ -138,7 +140,7 @@ func TestInsertAtNoOpReturnsSameTree(t *testing.T) {
 }
 
 func TestInsertAtBuildsTreeAndPreservesOriginal(t *testing.T) {
-	base, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	base, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
@@ -177,15 +179,75 @@ func TestInsertAtBuildsTreeAndPreservesOriginal(t *testing.T) {
 	}
 }
 
+func TestInsertAtRootRecalculatesWeight(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords.btree")
+	defer teardown()
+	//
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// trigger internal split/root growth.
+	for i := range MaxLeafItems + 1 {
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	if tree.root.isLeaf() {
+		t.Fatalf("expected root to be internal")
+	}
+	if tree.root.Weight() == 0 {
+		t.Fatalf("tree weight not set correctly")
+	}
+}
+
+func TestDeleteRecalculatesWeight(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords.btree")
+	defer teardown()
+	//
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
+		Monoid: textMonoid{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// trigger internal split/root growth.
+	for i := range MaxLeafItems + 1 {
+		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
+		if err != nil {
+			t.Fatalf("insert %d failed: %v", i, err)
+		}
+	}
+	if tree.Len() != MaxLeafItems+1 {
+		t.Fatalf("expected tree length %d, got %d", MaxLeafItems+1, tree.Len())
+	}
+	if tree, err = tree.DeleteRange(MaxLeafItems, 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !tree.root.isLeaf() {
+		t.Logf("tree top-node: %v", tree.root)
+		n := tree.root.(*innerNode[textChunk, textSummary, NO_EXT])
+		for _, child := range n.children {
+			t.Logf("child: %v, leaf=%v", child, child.isLeaf())
+		}
+	}
+	if tree.root.Weight() != MaxLeafItems {
+		t.Fatalf("expected tree length %d, got %d", MaxLeafItems, tree.Len())
+	}
+}
+
 func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
-	tree, err := New[textChunk, textSummary](Config[textChunk, textSummary, NO_EXT]{
+	tree, err := New(Config[textChunk, textSummary, NO_EXT]{
 		Monoid: textMonoid{},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// With fixed degree 12, a few hundred items trigger internal split/root growth.
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		tree, err = tree.InsertAt(tree.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
@@ -201,7 +263,7 @@ func TestInsertAtRootSplitAndInternalPropagation(t *testing.T) {
 	if len(got) != 200 {
 		t.Fatalf("unexpected item count: %d", len(got))
 	}
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		if got[i] != strconv.Itoa(i) {
 			t.Fatalf("unexpected order at %d: got %q want %q", i, got[i], strconv.Itoa(i))
 		}
@@ -215,7 +277,7 @@ func TestSplitAtKeepsOrderAndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		base, err = base.InsertAt(base.Len(), fromString(strconv.Itoa(i)))
 		if err != nil {
 			t.Fatalf("insert %d failed: %v", i, err)
@@ -1258,25 +1320,27 @@ func TestSplitAtStructuralOnlyAcrossAllBoundaries(t *testing.T) {
 		}
 	}
 	all := collectTextItems(tree)
-	for split := 0; split <= len(all); split++ {
+	l_all := int64(len(all))
+	for split := range l_all {
 		left, right, err := tree.SplitAt(split)
 		if err != nil {
 			t.Fatalf("split at %d failed: %v", split, err)
 		}
 		gotLeft := collectTextItems(left)
 		gotRight := collectTextItems(right)
-		if len(gotLeft) != split {
+		if int64(len(gotLeft)) != split {
 			t.Fatalf("split %d: left length mismatch got=%d want=%d", split, len(gotLeft), split)
 		}
-		if len(gotRight) != len(all)-split {
-			t.Fatalf("split %d: right length mismatch got=%d want=%d", split, len(gotRight), len(all)-split)
+		if int64(len(gotRight)) != l_all-split {
+			t.Fatalf("split %d: right length mismatch got=%d want=%d",
+				split, len(gotRight), l_all-split)
 		}
-		for i := 0; i < split; i++ {
+		for i := range split {
 			if gotLeft[i] != all[i] {
 				t.Fatalf("split %d: left mismatch at %d", split, i)
 			}
 		}
-		for i := split; i < len(all); i++ {
+		for i := split; i < l_all; i++ {
 			if gotRight[i-split] != all[i] {
 				t.Fatalf("split %d: right mismatch at %d", split, i)
 			}

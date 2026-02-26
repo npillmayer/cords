@@ -52,9 +52,11 @@ func TestItemRange(t *testing.T) {
 	}
 }
 
-func collectItemRange(tree *Tree[textChunk, textSummary, NO_EXT], from, to int) ([]string, []int) {
+func collectItemRange(tree *Tree[textChunk, textSummary, NO_EXT], from, to int64) (
+	[]string, []int64) {
+	//
 	items := make([]string, 0, max(0, to-from))
-	indexes := make([]int, 0, max(0, to-from))
+	indexes := make([]int64, 0, max(0, to-from))
 	for item, idx := range tree.ItemRange(from, to) {
 		items = append(items, item.String())
 		indexes = append(indexes, idx)
@@ -80,7 +82,7 @@ func TestItemRangeEmptyAndSingle(t *testing.T) {
 
 	last := tree.Len() - 1
 	items, indexes = collectItemRange(tree, last, tree.Len())
-	if len(items) != 1 || items[0] != strconv.Itoa(last) {
+	if len(items) != 1 || items[0] != strconv.Itoa(int(last)) {
 		t.Fatalf("single-item tail range mismatch: %v", items)
 	}
 	if len(indexes) != 1 || indexes[0] != last {
@@ -93,14 +95,14 @@ func TestItemRangeCrossLeafAndIndexes(t *testing.T) {
 	defer teardown()
 
 	tree := buildTextTree(t, 60)
-	from, to := 10, 19
+	var from, to int64 = 10, 19
 	items, indexes := collectItemRange(tree, from, to)
-	if len(items) != to-from {
+	if len(items) != int(to-from) {
 		t.Fatalf("range length mismatch: got=%d want=%d (%v)", len(items), to-from, items)
 	}
 	for i := from; i < to; i++ {
 		slot := i - from
-		wantItem := strconv.Itoa(i)
+		wantItem := strconv.Itoa(int(i))
 		if items[slot] != wantItem {
 			t.Fatalf("range item mismatch at %d: got=%v want=%v", slot, items, wantItem)
 		}
@@ -115,7 +117,7 @@ func TestItemRangeLastThreeLargeTree(t *testing.T) {
 	from := tree.Len() - 3
 	items, indexes := collectItemRange(tree, from, tree.Len())
 	wantItems := []string{"997", "998", "999"}
-	wantIdx := []int{997, 998, 999}
+	wantIdx := []int64{997, 998, 999}
 	if len(items) != len(wantItems) {
 		t.Fatalf("tail range length mismatch: got=%d want=%d (%v)", len(items), len(wantItems), items)
 	}

@@ -1,7 +1,7 @@
 package btree
 
 // At returns the leaf item at item index.
-func (t *Tree[I, S, E]) At(index int) (I, error) {
+func (t *Tree[I, S, E]) At(index int64) (I, error) {
 	var zero I
 	if t == nil || t.root == nil {
 		return zero, ErrIndexOutOfBounds
@@ -12,13 +12,15 @@ func (t *Tree[I, S, E]) At(index int) (I, error) {
 	return t.atNode(t.root, t.height, index)
 }
 
-func (t *Tree[I, S, E]) atNode(n treeNode[I, S, E], height int, index int) (I, error) {
+func (t *Tree[I, S, E]) atNode(n treeNode[I, S, E], height int, index int64) (I, error) {
 	var zero I
+	assert(index >= 0, "search for negative index in atNode")
 	assert(n != nil, "atNode called with nil node")
 	assert(height > 0, "atNode called with non-positive height")
 	if height == 1 {
 		leaf := n.(*leafNode[I, S, E])
-		if index < 0 || index >= len(leaf.items) {
+		//if index < 0 || index >= len(leaf.items) {
+		if index < 0 || index >= leaf.Weight() {
 			return zero, ErrIndexOutOfBounds
 		}
 		return leaf.items[index], nil
@@ -26,7 +28,8 @@ func (t *Tree[I, S, E]) atNode(n treeNode[I, S, E], height int, index int) (I, e
 	inner := n.(*innerNode[I, S, E])
 	remaining := index
 	for _, child := range inner.children {
-		childItems := t.countItems(child)
+		childItems := child.Weight()
+		//childItems := t.countItems(child)
 		if remaining < childItems {
 			return t.atNode(child, height-1, remaining)
 		}
@@ -40,7 +43,7 @@ func (t *Tree[I, S, E]) atNode(n treeNode[I, S, E], height int, index int) (I, e
 //
 // itemIndex may be equal to Len(), in which case the full tree summary is
 // returned. itemIndex must not be negative.
-func (t *Tree[I, S, E]) PrefixSummary(itemIndex int) (S, error) {
+func (t *Tree[I, S, E]) PrefixSummary(itemIndex int64) (S, error) {
 	zero := t.cfg.Monoid.Zero()
 	if t == nil || t.root == nil {
 		if itemIndex == 0 {
@@ -61,7 +64,7 @@ func (t *Tree[I, S, E]) PrefixSummary(itemIndex int) (S, error) {
 //
 // itemIndex may be equal to Len(), in which case the full extension value is
 // returned. itemIndex must not be negative.
-func (t *Tree[I, S, E]) PrefixExt(itemIndex int) (E, error) {
+func (t *Tree[I, S, E]) PrefixExt(itemIndex int64) (E, error) {
 	var zero E
 	if t == nil {
 		return zero, ErrInvalidConfig
@@ -84,7 +87,7 @@ func (t *Tree[I, S, E]) PrefixExt(itemIndex int) (E, error) {
 	return t.prefixExtNode(t.root, t.height, itemIndex, t.cfg.Extension.Zero())
 }
 
-func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remaining int, acc S) (S, error) {
+func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remaining int64, acc S) (S, error) {
 	assert(n != nil, "prefixSummaryNode called with nil node")
 	assert(height > 0, "prefixSummaryNode called with non-positive height")
 	assert(remaining >= 0, "prefixSummaryNode called with negative remaining")
@@ -94,12 +97,13 @@ func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remai
 	}
 	if height == 1 {
 		leaf := n.(*leafNode[I, S, E])
-		if remaining > len(leaf.items) {
+		//if remaining > len(leaf.items) {
+		if remaining > leaf.Weight() {
 			var zero S
 			return zero, ErrIndexOutOfBounds
 		}
 		sum := acc
-		for i := 0; i < remaining; i++ {
+		for i := range remaining {
 			sum = t.cfg.Monoid.Add(sum, leaf.items[i].Summary())
 		}
 		return sum, nil
@@ -109,7 +113,8 @@ func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remai
 	sum := acc
 	rem := remaining
 	for _, child := range inner.children {
-		childItems := t.countItems(child)
+		//childItems := t.countItems(child)
+		childItems := child.Weight()
 		if rem >= childItems {
 			sum = t.cfg.Monoid.Add(sum, child.Summary())
 			rem -= childItems
@@ -125,7 +130,7 @@ func (t *Tree[I, S, E]) prefixSummaryNode(n treeNode[I, S, E], height int, remai
 	return zero, ErrIndexOutOfBounds
 }
 
-func (t *Tree[I, S, E]) prefixExtNode(n treeNode[I, S, E], height int, remaining int, acc E) (E, error) {
+func (t *Tree[I, S, E]) prefixExtNode(n treeNode[I, S, E], height int, remaining int64, acc E) (E, error) {
 	assert(n != nil, "prefixExtNode called with nil node")
 	assert(height > 0, "prefixExtNode called with non-positive height")
 	assert(remaining >= 0, "prefixExtNode called with negative remaining")
@@ -135,7 +140,7 @@ func (t *Tree[I, S, E]) prefixExtNode(n treeNode[I, S, E], height int, remaining
 	}
 	if height == 1 {
 		leaf := n.(*leafNode[I, S, E])
-		if remaining > len(leaf.items) {
+		if remaining > leaf.Weight() {
 			var zero E
 			return zero, ErrIndexOutOfBounds
 		}

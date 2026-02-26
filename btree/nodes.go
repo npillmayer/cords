@@ -13,6 +13,7 @@ const (
 type treeNode[I SummarizedItem[S], S, E any] interface {
 	isLeaf() bool
 	Summary() S
+	Weight() int64
 	Ext() E
 }
 
@@ -28,9 +29,10 @@ type leafNode[I SummarizedItem[S], S, E any] struct {
 	items []I
 }
 
-func (l *leafNode[I, S, E]) isLeaf() bool { return true }
-func (l *leafNode[I, S, E]) Summary() S   { return l.summary }
-func (n *leafNode[I, S, E]) Ext() E       { return n.ext }
+func (l *leafNode[I, S, E]) isLeaf() bool  { return true }
+func (l *leafNode[I, S, E]) Summary() S    { return l.summary }
+func (l *leafNode[I, S, E]) Weight() int64 { return int64(l.n) }
+func (n *leafNode[I, S, E]) Ext() E        { return n.ext }
 
 func (l *leafNode[I, S, E]) String() string {
 	return fmt.Sprintf("[%d items]", l.n)
@@ -39,6 +41,8 @@ func (l *leafNode[I, S, E]) String() string {
 type innerNode[I SummarizedItem[S], S, E any] struct {
 	summary S
 	ext     E
+	// weight is the sum of the weight of all the descendents of this node
+	weight int64
 	// n is the logical child count; valid children are childStore[:n].
 	n uint8
 	// childStore is the fixed backing storage for child pointers.
@@ -48,12 +52,13 @@ type innerNode[I SummarizedItem[S], S, E any] struct {
 	children []treeNode[I, S, E]
 }
 
-func (n *innerNode[I, S, E]) isLeaf() bool { return false }
-func (n *innerNode[I, S, E]) Summary() S   { return n.summary }
-func (n *innerNode[I, S, E]) Ext() E       { return n.ext }
+func (n *innerNode[I, S, E]) isLeaf() bool  { return false }
+func (n *innerNode[I, S, E]) Summary() S    { return n.summary }
+func (n *innerNode[I, S, E]) Weight() int64 { return n.weight }
+func (n *innerNode[I, S, E]) Ext() E        { return n.ext }
 
 func (n *innerNode[I, S, E]) String() string {
-	return fmt.Sprintf("[%d kids]", n.n)
+	return fmt.Sprintf("[%d kids:%d]", n.n, n.weight)
 }
 
 // SummarizedItem ties a leaf item to its summary type at compile time.

@@ -19,12 +19,18 @@ func (t *Tree[I, S, E]) Check() error {
 	if t.height <= 0 {
 		return fmt.Errorf("%w: non-empty tree must have height > 0", ErrInvalidConfig)
 	}
-	_, height, err := t.checkNode(t.root, true)
+	w, height, err := t.checkNode(t.root, true)
 	if err != nil {
 		return err
 	}
 	if height != t.height {
 		return fmt.Errorf("%w: height mismatch (%d != %d)", ErrInvalidConfig, height, t.height)
+	}
+	if t.root.Weight() <= 0 {
+		return fmt.Errorf("%w: weight in top node=%d)", ErrInvalidConfig, t.root.Weight())
+	}
+	if w != int(t.root.Weight()) {
+		return fmt.Errorf("%w: weight mismatch (%d != %d)", ErrInvalidConfig, w, t.root.Weight())
 	}
 	return nil
 }

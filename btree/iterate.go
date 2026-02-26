@@ -39,20 +39,20 @@ func (t *Tree[I, S, E]) forEachItemNode(n treeNode[I, S, E], fn func(item I) boo
 // The yielded pair is (item, absoluteItemIndex). ItemRange delegates to the
 // internal traversal helper and currently suppresses traversal errors in the
 // iterator closure.
-func (t *Tree[I, S, E]) ItemRange(from, to int) iter.Seq2[I, int] {
+func (t *Tree[I, S, E]) ItemRange(from, to int64) iter.Seq2[I, int64] {
 	var t_, from_, to_ = t, from, to
-	return func(yield func(I, int) bool) {
+	return func(yield func(I, int64) bool) {
 		_, _ = t_.forEachItemRange(yield, from_, to_)
 	}
 }
 
 type where[I any] struct {
-	acc      int               // item count to the left of current leaf, variable
-	from, to int               // const
-	fn       func(I, int) bool // const
+	acc      int64               // item count to the left of current leaf, variable
+	from, to int64               // const
+	fn       func(I, int64) bool // const
 }
 
-func (t *Tree[I, S, E]) forEachItemRange(fn func(I, int) bool, from, to int) (int, error) {
+func (t *Tree[I, S, E]) forEachItemRange(fn func(I, int64) bool, from, to int64) (int64, error) {
 	w := where[I]{acc: 0, from: from, to: to, fn: fn}
 	p := pipeFor(t, fn != nil, from < to)
 	acc := pipeCall3(p, t.traverseItems, t.root, &w, t.height)
@@ -68,7 +68,7 @@ func (t *Tree[I, S, E]) forEachItemRange(fn func(I, int) bool, from, to int) (in
 // - 0 <= i < item.len
 // - from <= acc + i < to; otherwise skip or break
 func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height int) (
-	int, error) {
+	int64, error) {
 	//
 	assert(n != nil, "traverseItems called with nil node")
 	assert(height > 0, "traverseItems called with non-positive height")
@@ -78,23 +78,24 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 	if height == 1 { // we are in a leaf node
 		leaf := n.(*leafNode[I, S, E])
 		assert(w.acc < w.to, "traverseItems: travelled too far")
-		if w.acc+int(leaf.n) >= w.from { // leaf contains items in range
+		if w.acc+int64(leaf.n) >= w.from { // leaf contains items in range
 			for i := range leaf.n { // iterate over all items of leaf
-				if w.acc+int(i) < w.from {
+				if w.acc+int64(i) < w.from {
 					continue // not yet in range
-				} else if w.acc+int(i) >= w.to {
+				} else if w.acc+int64(i) >= w.to {
 					break // past range
 				}
 				// now: from <= acc + i < to
-				w.fn(leaf.items[i], w.acc+int(i)) // may be `yield(…)`
+				w.fn(leaf.items[i], w.acc+int64(i)) // may be `yield(…)`
 			}
 		}
-		w.acc += int(leaf.n) // jump past leaf
-		return w.acc, nil    // possibly go up to next recursion step
+		w.acc += int64(leaf.n) // jump past leaf
+		return w.acc, nil      // possibly go up to next recursion step
 	}
 	inner := n.(*innerNode[I, S, E])
 	for _, child := range inner.children {
-		itemcnt := t.countItems(child)
+		//itemcnt := t.countItems(child)
+		itemcnt := child.Weight()
 		if w.acc+itemcnt >= w.from { // child contains items in range
 			if n, err := t.traverseItems(child, w, height-1); err != nil {
 				return n, err

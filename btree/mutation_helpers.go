@@ -35,6 +35,7 @@ func (t *Tree[I, S, E]) cloneInner(inner *innerNode[I, S, E]) *innerNode[I, S, E
 	assert(inner != nil, "cloneInner called with nil inner node")
 	cloned := &innerNode[I, S, E]{
 		summary: inner.summary,
+		weight:  inner.weight,
 		ext:     inner.ext,
 		n:       inner.n,
 	}
@@ -88,8 +89,10 @@ func (t *Tree[I, S, E]) recomputeInnerSummary(inner *innerNode[I, S, E]) {
 	if t.cfg.Extension != nil {
 		inner.ext = t.cfg.Extension.Zero()
 	}
+	inner.weight = 0
 	for _, child := range inner.children {
 		if child != nil {
+			inner.weight += child.Weight()
 			inner.summary = t.cfg.Monoid.Add(inner.summary, child.Summary())
 			if t.cfg.Extension != nil {
 				inner.ext = t.cfg.Extension.Add(inner.ext, child.Ext())
@@ -155,15 +158,15 @@ func (t *Tree[I, S, E]) removeChildAt(inner *innerNode[I, S, E], idx int) {
 //
 // The leaf may temporarily exceed normal occupancy (up to overflow storage),
 // which is resolved by higher-level split logic.
-func (t *Tree[I, S, E]) insertLeafItemsAt(leaf *leafNode[I, S, E], idx int, values ...I) {
+func (t *Tree[I, S, E]) insertLeafItemsAt(leaf *leafNode[I, S, E], idx int64, values ...I) {
 	assert(leaf != nil, "insertLeafItemsAt called with nil leaf")
-	assert(idx >= 0 && idx <= len(leaf.items), "insertLeafItemsAt index out of range")
+	assert(idx >= 0 && idx <= leaf.Weight(), "insertLeafItemsAt index out of range")
 	if len(values) == 0 {
 		return
 	}
-	n := len(leaf.items)
-	k := len(values)
-	assert(n+k <= len(leaf.itemStore), "insertLeafItemsAt exceeds fixed leaf capacity")
+	n := leaf.Weight()
+	k := int64(len(values))
+	assert(n+k <= int64(len(leaf.itemStore)), "insertLeafItemsAt exceeds fixed leaf capacity")
 	if idx < n {
 		copy(leaf.itemStore[idx+k:n+k], leaf.itemStore[idx:n])
 	}
@@ -173,13 +176,13 @@ func (t *Tree[I, S, E]) insertLeafItemsAt(leaf *leafNode[I, S, E], idx int, valu
 }
 
 // removeLeafItemsRange removes half-open interval [from,to) from a leaf.
-func (t *Tree[I, S, E]) removeLeafItemsRange(leaf *leafNode[I, S, E], from, to int) {
+func (t *Tree[I, S, E]) removeLeafItemsRange(leaf *leafNode[I, S, E], from, to int64) {
 	assert(leaf != nil, "removeLeafItemsRange called with nil leaf")
-	assert(from >= 0 && from <= to && to <= len(leaf.items), "removeLeafItemsRange bounds invalid")
+	assert(from >= 0 && from <= to && to <= leaf.Weight(), "removeLeafItemsRange bounds invalid")
 	if from == to {
 		return
 	}
-	n := len(leaf.items)
+	n := leaf.Weight()
 	k := to - from
 	if to < n {
 		copy(leaf.itemStore[from:n-k], leaf.itemStore[to:n])
@@ -224,9 +227,9 @@ func (t *Tree[I, S, E]) innerUnderflow(inner *innerNode[I, S, E], isRoot bool) b
 //
 // It returns the updated (left) leaf and optionally a promoted right sibling if
 // a split occurred.
-func (t *Tree[I, S, E]) insertIntoLeafLocal(leaf *leafNode[I, S, E], index int, items ...I) (*leafNode[I, S, E], *leafNode[I, S, E], error) {
+func (t *Tree[I, S, E]) insertIntoLeafLocal(leaf *leafNode[I, S, E], index int64, items ...I) (*leafNode[I, S, E], *leafNode[I, S, E], error) {
 	assert(leaf != nil, "insertIntoLeafLocal called with nil leaf")
-	assert(index >= 0 && index <= len(leaf.items), "insertIntoLeafLocal index out of range")
+	assert(index >= 0 && index <= leaf.Weight(), "insertIntoLeafLocal index out of range")
 	if len(items) == 0 {
 		return t.cloneLeaf(leaf), nil, nil
 	}

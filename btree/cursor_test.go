@@ -52,7 +52,7 @@ func TestCursorSeekBytes(t *testing.T) {
 
 	type tc struct {
 		target uint64
-		idx    int
+		idx    int64
 		acc    uint64
 	}
 	cases := []tc{
@@ -96,7 +96,7 @@ func TestCursorSeekItemBytes(t *testing.T) {
 
 	type tc struct {
 		target uint64
-		idx    int
+		idx    int64
 		item   string
 		acc    uint64
 		found  bool
@@ -142,7 +142,7 @@ func TestCursorSeekLines(t *testing.T) {
 
 	type tc struct {
 		target uint64
-		idx    int
+		idx    int64
 		acc    uint64
 	}
 	cases := []tc{
@@ -196,7 +196,7 @@ func TestExtCursorSeekBytes(t *testing.T) {
 
 	type tc struct {
 		target uint64
-		idx    int
+		idx    int64
 		acc    uint64
 	}
 	cases := []tc{
@@ -241,7 +241,7 @@ func TestExtCursorSeekItemBytes(t *testing.T) {
 
 	type tc struct {
 		target uint64
-		idx    int
+		idx    int64
 		item   string
 		acc    uint64
 		found  bool

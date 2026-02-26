@@ -61,7 +61,7 @@ func assertTreeMatchesModelAndExtension(t *testing.T, tree *Tree[textChunk, text
 		t.Fatalf("summary bytes mismatch: got=%d want=%d", tree.Summary().Bytes, wantBytes)
 	}
 
-	prefix, err := tree.PrefixExt(len(model))
+	prefix, err := tree.PrefixExt(int64(len(model)))
 	if err != nil {
 		t.Fatalf("PrefixExt(len) failed: %v", err)
 	}
@@ -99,7 +99,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			}
 			token := randomToken(r)
 			var err error
-			tree, err = tree.InsertAt(pos, fromString(token))
+			tree, err = tree.InsertAt(int64(pos), fromString(token))
 			if err != nil {
 				t.Fatalf("InsertAt failed: %v", err)
 			}
@@ -112,7 +112,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			}
 			pos := r.Intn(len(model))
 			var err error
-			tree, err = tree.DeleteAt(pos)
+			tree, err = tree.DeleteAt(int64(pos))
 			if err != nil {
 				t.Fatalf("DeleteAt failed: %v", err)
 			}
@@ -125,7 +125,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			maxCount := len(model) - start
 			count := r.Intn(maxCount) + 1
 			var err error
-			tree, err = tree.DeleteRange(start, count)
+			tree, err = tree.DeleteRange(int64(start), int64(count))
 			if err != nil {
 				t.Fatalf("DeleteRange failed: %v", err)
 			}
@@ -135,7 +135,7 @@ func runRandomExtensionSequence(t *testing.T, seed uint64, steps int) {
 			if len(model) > 0 {
 				split = r.Intn(len(model) + 1)
 			}
-			left, right, err := tree.SplitAt(split)
+			left, right, err := tree.SplitAt(int64(split))
 			if err != nil {
 				t.Fatalf("SplitAt failed: %v", err)
 			}
