@@ -132,16 +132,7 @@ func (cord Cord) RangeChunk() iter.Seq[chunk.Chunk] {
 
 // RangeTextSegment returns an iterator over all text segments in logical order.
 func (cord Cord) RangeTextSegment() iter.Seq[TextSegment] {
-	return func(yield func(TextSegment) bool) {
-		tree, err := treeFromCord(cord)
-		assert(err == nil, "cord.RangeTextSegment: cannot materialize tree")
-		if tree == nil {
-			return
-		}
-		tree.ForEachItem(func(c chunk.Chunk) bool {
-			return yield(newTextSegment(c))
-		})
-	}
+	return toCordext(cord).RangeTextSegment()
 }
 
 // EachChunk visits all chunks in logical order.
@@ -159,20 +150,5 @@ func (cord Cord) EachChunk(f func(chunk.Chunk, uint64) error) error {
 // The callback receives each segment and its starting byte offset. Iteration
 // stops at the first callback error and returns that error to the caller.
 func (cord Cord) EachTextSegment(f func(TextSegment, uint64) error) error {
-	tree, convErr := treeFromCord(cord)
-	assert(convErr == nil, "cord.EachTextSegment: cannot materialize tree")
-	if tree == nil {
-		return nil
-	}
-	var err error
-	var pos uint64
-	tree.ForEachItem(func(c chunk.Chunk) bool {
-		if err != nil {
-			return false
-		}
-		err = f(newTextSegment(c), pos)
-		pos += c.Summary().Bytes
-		return err == nil
-	})
-	return err
+	return toCordext(cord).EachTextSegment(f)
 }
