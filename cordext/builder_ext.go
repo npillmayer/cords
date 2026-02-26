@@ -3,6 +3,7 @@ package cordext
 import (
 	"unicode/utf8"
 
+	"github.com/npillmayer/cords/btree"
 	"github.com/npillmayer/cords/chunk"
 )
 
@@ -28,6 +29,11 @@ func NewBuilderWithExtension[E any](ext TextSegmentExtension[E]) (*BuilderEx[E],
 		return nil, ErrIllegalArguments
 	}
 	return &BuilderEx[E]{ext: ext}, nil
+}
+
+// NewBuilderNoExt creates a builder for no-extension cords.
+func NewBuilderNoExt() *BuilderEx[btree.NO_EXT] {
+	return &BuilderEx[btree.NO_EXT]{}
 }
 
 // Cord returns the cord built from all staged fragments.
@@ -83,7 +89,7 @@ func (b *BuilderEx[E]) PrependString(text string) error {
 //
 // Adjacent chunks may be coalesced when capacity permits.
 func (b *BuilderEx[E]) AppendBytes(text []byte) error {
-	if b == nil || b.ext == nil {
+	if b == nil {
 		return ErrIllegalArguments
 	}
 	if b.done {
@@ -112,7 +118,7 @@ func (b *BuilderEx[E]) AppendBytes(text []byte) error {
 
 // PrependBytes prepends UTF-8 bytes to the staged build.
 func (b *BuilderEx[E]) PrependBytes(text []byte) error {
-	if b == nil || b.ext == nil {
+	if b == nil {
 		return ErrIllegalArguments
 	}
 	if b.done {
@@ -136,7 +142,7 @@ func (b *BuilderEx[E]) PrependBytes(text []byte) error {
 //
 // Adjacent chunks may be coalesced when capacity permits.
 func (b *BuilderEx[E]) AppendChunk(c chunk.Chunk) error {
-	if b == nil || b.ext == nil {
+	if b == nil {
 		return ErrIllegalArguments
 	}
 	if b.done {
@@ -161,7 +167,7 @@ func (b *BuilderEx[E]) AppendChunk(c chunk.Chunk) error {
 
 // PrependChunk prepends a pre-built chunk.
 func (b *BuilderEx[E]) PrependChunk(c chunk.Chunk) error {
-	if b == nil || b.ext == nil {
+	if b == nil {
 		return ErrIllegalArguments
 	}
 	if b.done {
@@ -181,7 +187,16 @@ func (b *BuilderEx[E]) buildCord() CordEx[E] {
 	if len(parts) == 0 {
 		return CordEx[E]{ext: b.ext}
 	}
-	tree, err := newChunkTreeEx(b.ext)
+	var (
+		tree *btree.Tree[chunk.Chunk, chunk.Summary, E]
+		err  error
+	)
+	if b.ext == nil {
+		cfg := btree.Config[chunk.Chunk, chunk.Summary, E]{Monoid: chunk.Monoid{}}
+		tree, err = btree.New[chunk.Chunk, chunk.Summary](cfg)
+	} else {
+		tree, err = newChunkTreeEx(b.ext)
+	}
 	assert(err == nil, "extension builder: btree.New failed")
 	tree, err = tree.InsertAt(0, parts...)
 	assert(err == nil, "extension builder: btree.InsertAt failed")

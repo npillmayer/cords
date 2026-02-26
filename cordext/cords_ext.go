@@ -46,6 +46,30 @@ type CordEx[E any] struct {
 	ext  TextSegmentExtension[E]
 }
 
+// FromStringNoExt creates a no-extension cord from a Go string.
+func FromStringNoExt(s string) CordEx[btree.NO_EXT] {
+	parts, err := splitToChunks([]byte(s))
+	assert(err == nil, "cordext.FromStringNoExt requires valid UTF-8 input")
+	cfg := btree.Config[chunk.Chunk, chunk.Summary, btree.NO_EXT]{Monoid: chunk.Monoid{}}
+	tree, err := btree.New[chunk.Chunk, chunk.Summary](cfg)
+	assert(err == nil, "cordext.FromStringNoExt: cannot create chunk tree")
+	if len(parts) > 0 {
+		tree, err = tree.InsertAt(0, parts...)
+		assert(err == nil, "cordext.FromStringNoExt: cannot insert chunks")
+	}
+	return cordExFromTree(tree, nil)
+}
+
+// FromTreeNoExt wraps a no-extension chunk tree as a no-extension CordEx.
+//
+// The tree is shared (persistent data-structure semantics apply).
+func FromTreeNoExt(tree *btree.Tree[chunk.Chunk, chunk.Summary, btree.NO_EXT]) CordEx[btree.NO_EXT] {
+	if tree == nil || tree.IsEmpty() {
+		return CordEx[btree.NO_EXT]{}
+	}
+	return CordEx[btree.NO_EXT]{tree: tree}
+}
+
 // FromStringWithExtension creates a cord with extension aggregation.
 func FromStringWithExtension[E any](s string, ext TextSegmentExtension[E]) (CordEx[E], error) {
 	parts, err := splitToChunks([]byte(s))
@@ -80,10 +104,13 @@ func treeFromCordEx[E any](cord CordEx[E]) (*btree.Tree[chunk.Chunk, chunk.Summa
 	if cord.tree != nil {
 		return cord.tree, nil
 	}
-	if cord.ext == nil {
-		return nil, ErrIllegalArguments
+	cfg := btree.Config[chunk.Chunk, chunk.Summary, E]{
+		Monoid: chunk.Monoid{},
 	}
-	return newChunkTreeEx(cord.ext)
+	if cord.ext != nil {
+		cfg.Extension = textSegmentExtensionAdapter[E]{ext: cord.ext}
+	}
+	return btree.New[chunk.Chunk, chunk.Summary](cfg)
 }
 
 func cordExFromTree[E any](tree *btree.Tree[chunk.Chunk, chunk.Summary, E], ext TextSegmentExtension[E]) CordEx[E] {
@@ -98,6 +125,13 @@ func newEmptyLike[E any](tree *btree.Tree[chunk.Chunk, chunk.Summary, E]) (*btre
 // Extension returns the configured extension implementation.
 func (cord CordEx[E]) Extension() TextSegmentExtension[E] {
 	return cord.ext
+}
+
+// Tree returns the underlying chunk tree.
+//
+// This is intended for package-bridge scenarios.
+func (cord CordEx[E]) Tree() *btree.Tree[chunk.Chunk, chunk.Summary, E] {
+	return cord.tree
 }
 
 // String returns the complete cord as a Go string.

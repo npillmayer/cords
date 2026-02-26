@@ -15,6 +15,7 @@ import (
 
 	"github.com/npillmayer/cords/btree"
 	"github.com/npillmayer/cords/chunk"
+	"github.com/npillmayer/cords/cordext"
 )
 
 // Cord stores immutable UTF-8 text fragments in a persistent summarized B+ tree.
@@ -51,15 +52,7 @@ type Cord struct {
 // The input string must be valid UTF-8. Invalid input triggers an internal
 // assertion panic, matching package invariants for stored text.
 func FromString(s string) Cord {
-	parts, err := splitToChunks([]byte(s))
-	assert(err == nil, "FromString requires valid UTF-8 input")
-	tree, e := newChunkTree()
-	assert(e == nil, "FromString: cannot create chunk tree")
-	if len(parts) > 0 {
-		tree, e = tree.InsertAt(0, parts...)
-		assert(e == nil, "FromString: cannot insert chunks")
-	}
-	return cordFromTree(tree)
+	return fromCordext(cordext.FromStringNoExt(s))
 }
 
 // String returns the complete cord as a Go string. This may be an expensive operation,
