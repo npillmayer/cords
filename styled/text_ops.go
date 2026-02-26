@@ -1,7 +1,8 @@
 package styled
 
 import (
-	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
 )
 
 // DeleteRange deletes byte range [from,to) from raw text and synchronizes style
@@ -22,7 +23,7 @@ func (t Text) DeleteRange(from, to uint64) (Text, error) {
 	} else if from == to {
 		return t, nil
 	}
-	raw, _, err := cords.Cut(t.text, from, to-from)
+	raw, _, err := t.text.Cut(from, to-from)
 	if err != nil {
 		return t, err
 	}
@@ -48,7 +49,7 @@ func (t Text) DeleteRange(from, to uint64) (Text, error) {
 //
 // The inserted range receives style sty. If the text has no style runs yet and
 // sty is nil, runs stay empty.
-func (t Text) InsertAt(pos uint64, insertion cords.Cord, sty Style) (Text, error) {
+func (t Text) InsertAt(pos uint64, insertion cordext.CordEx[btree.NO_EXT], sty Style) (Text, error) {
 	p := textPipeFor(t)
 	if p.err != nil {
 		return t, p.err
@@ -58,7 +59,7 @@ func (t Text) InsertAt(pos uint64, insertion cords.Cord, sty Style) (Text, error
 		return t, nil
 	}
 	n := insertion.Len()
-	raw, err := cords.Insert(t.text, insertion, pos)
+	raw, err := t.text.Insert(insertion, pos)
 	if err != nil {
 		return t, err
 	}
@@ -125,7 +126,10 @@ func (t Text) Concat(other Text) (Text, error) {
 	}
 	leftLen := t.text.Len()
 	rightLen := other.text.Len()
-	p.raw = cords.Concat(t.text, other.text)
+	p.raw, p.err = t.text.Concat(other.text)
+	if p.err != nil {
+		return t, p.err
+	}
 	// Keep "unstyled" semantics for completely unstyled concat.
 	p_runs := pipeFor(t.runs)
 	if leftLen+rightLen > 0 {
@@ -169,7 +173,7 @@ func (t Text) Section(from, to uint64) (Text, error) {
 	if to > t.text.Len() {
 		return Text{}, ErrIndexOutOfBounds
 	}
-	raw, err := cords.Substr(t.text, from, to-from)
+	raw, err := t.text.Substr(from, to-from)
 	if err != nil {
 		return Text{}, err
 	}

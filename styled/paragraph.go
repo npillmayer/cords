@@ -3,7 +3,8 @@ package styled
 import (
 	"io"
 
-	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
 	"github.com/npillmayer/uax/bidi"
 )
 
@@ -64,7 +65,7 @@ func (para *Paragraph) Style(style Style, from, to uint64) *Paragraph {
 }
 
 // Raw returns the underlying raw text of the paragraph.
-func (para *Paragraph) Raw() cords.Cord {
+func (para *Paragraph) Raw() cordext.CordEx[btree.NO_EXT] {
 	return para.text.Raw()
 }
 
@@ -139,7 +140,7 @@ func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 		tracer().Infof("Paragraph.WrapAt(EOT)")
 	}
 	tracer().Infof("  Levels = %v", para.BidiLevels())
-	line, p, err := cords.Split(para.text.Raw(), pos)
+	line, p, err := para.text.Raw().Split(pos)
 	if err != nil {
 		return nil, nil, err
 	}

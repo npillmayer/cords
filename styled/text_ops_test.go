@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/cordext"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -133,7 +133,7 @@ func TestTextInsertAtOnUnstyledText(t *testing.T) {
 
 	var err error
 	text := TextFromString("abcde")
-	if text, err = text.InsertAt(2, cords.FromString("XY"), nil); err != nil {
+	if text, err = text.InsertAt(2, cordext.FromStringNoExt("XY"), nil); err != nil {
 		t.Fatalf("insert on unstyled text failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abXYcde" {
@@ -151,7 +151,7 @@ func TestTextInsertAtOnUnstyledTextWithStyle(t *testing.T) {
 	text := TextFromString("abcde")
 	bold := teststyle("bold")
 	var err error
-	if text, err = text.InsertAt(2, cords.FromString("XY"), bold); err != nil {
+	if text, err = text.InsertAt(2, cordext.FromStringNoExt("XY"), bold); err != nil {
 		t.Fatalf("styled insert on unstyled text failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abXYcde" {
@@ -178,7 +178,7 @@ func TestTextInsertAtKeepsRunsInSync(t *testing.T) {
 	if text, err = text.Style(bold, 2, 8); err != nil {
 		t.Fatal(err)
 	}
-	if text, err = text.InsertAt(4, cords.FromString("XYZ"), italic); err != nil {
+	if text, err = text.InsertAt(4, cordext.FromStringNoExt("XYZ"), italic); err != nil {
 		t.Fatalf("insert failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abcdXYZefghij" {
@@ -223,7 +223,7 @@ func TestTextInsertAtBoundsNoOpAndAtomicity(t *testing.T) {
 	origRaw := text.Raw().String()
 	origRuns := collectRuns(text.runs)
 
-	if _, err := text.InsertAt(5, cords.FromString(""), bold); err != nil {
+	if _, err := text.InsertAt(5, cordext.FromStringNoExt(""), bold); err != nil {
 		t.Fatalf("insert no-op failed: %v", err)
 	}
 	if got := text.Raw().String(); got != origRaw {
@@ -231,7 +231,7 @@ func TestTextInsertAtBoundsNoOpAndAtomicity(t *testing.T) {
 	}
 	assertRunsEqual(t, collectRuns(text.runs), origRuns)
 
-	if _, err := text.InsertAt(11, cords.FromString("Z"), bold); !errors.Is(err, ErrIndexOutOfBounds) {
+	if _, err := text.InsertAt(11, cordext.FromStringNoExt("Z"), bold); !errors.Is(err, ErrIndexOutOfBounds) {
 		t.Fatalf("expected ErrIndexOutOfBounds for pos>len, got %v", err)
 	}
 	if got := text.Raw().String(); got != origRaw {
@@ -245,7 +245,7 @@ func TestTextInsertAtNilReceiver(t *testing.T) {
 	defer teardown()
 
 	var text Text
-	if _, err := text.InsertAt(0, cords.FromString("x"), nil); !errors.Is(err, ErrVoidText) {
+	if _, err := text.InsertAt(0, cordext.FromStringNoExt("x"), nil); !errors.Is(err, ErrVoidText) {
 		t.Fatalf("expected ErrVoidText for nil text receiver, got %v", err)
 	}
 }

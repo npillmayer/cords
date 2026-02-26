@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	//"github.com/npillmayer/schuko/tracing/gologadapter"
-	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -18,7 +18,7 @@ func TestInitialStyle(t *testing.T) {
 	defer teardown()
 	//
 	// make a text
-	text := cords.FromString("Hello World")
+	text := cordext.FromStringNoExt("Hello World")
 	t.Logf("string='%s', length=%d", text, text.Len())
 	// style the text
 	bold := teststyle("bold")

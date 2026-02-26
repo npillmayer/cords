@@ -1,8 +1,8 @@
 package styled
 
 import (
-	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
 )
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ func newRuns() (Runs, error) {
 
 // Text is a styled text. Its text and its styles are automatically synchronized.
 type Text struct {
-	text cords.Cord // TODO rename to `raw`
+	text cordext.CordEx[btree.NO_EXT] // TODO rename to `raw`
 	runs Runs
 }
 

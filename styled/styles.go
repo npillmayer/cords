@@ -3,8 +3,8 @@ package styled
 import (
 	"fmt"
 
-	"github.com/npillmayer/cords"
 	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
 )
 
 // --- Styled Text -----------------------------------------------------------
@@ -12,14 +12,14 @@ import (
 // TextFromString creates a stylable text from a string.
 func TextFromString(s string) Text {
 	t := Text{
-		text: cords.FromString(s),
+		text: cordext.FromStringNoExt(s),
 		runs: Runs{},
 	}
 	return t
 }
 
 // TextFromCord creates a stylable text from a cord.
-func TextFromCord(text cords.Cord) Text {
+func TextFromCord(text cordext.CordEx[btree.NO_EXT]) Text {
 	t := Text{
 		text: text,
 		runs: Runs{},
@@ -28,7 +28,7 @@ func TextFromCord(text cords.Cord) Text {
 }
 
 // Raw returns a copy of the text without any styles.
-func (t *Text) Raw() cords.Cord {
+func (t *Text) Raw() cordext.CordEx[btree.NO_EXT] {
 	return t.text
 }
 

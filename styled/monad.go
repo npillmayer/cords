@@ -1,6 +1,9 @@
 package styled
 
-import "github.com/npillmayer/cords"
+import (
+	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
+)
 
 // We create a couple of monadic helpers to make error-handling easier on the eye.
 // The boilerplate code in this file is a bit cumbersome, but application of the
@@ -172,7 +175,7 @@ func (p *pipeline) runsOrElse(fallback Runs) Runs {
 
 type textPipeline struct {
 	text *Text
-	raw  cords.Cord
+	raw  cordext.CordEx[btree.NO_EXT]
 	err  error
 }
 
@@ -190,7 +193,7 @@ func textPipeFor(text Text, conds ...bool) textPipeline {
 	return p
 }
 
-func (p *textPipeline) rawOrElse(fallback cords.Cord) cords.Cord {
+func (p *textPipeline) rawOrElse(fallback cordext.CordEx[btree.NO_EXT]) cordext.CordEx[btree.NO_EXT] {
 	if p.err != nil {
 		return fallback
 	}

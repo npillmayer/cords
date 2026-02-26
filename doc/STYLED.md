@@ -22,14 +22,14 @@ Result: **passes**.
 
 Target architecture:
 
-- `Text` stores raw text as a `cords.Cord`.
+- `Text` stores raw text as a `cordext.CordEx[btree.NO_EXT]`.
 - Styling metadata is stored separately as run segments (`Runs`) in a btree.
 - Text and runs must stay synchronized across text manipulations.
 
 Current implementation status:
 
 - `Text` already has the intended data split:
-  - raw: `text cords.Cord`
+  - raw: `text cordext.CordEx[btree.NO_EXT]`
   - styles: `runs Runs`
 - `Runs` is now btree-backed:
   - `btree.Tree[Run, Summary, btree.NO_EXT]`
@@ -83,13 +83,12 @@ These are refinement tasks; the main remaining blockers are section/iteration AP
 
 ### Missing/disabled Text & Paragraph APIs
 
-1. `Text.Section` is commented out.
-2. `Text.StyleRuns` is commented out.
-3. `Text.EachStyleRun` is commented out.
-4. `Paragraph.EachStyleRun` is stubbed and returns `nil`.
-5. `Paragraph.StyleRuns` is stubbed and returns `nil`.
-6. `ParagraphFromText` cannot construct sub-paragraphs yet (`Section` path disabled).
-7. `Paragraph.WrapAt` currently splits raw text only; style-run split/sync is not implemented.
+1. `Text.StyleRuns` is commented out.
+2. `Text.EachStyleRun` is commented out.
+3. `Paragraph.EachStyleRun` is stubbed and returns `nil`.
+4. `Paragraph.StyleRuns` is stubbed and returns `nil`.
+5. `ParagraphFromText` cannot construct sub-paragraphs yet (`Section` path disabled).
+6. `Paragraph.WrapAt` currently splits raw text only; style-run split/sync is not implemented.
 
 ## Consistency risks in current state
 
@@ -100,15 +99,14 @@ These are refinement tasks; the main remaining blockers are section/iteration AP
 
 ## Proposed next batches
 
-1. Implement `Text.Section` using raw-cord slicing plus `Runs.Section`.
-2. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
-3. Rework `ParagraphFromText` and `WrapAt` to use run primitives (`Section`/`SplitAt`/`Concat`) and maintain style sync.
-4. Define and document canonical semantics for unstyled runs (`ErrVoidRuns`) across all `Text` operations.
-5. Remove obsolete `styleLeaf` legacy scaffolding after replacement APIs are in place.
+1. Re-enable style-run iteration/reporting APIs (`StyleRuns`, `EachStyleRun`) on top of btree runs.
+2. Rework `ParagraphFromText` and `WrapAt` to use run primitives (`Section`/`SplitAt`/`Concat`) and maintain style sync.
+3. Define and document canonical semantics for unstyled runs (`ErrVoidRuns`) across all `Text` operations.
+4. Remove obsolete `styleLeaf` legacy scaffolding after replacement APIs are in place.
 
 ## Summary
 
-`styled` has successfully migrated core style storage, lookup, run operators, and synchronized `Text` editing (`DeleteRange`, `InsertAt`, `Concat`) to the btree-based model, with dedicated tests. Remaining refactoring work is now centered on section/iteration APIs and paragraph-level style synchronization.
+`styled` has successfully migrated core style storage, lookup, run operators, and synchronized `Text` editing (`DeleteRange`, `InsertAt`, `Concat`, `Section`) to the btree-based model, with dedicated tests. Remaining refactoring work is now centered on style-run iteration/reporting and paragraph-level style synchronization.
 
 ## Decision Record: Run-Coalescing Strategy
 
@@ -149,14 +147,17 @@ Completed since previous scan:
 
 Immediate next integration target:
 
-1. `Text.Section` and style-run reporting/iteration APIs (`StyleRuns`, `EachStyleRun`).
+1. style-run reporting/iteration APIs (`StyleRuns`, `EachStyleRun`).
 2. paragraph synchronization (`ParagraphFromText`/`WrapAt`) on top of run primitives.
 
 # Pre-Requisites before “Paragraphs”
 
 1. Disentangle the API for `cords.Cord` from `CordEx`. Currently the package-structure is bad. I moved out some file into a new sub-package `cordext`, where in the future `CordEx` should live. The sub-package now breaks and is not buildable. The API in `cordext` is allowed to be broad, as it is a base-package for extension, while the base package `cords` should have a thin API, as it is geared toward end-users. The implementation in the base package should be based on the wider implementation in `cordext`. That means, dealing with `Chunk`s etc has to be moved to `cordext`. The base package should in essence use `CordEx` with `E` being `NO_EXT`.
-2. Tackle this TODO: “TODO: Cached subtree sizes for better performance.” (file @btree/tree.go). This is slowly becoming an issue. Make a careful step-by-step effort to introduce the substree-sizes as additional fields in the nodes.
-3. Design an implement means to discovering paragraphs in text. This can (at least) be done by either:
+2. Re-base sub-package `styled/` on `CordEx` instead of `cords.Cord`. This is the cleaner approach, especially when designing and implementing the “paragraph" idea. That will make the `styled.Text` API expose the extension `E` and will probably the function signatures more complicated (and possibly confusing for clients of `styled`). Let's first do the re-basing, an afterwards decide on a usable client-API.
+   - Status (2026-02-26): top-level `styled` is now rebased to `cordext.CordEx[btree.NO_EXT]` for raw text storage and text ops (`DeleteRange`, `InsertAt`, `Concat`, `Section`) plus builder/paragraph raw access paths.
+   - Scope caveat: `styled` sub-packages (`formatter`, `inline`, `itemized`) are not yet adapted and will not compile until they are migrated to the new raw-text type/API.
+3. Tackle this TODO: “TODO: Cached subtree sizes for better performance.” (file @btree/tree.go). This is slowly becoming an issue. Make a careful step-by-step effort to introduce the substree-sizes as additional fields in the nodes.
+4. Design an implement means to discovering paragraphs in text. This can (at least) be done by either:
    1. Including a “paragraph” bitfield in the nodes, similar to “lines”.
    2. Create a metric for it (like for words in sub-package `metrics`)
    3. Use the `CordEx` extension mechanism to provide a paragraph metric/summary.
