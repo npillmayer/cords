@@ -10,8 +10,8 @@ import (
 // --- Styled Text -----------------------------------------------------------
 
 // TextFromString creates a stylable text from a string.
-func TextFromString(s string) *Text {
-	t := &Text{
+func TextFromString(s string) Text {
+	t := Text{
 		text: cords.FromString(s),
 		runs: Runs{},
 	}
@@ -41,7 +41,7 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 		return nil, pos, ErrIndexOutOfBounds
 	}
 	r := t.runs
-	cursor, err := btree.NewCursor(r.tree, StyleDimension{})
+	cursor, err := btree.NewCursor(r.tree, styleDimension{})
 	assert(err == nil, "cursor cannot be nil")
 	idx, run, acc, found, err := cursor.SeekItem(pos + 1)
 	assert(err == nil, "cursor cannot be unsuccessful")
@@ -92,13 +92,15 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 // }
 
 // Style styles a run of text, given the start and end position.
-func (t *Text) Style(sty Style, from, to uint64) (*Text, error) {
+func (t Text) Style(sty Style, from, to uint64) (Text, error) {
 	var err error
 	if t.runs.tree == nil || t.runs.tree.IsEmpty() {
 		t.runs, err = initialStyle(t.text.Len(), sty, from, to)
+		assert(t.runs.tree != nil, "runs.tree should not be nil (initial styling)")
 		return t, err
 	}
 	t.runs, err = t.runs.Style(t.text.Len(), sty, from, to)
+	assert(t.runs.tree != nil, "runs.tree should not be nil (styling)")
 	return t, err
 }
 

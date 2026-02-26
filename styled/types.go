@@ -67,15 +67,15 @@ type Text struct {
 
 // ---------------------------------------------------------------------------
 
-type StyleDimension struct{}
+type styleDimension struct{}
 
-func (StyleDimension) Zero() uint64 { return 0 }
+func (styleDimension) Zero() uint64 { return 0 }
 
-func (StyleDimension) Add(acc uint64, summary Summary) uint64 {
+func (styleDimension) Add(acc uint64, summary Summary) uint64 {
 	return acc + summary.length()
 }
 
-func (StyleDimension) Compare(acc uint64, target uint64) int {
+func (styleDimension) Compare(acc uint64, target uint64) int {
 	switch {
 	case acc < target:
 		return -1

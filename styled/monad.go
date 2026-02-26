@@ -176,9 +176,9 @@ type textPipeline struct {
 	err  error
 }
 
-func textPipeFor(text *Text, conds ...bool) textPipeline {
-	p := textPipeline{text: text}
-	if text == nil {
+func textPipeFor(text Text, conds ...bool) textPipeline {
+	p := textPipeline{text: &text}
+	if text.text.IsVoid() {
 		p.err = ErrVoidText
 		return p
 	}

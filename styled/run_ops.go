@@ -58,7 +58,7 @@ func (runs Runs) SplitAt(pos uint64) (Runs, Runs, error) {
 	}
 
 	tree := runs.tree
-	cursor, err := btree.NewCursor(tree, StyleDimension{})
+	cursor, err := btree.NewCursor(tree, styleDimension{})
 	if err != nil {
 		return Runs{}, Runs{}, err
 	}
@@ -290,7 +290,7 @@ func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error)
 	if runs.tree == nil || runs.tree.IsEmpty() {
 		return initialStyle(textlen, sty, from, to)
 	}
-	cursor, err := btree.NewCursor(runs.tree, StyleDimension{})
+	cursor, err := btree.NewCursor(runs.tree, styleDimension{})
 	if err != nil {
 		return runs, err
 	}

@@ -12,8 +12,9 @@ func TestTextDeleteRangeOnUnstyledText(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	text := TextFromString("abcdefghij")
-	if _, err := text.DeleteRange(3, 6); err != nil {
+	if text, err = text.DeleteRange(3, 6); err != nil {
 		t.Fatalf("delete on unstyled text failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abcghij" {
@@ -28,12 +29,13 @@ func TestTextDeleteRangeKeepsRunsInSync(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	text := TextFromString("abcdefghij")
 	bold := teststyle("bold")
-	if _, err := text.Style(bold, 2, 8); err != nil {
+	if text, err = text.Style(bold, 2, 8); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := text.DeleteRange(4, 7); err != nil {
+	if text, err = text.DeleteRange(4, 7); err != nil {
 		t.Fatalf("delete range failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abcdhij" {
@@ -105,12 +107,13 @@ func TestTextDeleteRangeWholeText(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	text := TextFromString("abcdefghij")
 	bold := teststyle("bold")
-	if _, err := text.Style(bold, 2, 8); err != nil {
+	if text, err = text.Style(bold, 2, 8); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := text.DeleteRange(0, text.Raw().Len()); err != nil {
+	if text, err = text.DeleteRange(0, text.Raw().Len()); err != nil {
 		t.Fatalf("full delete failed: %v", err)
 	}
 	if text.Raw().Len() != 0 {
@@ -128,8 +131,9 @@ func TestTextInsertAtOnUnstyledText(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	text := TextFromString("abcde")
-	if _, err := text.InsertAt(2, cords.FromString("XY"), nil); err != nil {
+	if text, err = text.InsertAt(2, cords.FromString("XY"), nil); err != nil {
 		t.Fatalf("insert on unstyled text failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abXYcde" {
@@ -146,7 +150,8 @@ func TestTextInsertAtOnUnstyledTextWithStyle(t *testing.T) {
 
 	text := TextFromString("abcde")
 	bold := teststyle("bold")
-	if _, err := text.InsertAt(2, cords.FromString("XY"), bold); err != nil {
+	var err error
+	if text, err = text.InsertAt(2, cords.FromString("XY"), bold); err != nil {
 		t.Fatalf("styled insert on unstyled text failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abXYcde" {
@@ -166,13 +171,14 @@ func TestTextInsertAtKeepsRunsInSync(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	text := TextFromString("abcdefghij")
 	bold := teststyle("bold")
 	italic := teststyle("italic")
-	if _, err := text.Style(bold, 2, 8); err != nil {
+	if text, err = text.Style(bold, 2, 8); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := text.InsertAt(4, cords.FromString("XYZ"), italic); err != nil {
+	if text, err = text.InsertAt(4, cords.FromString("XYZ"), italic); err != nil {
 		t.Fatalf("insert failed: %v", err)
 	}
 	if got := text.Raw().String(); got != "abcdXYZefghij" {
@@ -238,7 +244,7 @@ func TestTextInsertAtNilReceiver(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
-	var text *Text
+	var text Text
 	if _, err := text.InsertAt(0, cords.FromString("x"), nil); !errors.Is(err, ErrVoidText) {
 		t.Fatalf("expected ErrVoidText for nil text receiver, got %v", err)
 	}
@@ -248,16 +254,16 @@ func TestTextConcatStyledSeamMerge(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	left := TextFromString("abcde")
 	right := TextFromString("fghij")
 	bold := teststyle("bold")
-	if _, err := left.Style(bold, 2, 5); err != nil {
+	if left, err = left.Style(bold, 2, 5); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := right.Style(bold, 0, 3); err != nil {
+	if right, err = right.Style(bold, 0, 3); err != nil {
 		t.Fatal(err)
 	}
-	var err error
 	if left, err = left.Concat(right); err != nil {
 		t.Fatalf("concat failed: %v", err)
 	}
@@ -278,13 +284,13 @@ func TestTextConcatStyledAndUnstyled(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
 
+	var err error
 	left := TextFromString("abcde")
 	right := TextFromString("XYZ")
 	bold := teststyle("bold")
-	if _, err := left.Style(bold, 2, 5); err != nil {
+	if left, err = left.Style(bold, 2, 5); err != nil {
 		t.Fatal(err)
 	}
-	var err error
 	if left, err = left.Concat(right); err != nil {
 		t.Fatalf("concat failed: %v", err)
 	}
@@ -308,10 +314,12 @@ func TestTextConcatUnstyledAndStyled(t *testing.T) {
 	left := TextFromString("abc")
 	right := TextFromString("defg")
 	italic := teststyle("italic")
-	if _, err := right.Style(italic, 1, 4); err != nil {
+	var err error
+	if right, err = right.Style(italic, 1, 4); err != nil {
 		t.Fatal(err)
 	}
-	l, err := left.Concat(right)
+	var l Text
+	l, err = left.Concat(right)
 	if err != nil {
 		t.Fatalf("concat failed: %v", err)
 	}
@@ -337,7 +345,8 @@ func TestTextConcatBothUnstyledKeepsVoidRuns(t *testing.T) {
 
 	left := TextFromString("abc")
 	right := TextFromString("def")
-	if _, err := left.Concat(right); err != nil {
+	var err error
+	if left, err = left.Concat(right); err != nil {
 		t.Fatalf("concat failed: %v", err)
 	}
 	if got := left.Raw().String(); got != "abcdef" {
@@ -346,7 +355,7 @@ func TestTextConcatBothUnstyledKeepsVoidRuns(t *testing.T) {
 	if left.runs.tree != nil && !left.runs.tree.IsEmpty() {
 		t.Fatalf("unstyled concat should keep void runs, got len=%d", left.runs.tree.Len())
 	}
-	if _, _, err := left.StyleAt(0); !errors.Is(err, ErrIndexOutOfBounds) {
+	if _, _, err = left.StyleAt(0); !errors.Is(err, ErrIndexOutOfBounds) {
 		t.Fatalf("expected ErrIndexOutOfBounds with void runs, got %v", err)
 	}
 }
@@ -356,12 +365,98 @@ func TestTextConcatNilArgument(t *testing.T) {
 	defer teardown()
 
 	left := TextFromString("abc")
-	if _, err := left.Concat(nil); !errors.Is(err, ErrIllegalArguments) {
+	if _, err := left.Concat(Text{}); !errors.Is(err, ErrIllegalArguments) {
 		t.Fatalf("expected ErrIllegalArguments for nil arg, got %v", err)
 	}
 
-	var nilText *Text
+	var nilText Text
 	if _, err := nilText.Concat(left); !errors.Is(err, ErrVoidText) {
+		t.Fatalf("expected ErrVoidText for nil receiver, got %v", err)
+	}
+}
+
+func TestTextSectionOnUnstyledText(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "styles")
+	defer teardown()
+
+	text := TextFromString("abcdefghij")
+	section, err := text.Section(2, 7)
+	if err != nil {
+		t.Fatalf("section on unstyled text failed: %v", err)
+	}
+	if got := section.Raw().String(); got != "cdefg" {
+		t.Fatalf("raw section mismatch: got=%q want=%q", got, "cdefg")
+	}
+	if section.runs.tree != nil && !section.runs.tree.IsEmpty() {
+		t.Fatalf("unstyled section should keep void runs, got len=%d", section.runs.tree.Len())
+	}
+}
+
+func TestTextSectionKeepsStyledRunsInSync(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "styles")
+	defer teardown()
+
+	var err error
+	text := TextFromString("abcdefghij")
+	bold := teststyle("bold")
+	if text, err = text.Style(bold, 2, 8); err != nil {
+		t.Fatal(err)
+	}
+
+	var section Text
+	section, err = text.Section(3, 9)
+	if err != nil {
+		t.Fatalf("section failed: %v", err)
+	}
+	if got := section.Raw().String(); got != "defghi" {
+		t.Fatalf("raw section mismatch: got=%q want=%q", got, "defghi")
+	}
+	gotRuns := collectRuns(section.runs)
+	wantRuns := []Run{
+		{length: 5, style: bold},
+		{length: 1, style: nil},
+	}
+	assertRunsEqual(t, gotRuns, wantRuns)
+	assertRunsInvariant(t, gotRuns, section.Raw().Len())
+
+	st, off, err := section.StyleAt(0)
+	if err != nil {
+		t.Fatalf("StyleAt(0) failed: %v", err)
+	}
+	if !equals(st, bold) || off != 0 {
+		t.Fatalf("StyleAt(0) mismatch: style=%v off=%d", st, off)
+	}
+	st, off, err = section.StyleAt(5)
+	if err != nil {
+		t.Fatalf("StyleAt(5) failed: %v", err)
+	}
+	if !equals(st, nil) || off != 0 {
+		t.Fatalf("StyleAt(5) mismatch: style=%v off=%d", st, off)
+	}
+}
+
+func TestTextSectionBoundsAndNilReceiver(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "styles")
+	defer teardown()
+
+	text := TextFromString("abc")
+	if _, err := text.Section(2, 1); !errors.Is(err, ErrIllegalArguments) {
+		t.Fatalf("expected ErrIllegalArguments for from>to, got %v", err)
+	}
+	if _, err := text.Section(0, 4); !errors.Is(err, ErrIndexOutOfBounds) {
+		t.Fatalf("expected ErrIndexOutOfBounds for to>len, got %v", err)
+	}
+
+	empty, err := text.Section(1, 1)
+	if err != nil {
+		t.Fatalf("empty section should succeed: %v", err)
+	}
+	if empty.Raw().Len() != 0 {
+		t.Fatalf("empty section should be length 0, got %d", empty.Raw().Len())
+	}
+
+	var nilText Text
+	if _, err := nilText.Section(0, 0); !errors.Is(err, ErrVoidText) {
 		t.Fatalf("expected ErrVoidText for nil receiver, got %v", err)
 	}
 }

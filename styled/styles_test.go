@@ -59,7 +59,7 @@ func TestBasicStyleCursor(t *testing.T) {
 		t.Errorf("expected styles tree to have 3 nodes, has %d", runs.tree.Len())
 	}
 	text.runs = runs
-	cursor, err := btree.NewCursor(text.runs.tree, StyleDimension{})
+	cursor, err := btree.NewCursor(text.runs.tree, styleDimension{})
 	if err != nil {
 		t.Fatalf("new cursor failed: %v", err)
 	}
@@ -77,17 +77,24 @@ func TestBasicStyle(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
 	//
+	var err error
 	text := TextFromString("Hello World, how are you?")
 	bold, italic := teststyle("bold"), teststyle("italic")
-	text.Style(bold, 6, 11)
+	text, err = text.Style(bold, 6, 11)
+	if err != nil {
+		t.Fatalf("styling failed: %v", err)
+	}
 	t.Logf("runs.len = %d", text.runs.tree.Len())
 	if text.runs.tree == nil {
-		t.Errorf("expected styles tree to be non-nil")
+		t.Fatalf("expected styles tree to be non-nil")
 	} else if text.runs.tree.Len() != 3 {
-		t.Errorf("expected styles tree to have 3 nodes, has %d", text.runs.tree.Len())
+		t.Fatalf("expected styles tree to have 3 nodes, has %d", text.runs.tree.Len())
 	}
 	t.Logf("runs.summary = %v", text.runs.tree.Summary())
-	text.Style(italic, 8, 16) // erase part of bold run
+	text, err = text.Style(italic, 8, 16) // erase part of bold run
+	if err != nil {
+		t.Fatalf("re-styling failed: %v", err)
+	}
 	summary := text.runs.tree.Summary()
 	got := summary.runs
 	if len(got) != 4 {
@@ -107,12 +114,13 @@ func TestStyleMergesAdjacentEqualStyles(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
 
+	var err error
 	text := TextFromString("Hello World, how are you?")
 	bold := teststyle("bold")
-	if _, err := text.Style(bold, 6, 11); err != nil {
+	if text, err = text.Style(bold, 6, 11); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := text.Style(bold, 11, 16); err != nil {
+	if text, err = text.Style(bold, 11, 16); err != nil {
 		t.Fatal(err)
 	}
 	got := collectRuns(text.runs)
@@ -142,9 +150,10 @@ func TestStyleCoversWholeText(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
 
+	var err error
 	text := TextFromString("Hello World")
 	bold := teststyle("bold")
-	if _, err := text.Style(bold, 0, text.Raw().Len()); err != nil {
+	if text, err = text.Style(bold, 0, text.Raw().Len()); err != nil {
 		t.Fatal(err)
 	}
 	got := collectRuns(text.runs)
@@ -157,9 +166,10 @@ func TestStyleAtReturnsRunStyleAndRelativeOffset(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "cords")
 	defer teardown()
 
+	var err error
 	text := TextFromString("Hello World, how are you?")
 	bold := teststyle("bold")
-	if _, err := text.Style(bold, 6, 11); err != nil {
+	if text, err = text.Style(bold, 6, 11); err != nil {
 		t.Fatal(err)
 	}
 

@@ -6,7 +6,7 @@ import (
 
 // DeleteRange deletes byte range [from,to) from raw text and synchronizes style
 // runs accordingly.
-func (t *Text) DeleteRange(from, to uint64) (*Text, error) {
+func (t Text) DeleteRange(from, to uint64) (Text, error) {
 	p := textPipeFor(t, from <= to)
 	if p.err != nil {
 		return t, p.err
@@ -48,7 +48,7 @@ func (t *Text) DeleteRange(from, to uint64) (*Text, error) {
 //
 // The inserted range receives style sty. If the text has no style runs yet and
 // sty is nil, runs stay empty.
-func (t *Text) InsertAt(pos uint64, insertion cords.Cord, sty Style) (*Text, error) {
+func (t Text) InsertAt(pos uint64, insertion cords.Cord, sty Style) (Text, error) {
 	p := textPipeFor(t)
 	if p.err != nil {
 		return t, p.err
@@ -117,9 +117,9 @@ func ensureRunsForConcat(runs Runs, textlen uint64) (Runs, error) {
 }
 
 // Concat appends other's content to text and synchronizes style runs.
-func (t *Text) Concat(other *Text) (*Text, error) {
+func (t Text) Concat(other Text) (Text, error) {
 	var result Text
-	p := textPipeFor(t, other != nil)
+	p := textPipeFor(t, !other.text.IsVoid())
 	if p.err != nil {
 		return t, p.err
 	}
@@ -157,5 +157,27 @@ func (t *Text) Concat(other *Text) (*Text, error) {
 	result.runs = p_runs.runsOrElse(t.runs)
 	// t.text = raw
 	// t.runs = merged
-	return &result, p.err
+	return result, p.err
+}
+
+// Section returns a copy of text range [from,to), keeping style runs in sync.
+func (t Text) Section(from, to uint64) (Text, error) {
+	p := textPipeFor(t, from <= to)
+	if p.err != nil {
+		return Text{}, p.err
+	}
+	if to > t.text.Len() {
+		return Text{}, ErrIndexOutOfBounds
+	}
+	raw, err := cords.Substr(t.text, from, to-from)
+	if err != nil {
+		return Text{}, err
+	}
+	section := Text{text: raw}
+	p_runs := pipeFor(t.runs)
+	if p_runs.err == ErrVoidRuns {
+		return section, nil // OK: text was unsyled => section is as well
+	}
+	section.runs = pipeCall2(p_runs, t.runs.Section, from, to)
+	return section, p_runs.err
 }
