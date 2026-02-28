@@ -1,6 +1,7 @@
 package inline
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -27,10 +28,13 @@ func TestHTMLSimple(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	t.Logf("HTML inner text = '%s'", text.Raw())
-	styles := text.StyleRuns()
 	cnt := 0
-	for i, style := range styles {
-		t.Logf("  %d: %v", i, style)
+	for run, reader := range text.StyleRanges() {
+		s, err := io.ReadAll(reader)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Logf("  %d: %v", run, string(s))
 		cnt++
 	}
 	if cnt != 5 {

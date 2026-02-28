@@ -74,3 +74,11 @@ func (b *TextBuilder) Append(chunk *chunk.Chunk, style Style) error {
 func (b *TextBuilder) Len() uint64 {
 	return b.length
 }
+
+func (b *TextBuilder) AppendString(s string, style Style) error {
+	b.ensureBuilder()
+	if b.done {
+		return cordext.ErrCordCompleted
+	}
+	return b.cordBuilder.AppendString(s)
+}

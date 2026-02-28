@@ -65,31 +65,31 @@ func ParagraphFromText(text *Text, from, to uint64, embBidi bidi.Direction,
 }
 
 // Style styles a run of text of a styled paragraph, given the start and end position.
-func (para *Paragraph) Style(style Style, from, to uint64) (*Paragraph, error) {
-	t, err := para.text.Style(style, from, to)
+func (text *Paragraph) Style(style Style, from, to uint64) (*Paragraph, error) {
+	t, err := text.text.Style(style, from, to)
 	if err != nil {
 		return nil, err
 	}
-	para.text = &t
-	return para, nil
+	text.text = &t
+	return text, nil
 }
 
 // Raw returns the underlying raw text of the paragraph.
-func (para *Paragraph) Raw() cordext.CordEx[btree.NO_EXT] {
-	return para.text.Raw()
+func (text *Paragraph) Raw() cordext.CordEx[btree.NO_EXT] {
+	return text.text.Raw()
 }
 
 // BidiLevels returns the resolved Bidi levels in a paragraph of text.
-func (para *Paragraph) BidiLevels() *bidi.ResolvedLevels {
-	return para.levels
+func (text *Paragraph) BidiLevels() *bidi.ResolvedLevels {
+	return text.levels
 }
 
 // StyleAt returns the active style at text position pos, together with an
 // index relative to the start of the style run.
 //
 // Calls [StyleAt] from [styled.Text].
-func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
-	sty, i, err := para.text.StyleAt(pos)
+func (text *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
+	sty, i, err := text.text.StyleAt(pos)
 	if err != nil {
 		return nil, pos, err
 	}
@@ -97,8 +97,8 @@ func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
 }
 
 // Reader returns an io.Reader for the raw text of the paragraph (without styles).
-func (para *Paragraph) Reader() io.Reader {
-	return para.text.Raw().Reader()
+func (text *Paragraph) Reader() io.Reader {
+	return text.text.Raw().Reader()
 }
 
 // WrapAt splits off a front segment (usually a “line”) from a paragraph.

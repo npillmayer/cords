@@ -18,7 +18,7 @@ import (
 // Therefore the resulting styled text is limited to inline span elements like
 //
 //	<strong> … </strong>
-//	<i> … </i>
+//	<i> … </i>
 //
 // etc. Clients should provide a paragraph-like element.
 //
@@ -34,14 +34,15 @@ func InnerText(n *html.Node) (styled.Text, error) {
 }
 
 func collectText(n *html.Node, style Style, b *styled.TextBuilder) {
-	if n.Type == html.ElementNode {
-		T().Debugf("styled inline text: collect text of <%s>", n.Data)
+	switch n.Type {
+	case html.ElementNode:
+		tracer().Debugf("styled inline text: collect text of <%s>", n.Data)
 		st := StyleFromHTMLName(n.Data)
 		if st != PlainStyle {
 			style = st
 		}
-	} else if n.Type == html.TextNode {
-		T().Debugf("styled inline text = %s (%v)", n.Data, style)
+	case html.TextNode:
+		tracer().Debugf("styled inline text = %s (%v)", n.Data, style)
 		b.AppendString(n.Data, style)
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {

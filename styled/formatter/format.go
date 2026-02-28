@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/npillmayer/cords/styled"
-	"github.com/npillmayer/cords/styled/itemized"
 	"github.com/npillmayer/uax/bidi"
 	"github.com/npillmayer/uax/grapheme"
 	"github.com/npillmayer/uax/segment"
@@ -89,15 +88,30 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 				if err != nil {
 					return err
 				}
-				iter := itemized.IterateText(&section)
-				for iter.Next() {
-					text, style, from, to := iter.Style()
-					tracer().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
-					if run.IsOpposite(bidi.LeftToRight) {
-						text = reorder(text, format.NeedsReordering())
+				for styleRun, byteReader := range section.StyleRanges() {
+					text, err := io.ReadAll(byteReader)
+					if err != nil {
+						tracer().Errorf("failed to read style run %v: %v", styleRun, err)
+						return err
 					}
-					format.StyledText(text, style, out)
+					from := styleRun.Position
+					to := from + styleRun.Length
+					tracer().Infof("%v: %d…%d = \"%v\"", styleRun.Style, from, to, text)
+					var s string
+					if run.IsOpposite(bidi.LeftToRight) {
+						s = reorder(string(text), format.NeedsReordering())
+					}
+					format.StyledText(s, styleRun.Style, out)
 				}
+				// iter := itemized.IterateText(&section)
+				// for iter.Next() {
+				// 	text, style, from, to := iter.Style()
+				// 	tracer().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
+				// 	if run.IsOpposite(bidi.LeftToRight) {
+				// 		text = reorder(text, format.NeedsReordering())
+				// 	}
+				// 	format.StyledText(text, style, out)
+				// }
 			}
 		}
 		format.Newline(out)

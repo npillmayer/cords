@@ -80,6 +80,20 @@ func (t Text) StyleRanges() iter.Seq2[StyleChange, io.Reader] {
 	}
 }
 
+// StyleRuns returns a slice of style runs for a styled text.
+// This is a convenience function. If clients want to avoid slice allocation,
+// they should use one of the iterators.
+func (text *Text) StyleRuns() []StyleChange {
+	if text == nil {
+		return nil
+	}
+	var runs []StyleChange
+	for run, _ := range text.StyleRanges() {
+		runs = append(runs, run)
+	}
+	return runs
+}
+
 // ---Paragraph Iterators ----------------------------------------------------
 
 // EachStyleRun applies a function to each run of a single style.
@@ -88,14 +102,14 @@ func (t Text) StyleRanges() iter.Seq2[StyleChange, io.Reader] {
 //
 // This may be thought of as a “push”-interface to access style runs for a text.
 // For a “pull”-interface please refer to interface `itemized.Iterator`.
-func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos, length uint64) error) error {
-	if para == nil || para.text == nil {
+func (text *Paragraph) EachStyleRun(f func(content string, sty Style, pos, length uint64) error) error {
+	if text == nil || text.text == nil {
 		return nil
 	}
-	return para.text.eachStyleRun(para.Offset, f)
+	return text.text.eachStyleRun(text.Offset, f)
 }
 
-// StyleRuns returns a slice of style runs for a styled text.
+// StyleRuns returns a slice of style runs for a styled paragraph.
 func (para *Paragraph) StyleRuns() []StyleChange {
 	if para == nil || para.text == nil {
 		return nil
