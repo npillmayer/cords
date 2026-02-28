@@ -156,8 +156,42 @@ Immediate next integration target:
 2. Re-base sub-package `styled/` on `CordEx` instead of `cords.Cord`. This is the cleaner approach, especially when designing and implementing the “paragraph" idea. That will make the `styled.Text` API expose the extension `E` and will probably the function signatures more complicated (and possibly confusing for clients of `styled`). Let's first do the re-basing, an afterwards decide on a usable client-API.
    - Status (2026-02-26): top-level `styled` is now rebased to `cordext.CordEx[btree.NO_EXT]` for raw text storage and text ops (`DeleteRange`, `InsertAt`, `Concat`, `Section`) plus builder/paragraph raw access paths.
    - Scope caveat: `styled` sub-packages (`formatter`, `inline`, `itemized`) are not yet adapted and will not compile until they are migrated to the new raw-text type/API.
-3. Tackle this TODO: “TODO: Cached subtree sizes for better performance.” (file @btree/tree.go). This is slowly becoming an issue. Make a careful step-by-step effort to introduce the substree-sizes as additional fields in the nodes.
+3. Tackle this TODO: “TODO: Cached subtree sizes for better performance.” (file @btree/tree.go). This is slowly becoming an issue. Make a careful step-by-step effort to introduce the substree-sizes as additional fields in the nodes. ( **Remark**: I have implemented `Weight()` for tree-nodes myself. This is not exactly the same as caching subtree sizes within inner nodes, but is more suitable for sum-trees. It should be enough to avoid deep recursion. ) With `Weight()` now available on tree nodes, the immediate pressure to add more structural caching for traversal depth has decreased.
 4. Design an implement means to discovering paragraphs in text. This can (at least) be done by either:
    1. Including a “paragraph” bitfield in the nodes, similar to “lines”.
    2. Create a metric for it (like for words in sub-package `metrics`)
    3. Use the `CordEx` extension mechanism to provide a paragraph metric/summary.
+
+## Paragraph Discovery Decision Notes (2026-02-26)
+
+For paragraph discovery we should prefer the least invasive approach first.
+
+Recommended first implementation:
+
+1. Implement paragraph discovery as a dedicated analyzer/metric-style operation (not as node bitfields).
+2. Build it on top of `cordext` segment iteration (`RangeTextSegment` / `EachTextSegment`) with a small separator state machine.
+3. Return byte spans `[from,to)` for paragraphs, with configurable delimiter policy.
+
+Rationale:
+
+1. No changes to tree/node storage layout are required.
+2. Fits naturally with the current `styled.Text` raw representation (`cordext.CordEx[btree.NO_EXT]`).
+3. Keeps semantics explicit and testable (`\n`, `\r\n`, optional blank-line handling).
+
+Proposed API shape (initial):
+
+1. `type ParagraphSpan struct { From uint64; To uint64 }`
+2. `type ParagraphPolicy ...` (default LF/CRLF policy first)
+3. `FindParagraphs(text cordext.CordEx[btree.NO_EXT], policy ParagraphPolicy) []ParagraphSpan`
+
+Phased strategy:
+
+1. Phase 1: implement analyzer + tests + integration with `styled` sectioning.
+2. Phase 2: add helpers like `ParagraphAt(pos)` / `ParagraphsInRange(from,to)`.
+3. Phase 3 (only if needed): evaluate `CordEx` extension summaries for faster paragraph-index lookups at large scale.
+
+Option trade-off summary:
+
+1. Node bitfield in tree nodes: potentially fastest lookups, but highest implementation cost and strongest coupling to storage internals.
+2. Metric/analyzer over segments: best first step; low risk, low complexity, good correctness surface.
+3. `CordEx` extension-based paragraph summary: good medium-term optimization path if profiling shows paragraph lookup hot spots.

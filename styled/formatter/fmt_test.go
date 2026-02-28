@@ -6,16 +6,13 @@ import (
 
 	"github.com/npillmayer/cords/styled"
 	"github.com/npillmayer/cords/styled/inline"
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/bidi"
 )
 
 func TestReorderGraphemes(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	s := "Hello 👍🏼!"
 	s = reorder(s, ReorderGraphemes)
@@ -26,14 +23,13 @@ func TestReorderGraphemes(t *testing.T) {
 }
 
 func TestFmt1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
 	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
 	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
 	text.Style(inline.BoldStyle, 4, 9)
-	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	para, err := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -46,14 +42,13 @@ func TestFmt1(t *testing.T) {
 }
 
 func TestVTE(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
 	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
 	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
 	text.Style(inline.BoldStyle, 4, 9)
-	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	para, err := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -81,7 +76,7 @@ func ExampleConsoleFixedWidth() {
 	config := &Config{LineWidth: 40}         // format into narrow lines
 	//
 	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
-	para, _ := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	para, _ := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	console.Print(para, config)
 	// Output:
 	// The quick brown fox jumps over the כלב <nl>
@@ -90,14 +85,14 @@ func ExampleConsoleFixedWidth() {
 }
 
 func TestHTML1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "styles")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
+	var err error
 	//text := styled.TextFromString("The quick brown fox jumps over the lazy dog!")
 	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
-	text.Style(inline.BoldStyle, 4, 9)
-	para, err := styled.ParagraphFromText(text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	text, err = text.Style(inline.BoldStyle, 4, 9)
+	para, err := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

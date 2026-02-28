@@ -82,7 +82,7 @@ func (cc *CharCursor) Next() (r rune, ok bool) {
 	if err != nil {
 		return 0, false
 	}
-	b := item.Bytes()
+	b := item.Bytes(nil)
 	off := int(local)
 	if off < 0 || off >= len(b) {
 		return 0, false
@@ -112,7 +112,7 @@ func (cc *CharCursor) Prev() (r rune, ok bool) {
 	if err != nil {
 		return 0, false
 	}
-	b := item.Bytes()
+	b := item.Bytes(nil)
 	off := int(local)
 	if off < 0 || off >= len(b) {
 		return 0, false

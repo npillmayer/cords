@@ -55,7 +55,6 @@ type ControlCodes struct {
 
 // StandardCodes is the set of control codes for standards conforming terminals.
 // See https://terminal-wg.pages.freedesktop.org/bidi/recommendation/escape-sequences.html
-//
 var StandardCodes = ControlCodes{
 	Preamble:  []byte{27, '[', '8', 'l'}, // switch to explicit mode
 	Postamble: []byte{},
@@ -96,7 +95,6 @@ var WindowsCodes = ControlCodes{
 // This is unfortunate for applications which are supposed to run in multi-platform
 // and multi-regional environments. However, it is no longer acceptable for
 // applications to be content with handling Latin text only.
-//
 type ConsoleFixedWidth struct {
 	Codes        *ControlCodes // escape sequences, usually set by constructur
 	NeedsReorder ReorderFlag   // re-ordering hint, usually set by constructor
@@ -130,7 +128,6 @@ func (fw *ConsoleFixedWidth) Print(para *styled.Paragraph, config *Config) error
 //
 // This API is for clients having a need for fine control over the formatter.
 // Often it is enough to call `NewLocalConsoleFormat`.
-//
 func NewConsoleFixedWidthFormat(codes *ControlCodes, colors map[styled.Style]*color.Color,
 	reorder ReorderFlag) *ConsoleFixedWidth {
 	//
@@ -292,6 +289,6 @@ func ConfigFromTerminal() *Config {
 	} else {
 		config.LineWidth = 65
 	}
-	T().P("format", "console").Infof("setting line length to %d en", config.LineWidth)
+	tracer().P("format", "console").Infof("setting line length to %d en", config.LineWidth)
 	return config
 }

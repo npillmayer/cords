@@ -44,24 +44,34 @@ type Paragraph struct {
 func ParagraphFromText(text *Text, from, to uint64, embBidi bidi.Direction,
 	m bidi.OutOfLineBidiMarkup) (*Paragraph, error) {
 	//
-	para := &Paragraph{Offset: from}
+	if text == nil {
+		return nil, ErrIllegalArguments
+	}
+	para := &Paragraph{
+		Offset:   from,
+		eBidiDir: embBidi,
+	}
 	if from == 0 && to == text.Raw().Len() {
 		para.text = text
 	} else {
-		var err error
-		// if para.text, err = Section(text, from, to); err != nil {
-		// 	return nil, err
-		// }
-		return nil, err
+		section, err := text.Section(from, to)
+		if err != nil {
+			return nil, err
+		}
+		para.text = &section
 	}
 	para.levels = bidi.ResolveParagraph(para.text.Raw().Reader(), m, bidi.DefaultDirection(embBidi), bidi.IgnoreParagraphSeparators(true))
 	return para, nil
 }
 
 // Style styles a run of text of a styled paragraph, given the start and end position.
-func (para *Paragraph) Style(style Style, from, to uint64) *Paragraph {
-	para.text.Style(style, from, to)
-	return para
+func (para *Paragraph) Style(style Style, from, to uint64) (*Paragraph, error) {
+	t, err := para.text.Style(style, from, to)
+	if err != nil {
+		return nil, err
+	}
+	para.text = &t
+	return para, nil
 }
 
 // Raw returns the underlying raw text of the paragraph.
@@ -77,7 +87,7 @@ func (para *Paragraph) BidiLevels() *bidi.ResolvedLevels {
 // StyleAt returns the active style at text position pos, together with an
 // index relative to the start of the style run.
 //
-// Overwrites StyleAt from cords.styled.Text
+// Calls [StyleAt] from [styled.Text].
 func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
 	sty, i, err := para.text.StyleAt(pos)
 	if err != nil {
@@ -86,55 +96,19 @@ func (para *Paragraph) StyleAt(pos uint64) (Style, uint64, error) {
 	return sty, i, nil
 }
 
-// EachStyleRun applies a function to each run of a single style.
-// pos is the text position of this run of text within the overall
-// styled text, i.e., it included para.Offset.
-//
-// This may be thought of as a “push”-interface to access style runs for a text.
-// For a “pull”-interface please refer to interface `itemized.Iterator`.
-func (para *Paragraph) EachStyleRun(f func(content string, sty Style, pos, length uint64) error) error {
-	t := para.text
-	if t == nil {
-		return nil
-	}
-	// runs := t.styles()
-	// err := runs.ForEachItem(func(leaf cords.Leaf, i uint64) error {
-	// 	length := leaf.Weight()
-	// 	content, err := t.Raw().Report(i, length)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	st := leaf.(*styleLeaf).style
-	// 	return f(content, st, i+para.Offset, length)
-	// })
-	// return err
-	return nil
-}
-
-// TODO
-//
-// func (para *Paragraph) Range() iter.Seq2[int, Run] {
-// 	    return func(yield func(int, Run) bool) {
-//         for v := range s.m {
-//             if !yield(v) {
-//                 return
-//             }
-//         }
-// }
-
-// StyleRuns returns a slice of style runs for a styled text.
-func (para *Paragraph) StyleRuns() []StyleChange {
-	//return para.text.styleRuns(para.Offset)
-	return nil
-}
-
 // Reader returns an io.Reader for the raw text of the paragraph (without styles).
 func (para *Paragraph) Reader() io.Reader {
 	return para.text.Raw().Reader()
 }
 
-// WrapAt splits of a front segment (usually a “line”) from a paragraph.
+// WrapAt splits off a front segment (usually a “line”) from a paragraph.
 func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
+	if para == nil || para.text == nil {
+		return nil, nil, ErrIllegalArguments
+	}
+	if pos < para.cutoff {
+		return nil, nil, ErrIndexOutOfBounds
+	}
 	pos -= para.cutoff
 	if pos >= para.Raw().Len() {
 		tracer().Infof("Paragraph.WrapAt(EOT)")
@@ -148,14 +122,20 @@ func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	text := &Text{
 		text: line,
 	}
-	// if !cords.Cord(para.text.runs).IsVoid() {
-	// 	lineStyles, pStyles, err := cords.Split(cords.Cord(para.text.runs), pos)
-	// 	if err != nil {
-	// 		return nil, nil, err
-	// 	}
-	// 	para.text.runs = runs(pStyles)
-	// 	text.runs = runs(lineStyles)
-	// }
+	p_runs := pipeFor(para.text.runs)
+	switch p_runs.err {
+	case nil:
+		lineRuns, paraRuns, splitErr := para.text.runs.SplitAt(pos)
+		if splitErr != nil {
+			return nil, nil, splitErr
+		}
+		text.runs = lineRuns
+		para.text.runs = paraRuns
+	case ErrVoidRuns:
+		// Unstyled paragraph: keep both sides unstyled.
+	default:
+		return nil, nil, p_runs.err
+	}
 	var lineLev *bidi.ResolvedLevels
 	lineLev, para.levels = para.levels.Split(pos, true)
 	tracer().Infof("para.levels = %v", para.levels)

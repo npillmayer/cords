@@ -61,7 +61,7 @@ func (s TextSegment) String() string {
 
 // Bytes returns a copied byte slice of the segment text.
 func (s TextSegment) Bytes() []byte {
-	return s.chunk.Bytes()
+	return s.chunk.Bytes(nil)
 }
 
 // Chars returns the UTF-8 character-start bitmap for this segment.

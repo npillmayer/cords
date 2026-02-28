@@ -2,12 +2,13 @@ package itemized
 
 import (
 	"github.com/npillmayer/cords"
+	"github.com/npillmayer/cords/cordext"
 	"github.com/npillmayer/cords/styled"
 )
 
 // Iterator iterates over the style runs (items) of styled text.
-type Iterator struct {
-	text    cords.Cord
+type Iterator[E any] struct {
+	text    cordext.CordEx[E]
 	runs    []styled.StyleChange
 	inx     int
 	lastErr error
@@ -15,8 +16,8 @@ type Iterator struct {
 }
 
 // IterateText creates an iterator for styled text.
-func IterateText(text *styled.Text) *Iterator {
-	iterator := &Iterator{
+func IterateText(text *styled.Text[E]) *Iterator[E] {
+	iterator := &Iterator[E]{
 		text: text.Raw(),
 		runs: text.StyleRuns(),
 	}

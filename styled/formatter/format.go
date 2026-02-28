@@ -1,38 +1,5 @@
 package formatter
 
-/*
-BSD 3-Clause License
-
-Copyright (c) 2020–21, Norbert Pillmayer
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 import (
 	"bufio"
 	"errors"
@@ -97,12 +64,12 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 	for i, pos := range breaks {
 		line, runs, err := para.WrapAt(pos)
 		if err != nil {
-			T().Errorf("error Paragraph.WrapAt = %v", err)
+			tracer().Errorf("error Paragraph.WrapAt = %v", err)
 			return err
 		}
-		T().Infof("[%3d] \"%s\"", i, line.Raw())
-		T().Infof("      with styles = %v", line.StyleRuns())
-		T().Infof("      with runs   = %v", runs)
+		tracer().Infof("[%3d] \"%s\"", i, line.Raw())
+		tracer().Infof("      with styles = %v", line.StyleRuns())
+		tracer().Infof("      with runs   = %v", runs)
 		// iter := itemized.IterateText(line)
 		// for iter.Next() {
 		// 	text, style, from, to := iter.Style()
@@ -117,15 +84,15 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 			segit := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
 			for segit.Next() {
 				dir, from, to := segit.Segment()
-				T().Infof("segment (%v): %d…%d", dir, from, to)
-				section, err := styled.Section(line, from, to)
+				tracer().Infof("segment (%v): %d…%d", dir, from, to)
+				section, err := line.Section(from, to)
 				if err != nil {
 					return err
 				}
-				iter := itemized.IterateText(section)
+				iter := itemized.IterateText(&section)
 				for iter.Next() {
 					text, style, from, to := iter.Style()
-					T().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
+					tracer().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
 					if run.IsOpposite(bidi.LeftToRight) {
 						text = reorder(text, format.NeedsReordering())
 					}
@@ -134,7 +101,7 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 			}
 		}
 		format.Newline(out)
-		T().Infof("----------- 8< ---------------")
+		tracer().Infof("----------- 8< ---------------")
 	}
 	format.Postamble(out)
 	return nil
@@ -176,11 +143,11 @@ func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []u
 			if linestart { // fragment is too long for a line
 				pos := prevpos + len(frag)
 				breaks = append(breaks, uint64(pos))
-				T().Debugf("line break @ %d", prevpos)
+				tracer().Debugf("line break @ %d", prevpos)
 				spaceleft = linewidth
 			} else { // fragment overshoots line
 				breaks = append(breaks, uint64(prevpos))
-				T().Debugf("line break @ %d", prevpos)
+				tracer().Debugf("line break @ %d", prevpos)
 				spaceleft = linewidth - fraglen
 			}
 		} else { // no break, just append the fragment to the current line
@@ -191,7 +158,7 @@ func firstFit(para *styled.Paragraph, linewidth int, context *uax11.Context) []u
 	}
 	if spaceleft < linewidth { // we have a partial line to consume
 		breaks = append(breaks, para.Raw().Len())
-		T().Debugf("line break @ %d", para.Raw().Len())
+		tracer().Debugf("line break @ %d", para.Raw().Len())
 	}
 	return breaks
 }
@@ -203,7 +170,7 @@ func reorder(s string, how ReorderFlag) string {
 		return s
 	}
 	if how == ReorderWords {
-		T().Errorf("REVERSE WORDS: %s", s)
+		tracer().Errorf("REVERSE WORDS: %s", s)
 		seg := segment.NewSegmenter() // uses a simple word breaker
 		seg.Init(strings.NewReader(s))
 		out := make([]byte, len(s))
@@ -221,7 +188,7 @@ func reorder(s string, how ReorderFlag) string {
 	out := make([]byte, len(s))
 	for i, j := n-1, 0; i >= 0; i-- {
 		g := gstr.Nth(i)
-		T().Infof("grapheme = '%s' (%d)", g, len(g))
+		tracer().Infof("grapheme = '%s' (%d)", g, len(g))
 		copy(out[j:], g)
 		j += len(g)
 	}

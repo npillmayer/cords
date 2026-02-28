@@ -65,6 +65,10 @@ type Text struct {
 	runs Runs
 }
 
+func (t Text) isUnstyled() bool {
+	return t.runs.tree == nil || t.runs.tree.IsEmpty()
+}
+
 // ---------------------------------------------------------------------------
 
 type styleDimension struct{}

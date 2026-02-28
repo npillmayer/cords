@@ -108,8 +108,14 @@ func (c Chunk) String() string {
 }
 
 // Bytes returns a copied byte slice of the chunk text.
-func (c Chunk) Bytes() []byte {
-	return append([]byte(nil), c.text[:c.n]...)
+func (c Chunk) Bytes(p []byte) []byte {
+	if p == nil || cap(p) < int(c.n) {
+		p = make([]byte, 0, c.n)
+		tracer().Debugf("cordext: chunk.Bytes() created new slice")
+	} else {
+		p = p[:0]
+	}
+	return append(p, c.text[:c.n]...)
 }
 
 // Chars returns the UTF-8 character-start bitmap.

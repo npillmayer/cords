@@ -1,4 +1,4 @@
-package cordext
+package chunk
 
 import "github.com/npillmayer/schuko/tracing"
 

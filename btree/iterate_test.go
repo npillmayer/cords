@@ -38,7 +38,7 @@ func TestItemRange(t *testing.T) {
 
 	tree := buildTextTree(t, 10)
 	got := make([]string, 0, 4)
-	for item, _ := range tree.ItemRange(3, 7) {
+	for _, item := range tree.ItemRange(3, 7) {
 		got = append(got, item.String())
 	}
 	want := []string{"3", "4", "5", "6"}
@@ -57,9 +57,9 @@ func collectItemRange(tree *Tree[textChunk, textSummary, NO_EXT], from, to int64
 	//
 	items := make([]string, 0, max(0, to-from))
 	indexes := make([]int64, 0, max(0, to-from))
-	for item, idx := range tree.ItemRange(from, to) {
+	for i, item := range tree.ItemRange(from, to) {
 		items = append(items, item.String())
-		indexes = append(indexes, idx)
+		indexes = append(indexes, i)
 	}
 	return items, indexes
 }

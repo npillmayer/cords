@@ -47,7 +47,7 @@ func (uint64Dim) Compare(acc, target uint64) int {
 }
 
 func TestCordWithExtensionAggregatesNewlines(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.cords")
 	defer teardown()
 
 	text := strings.Repeat("ab\n", 50)
@@ -69,7 +69,7 @@ func TestCordWithExtensionAggregatesNewlines(t *testing.T) {
 }
 
 func TestFromStringWithExtension(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.cords")
 	defer teardown()
 
 	text := "Hello\nWorld\n"
@@ -87,7 +87,7 @@ func TestFromStringWithExtension(t *testing.T) {
 }
 
 func TestCordExConcatRejectsIncompatibleExtension(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.cords")
 	defer teardown()
 
 	left, err := FromStringWithExtension("left", newlineExt{id: "cords:test:left"})
@@ -105,7 +105,7 @@ func TestCordExConcatRejectsIncompatibleExtension(t *testing.T) {
 }
 
 func TestCordExCursor(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.cords")
 	defer teardown()
 
 	text := "a\nb\nc\nd\n"

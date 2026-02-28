@@ -39,9 +39,9 @@ func (t *Tree[I, S, E]) forEachItemNode(n treeNode[I, S, E], fn func(item I) boo
 // The yielded pair is (item, absoluteItemIndex). ItemRange delegates to the
 // internal traversal helper and currently suppresses traversal errors in the
 // iterator closure.
-func (t *Tree[I, S, E]) ItemRange(from, to int64) iter.Seq2[I, int64] {
+func (t *Tree[I, S, E]) ItemRange(from, to int64) iter.Seq2[int64, I] {
 	var t_, from_, to_ = t, from, to
-	return func(yield func(I, int64) bool) {
+	return func(yield func(int64, I) bool) {
 		_, _ = t_.forEachItemRange(yield, from_, to_)
 	}
 }
@@ -49,10 +49,10 @@ func (t *Tree[I, S, E]) ItemRange(from, to int64) iter.Seq2[I, int64] {
 type where[I any] struct {
 	acc      int64               // item count to the left of current leaf, variable
 	from, to int64               // const
-	fn       func(I, int64) bool // const
+	fn       func(int64, I) bool // const
 }
 
-func (t *Tree[I, S, E]) forEachItemRange(fn func(I, int64) bool, from, to int64) (int64, error) {
+func (t *Tree[I, S, E]) forEachItemRange(fn func(int64, I) bool, from, to int64) (int64, error) {
 	w := where[I]{acc: 0, from: from, to: to, fn: fn}
 	p := pipeFor(t, fn != nil, from < to)
 	acc := pipeCall3(p, t.traverseItems, t.root, &w, t.height)
@@ -86,7 +86,7 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 					break // past range
 				}
 				// now: from <= acc + i < to
-				w.fn(leaf.items[i], w.acc+int64(i)) // may be `yield(…)`
+				w.fn(w.acc+int64(i), leaf.items[i]) // may be `yield(…)`
 			}
 		}
 		w.acc += int64(leaf.n) // jump past leaf

@@ -3,7 +3,6 @@ package cordext
 import (
 	"bytes"
 	"fmt"
-	"iter"
 
 	"github.com/npillmayer/cords/btree"
 	"github.com/npillmayer/cords/chunk"
@@ -185,54 +184,6 @@ func (cord CordEx[E]) PrefixExt(itemIndex int64) (E, error) {
 		return zero, err
 	}
 	return tree.PrefixExt(itemIndex)
-}
-
-// RangeChunk returns an iterator over all chunks in logical order.
-func (cord CordEx[E]) RangeChunk() iter.Seq[chunk.Chunk] {
-	return func(yield func(chunk.Chunk) bool) {
-		for seg := range cord.RangeTextSegment() {
-			if !yield(seg.Chunk()) {
-				return
-			}
-		}
-	}
-}
-
-// RangeTextSegment returns an iterator over all text segments in logical order.
-func (cord CordEx[E]) RangeTextSegment() iter.Seq[TextSegment] {
-	return func(yield func(TextSegment) bool) {
-		if cord.tree == nil {
-			return
-		}
-		cord.tree.ForEachItem(func(c chunk.Chunk) bool {
-			return yield(newTextSegment(c))
-		})
-	}
-}
-
-// EachChunk visits all chunks in logical order.
-func (cord CordEx[E]) EachChunk(f func(chunk.Chunk, uint64) error) error {
-	return cord.EachTextSegment(func(seg TextSegment, pos uint64) error {
-		return f(seg.Chunk(), pos)
-	})
-}
-
-// EachTextSegment visits all text segments in logical order.
-func (cord CordEx[E]) EachTextSegment(f func(TextSegment, uint64) error) error {
-	if cord.tree == nil {
-		return nil
-	}
-	var err error
-	var pos uint64
-	cord.tree.ForEachItem(func(c chunk.Chunk) bool {
-		if err != nil {
-			return false
-		}
-		err = f(newTextSegment(c), pos)
-		pos += c.Summary().Bytes
-		return err == nil
-	})
-	return err
 }
 
 // Concat concatenates cords and returns a new extension-enabled cord.

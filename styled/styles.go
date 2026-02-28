@@ -58,39 +58,6 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 	return run.style, pos - runStart, nil
 }
 
-// EachStyleRun applies a function to each run of a single style.
-// pos is the text position of this run of text within the overall
-// styled text.
-//
-// This may be thought of as a “push”-interface to access style runs for a text.
-// For a “pull”-interface please refer to interface `itemized.Iterator`.
-//
-// func (t *Text) EachStyleRun(f func(content string, sty Style, pos uint64) error) error {
-// 	t.runs.tree.ForEachItem(func(item Run) bool {
-// 		length := item.length
-// 		content, err := t.Raw().Report(item.Start(), length)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		st := leaf.(*styleLeaf).style
-// 		return f(content, st, i)
-// 	})
-// 	return err
-// }
-
-// func (t *Text) RangeStyleRun() iter.Seq2[string, Style] {
-// 	return func(yield func(string, Style) bool) {
-// 		n := 0
-// 		_ = t.EachStyleRun(func(content string, sty Style, pos uint64) (e error) {
-// 			if !yield(content, sty) {
-// 				return
-// 			}
-// 			n++
-// 			return
-// 		})
-// 	}
-// }
-
 // Style styles a run of text, given the start and end position.
 func (t Text) Style(sty Style, from, to uint64) (Text, error) {
 	var err error
@@ -120,33 +87,6 @@ func (t Text) Style(sty Style, from, to uint64) (Text, error) {
 // 	}
 // 	section.runs = runs(s)
 // 	return section, nil
-// }
-
-// StyleChange holds a style and the text position where the style run starts.
-type StyleChange struct {
-	Style    Style
-	Position uint64
-	Length   uint64
-}
-
-// StyleRuns returns a slice of style runs for a styled text.
-// func (t *Text) StyleRuns() []StyleChange {
-// 	return t.styleRuns(0)
-// }
-
-// func (t *Text) styleRuns(offset uint64) []StyleChange {
-// 	count := cords.Cord(t.runs).FragmentCount()
-// 	slice := make([]StyleChange, count)
-// 	i := 0
-// 	_ = cords.Cord(t.runs).EachLeaf(func(leaf cords.Leaf, pos uint64) error {
-// 		style := leaf.(*styleLeaf).style
-// 		slice[i].Style = style
-// 		slice[i].Position = pos
-// 		slice[i].Length = leaf.Weight()
-// 		i++
-// 		return nil
-// 	})
-// 	return slice
 // }
 
 // --- Runs of Styles --------------------------------------------------------
