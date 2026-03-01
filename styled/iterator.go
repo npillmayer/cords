@@ -104,6 +104,10 @@ func (text *Text) StyleRuns() []StyleChange {
 
 // ---Paragraph Iterators ----------------------------------------------------
 
+func (para *Paragraph) StyleRanges() iter.Seq2[StyleChange, io.Reader] {
+	return para.text.StyleRanges()
+}
+
 // EachStyleRun applies a function to each run of a single style.
 // pos is the text position of this run of text within the overall
 // styled text, i.e., its included [para.Offset].
