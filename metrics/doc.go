@@ -7,7 +7,11 @@ or segment iterators.
 */
 package metrics
 
-import "github.com/npillmayer/schuko/tracing"
+import (
+	"github.com/npillmayer/cords/btree"
+	"github.com/npillmayer/cords/cordext"
+	"github.com/npillmayer/schuko/tracing"
+)
 
 // tracer writes to trace with key 'cords.cords'
 func tracer() tracing.Trace {
@@ -19,3 +23,6 @@ func assert(cond bool, msg string) {
 		panic(msg)
 	}
 }
+
+// We will be dealing mainly with cords without extension.
+type plainCordType = cordext.CordEx[btree.NO_EXT]

@@ -30,10 +30,6 @@ type ParagraphPolicy struct {
 	// KeepEmpty reports empty paragraphs created by separators at boundaries or
 	// by consecutive separators.
 	KeepEmpty bool
-	// TreatCRAsLineBreak recognizes standalone '\r' as a line break.
-	//
-	// '\r\n' is always recognized as one line break.
-	TreatCRAsLineBreak bool
 }
 
 // FindParagraphs finds paragraph spans in text according to policy.
@@ -44,7 +40,7 @@ func FindParagraphs(text cordext.CordEx[btree.NO_EXT], policy ParagraphPolicy) [
 		return nil
 	}
 	policy = normalizeParagraphPolicy(policy)
-	lineBreaks := scanLineBreaks(text, policy.TreatCRAsLineBreak)
+	lineBreaks := scanLineBreaks(text)
 	tracer().Debugf("lineBreaks: %v", lineBreaks)
 	separators := toParagraphSeparators(lineBreaks, policy.Delimiters)
 	return toParagraphSpans(text.Len(), separators, policy.KeepEmpty)
@@ -104,7 +100,7 @@ type byteRange struct {
 	to   uint64
 }
 
-func scanLineBreaks(text cordext.CordEx[btree.NO_EXT], treatCRAsLineBreak bool) []byteRange {
+func scanLineBreaks(text cordext.CordEx[btree.NO_EXT]) []byteRange {
 	breaks := make([]byteRange, 0, 8)
 	var pendingCR bool
 	var crPos uint64
@@ -117,11 +113,6 @@ func scanLineBreaks(text cordext.CordEx[btree.NO_EXT], treatCRAsLineBreak bool) 
 			if pendingCR {
 				if c == '\n' {
 					breaks = append(breaks, byteRange{from: crPos, to: pos + 1})
-					pendingCR = false
-					continue
-				}
-				if treatCRAsLineBreak {
-					breaks = append(breaks, byteRange{from: crPos, to: crPos + 1})
 				}
 				pendingCR = false
 			}
@@ -136,9 +127,6 @@ func scanLineBreaks(text cordext.CordEx[btree.NO_EXT], treatCRAsLineBreak bool) 
 		}
 		return nil
 	})
-	if pendingCR && treatCRAsLineBreak {
-		breaks = append(breaks, byteRange{from: crPos, to: crPos + 1})
-	}
 	return breaks
 }
 

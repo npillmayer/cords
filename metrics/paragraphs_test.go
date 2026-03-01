@@ -81,20 +81,11 @@ func TestFindParagraphsKeepEmpty(t *testing.T) {
 	}
 }
 
-func TestFindParagraphsStandaloneCRPolicy(t *testing.T) {
+func TestFindParagraphsStandaloneCRIgnored(t *testing.T) {
 	c := cordext.FromStringNoExt("a\rb\rc")
 	spans := FindParagraphs(c, ParagraphPolicy{})
 	if len(spans) != 1 || spans[0] != (ParagraphSpan{From: 0, To: 5}) {
-		t.Fatalf("default policy should not split on standalone CR: got=%+v", spans)
-	}
-	spans = FindParagraphs(c, ParagraphPolicy{TreatCRAsLineBreak: true})
-	want := []ParagraphSpan{
-		{From: 0, To: 1},
-		{From: 2, To: 3},
-		{From: 4, To: 5},
-	}
-	if !reflect.DeepEqual(spans, want) {
-		t.Fatalf("unexpected spans with CR policy: got=%+v want=%+v", spans, want)
+		t.Fatalf("standalone CR should not split paragraphs: got=%+v", spans)
 	}
 }
 
