@@ -1,7 +1,9 @@
 package btree
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
@@ -33,7 +35,7 @@ func collectStrings(items []textChunk) []string {
 }
 
 func TestItemRange(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.btree")
 	defer teardown()
 
 	tree := buildTextTree(t, 10)
@@ -91,7 +93,7 @@ func TestItemRangeEmptyAndSingle(t *testing.T) {
 }
 
 func TestItemRangeCrossLeafAndIndexes(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "cords")
+	teardown := gotestingadapter.QuickConfig(t, "cords.btree")
 	defer teardown()
 
 	tree := buildTextTree(t, 60)
@@ -129,4 +131,41 @@ func TestItemRangeLastThreeLargeTree(t *testing.T) {
 			t.Fatalf("tail range index mismatch: got=%v want=%v", indexes, wantIdx)
 		}
 	}
+}
+
+func TestMetricSimple(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "cords.btree")
+	defer teardown()
+
+	tree := buildTextTree(t, 15)
+	k := ApplyMetric(tree, metric{treeHeight: tree.Height()})
+	t.Logf("k = %v", k)
+	//t.Fail()
+}
+
+// ---------------------------------------------------------------------------
+
+type metric struct{ treeHeight int }
+type testM struct {
+	s string
+}
+
+func (m metric) Zero() testM {
+	return testM{s: ""}
+}
+
+func (m metric) Leaf(item textChunk) (testM, bool) {
+	return testM{s: item.String()}, true
+}
+
+func (m metric) Add(k1, k2 testM) testM {
+	if k1.s == "" {
+		return k2
+	}
+	return testM{s: k1.s + "," + k2.s}
+}
+
+func (m metric) Apply(k testM, summary textSummary, height int) (testM, bool) {
+	fmt.Printf("%s(%s)\n", strings.Repeat("| ", m.treeHeight-height), k.s)
+	return k, true
 }

@@ -34,6 +34,63 @@ func (t *Tree[I, S, E]) forEachItemNode(n treeNode[I, S, E], fn func(item I) boo
 	return true
 }
 
+// Dimension describes a seek dimension over summaries.
+//
+// K is the dimension key/position type.
+type Metric[I SummarizedItem[S], S, K any] interface {
+	Zero() K
+	Add(acc, k K) K
+	Apply(acc K, summary S, height int) (K, bool)
+	Leaf(I) (K, bool)
+	//Compare(acc K, target K) int
+}
+
+func ApplyMetric[I SummarizedItem[S], S, E, K any](tree *Tree[I, S, E], m Metric[I, S, K]) K {
+	if tree.IsEmpty() || m == nil {
+		return m.Zero()
+	}
+	height := tree.Height()
+	k, _ := forEachNode(tree.root, m, height)
+	return k
+}
+
+func forEachNode[I SummarizedItem[S], S, E, K any](
+	n treeNode[I, S, E], m Metric[I, S, K], height int) (K, bool) {
+	//
+	assert(n != nil, "forEachNode called with nil node")
+	if n.isLeaf() {
+		assert(height == 1, "forEachNode called with leaf node at height > 1")
+		leaf := n.(*leafNode[I, S, E])
+		k := m.Zero()
+		for _, item := range leaf.items {
+			l, ok := m.Leaf(item)
+			if !ok {
+				return k, false
+			}
+			k = m.Add(k, l)
+		}
+		var ok bool
+		if k, ok = m.Apply(k, leaf.summary, 1); ok {
+			return k, true
+		}
+		return k, false
+	}
+	inner := n.(*innerNode[I, S, E])
+	k := m.Zero()
+	for _, child := range inner.children {
+		n, ok := forEachNode(child, m, height-1)
+		if !ok {
+			return k, false
+		}
+		k = m.Add(k, n)
+	}
+	var ok bool
+	if k, ok = m.Apply(k, inner.summary, height); ok {
+		return k, true
+	}
+	return k, false
+}
+
 // ItemRange returns a range iterator over items in [from,to).
 //
 // The yielded pair is (item, absoluteItemIndex). ItemRange delegates to the
