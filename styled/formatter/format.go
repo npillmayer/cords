@@ -49,8 +49,6 @@ const (
 //
 // Neither of the arguments may be nil. However, it is safe to have config.Context
 // set to nil. In this case, uax11.LatinContext is used.
-//
-// TODO do not consume para
 func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format) error {
 	//
 	if para == nil || config == nil || format == nil {

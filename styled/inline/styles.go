@@ -73,7 +73,7 @@ func (s Style) String() string {
 		return styleString(0)
 	}
 	str := ""
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		//T().Debugf("check: %d = %s", 1<<i, styleString(1<<i))
 		if s&(1<<i) > 0 {
 			str = str + styleString(1<<i)
