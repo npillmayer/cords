@@ -61,20 +61,20 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 	breaks := firstFit(para, config.LineWidth, config.Context)
 	format.Preamble(out)
 	for i, pos := range breaks {
-		line, runs, err := para.WrapAt(pos)
+		line, bidiRuns, err := para.WrapAt(pos)
 		if err != nil {
 			tracer().Errorf("error Paragraph.WrapAt = %v", err)
 			return err
 		}
 		tracer().Infof("[%3d] \"%s\"", i, line.Raw())
-		tracer().Infof("      with styles = %v", line.StyleRuns())
-		tracer().Infof("      with runs   = %v", runs)
+		tracer().Infof("    with styles    = %v", line.StyleRuns())
+		tracer().Infof("    with bidi runs = %v", bidiRuns)
 		// iter := itemized.IterateText(line)
 		// for iter.Next() {
 		// 	text, style, from, to := iter.Style()
 		// 	T().Infof("%v: %d…%d = %s", style, from, to, text)
 		// }
-		for _, run := range runs.Runs {
+		for _, run := range bidiRuns.Runs {
 			if run.Dir == bidi.RightToLeft {
 				format.RTL(out) // TODO probably have to reverse graphemes
 			} else {
@@ -96,26 +96,17 @@ func Output(para *styled.Paragraph, out io.Writer, config *Config, format Format
 					}
 					from := styleRun.Position
 					to := from + styleRun.Length
-					tracer().Infof("%v: %d…%d = \"%v\"", styleRun.Style, from, to, text)
-					var s string
+					tracer().Debugf("%v: %d…%d = \"%s\"", styleRun.Style, from, to, text)
+					s := string(text)
 					if run.IsOpposite(bidi.LeftToRight) {
 						s = reorder(string(text), format.NeedsReordering())
 					}
 					format.StyledText(s, styleRun.Style, out)
 				}
-				// iter := itemized.IterateText(&section)
-				// for iter.Next() {
-				// 	text, style, from, to := iter.Style()
-				// 	tracer().Infof("%v: %d…%d = \"%s\"", style, from, to, text)
-				// 	if run.IsOpposite(bidi.LeftToRight) {
-				// 		text = reorder(text, format.NeedsReordering())
-				// 	}
-				// 	format.StyledText(text, style, out)
-				// }
 			}
 		}
 		format.Newline(out)
-		tracer().Infof("----------- 8< ---------------")
+		tracer().Debugf("----------- 8< ---------------")
 	}
 	format.Postamble(out)
 	return nil

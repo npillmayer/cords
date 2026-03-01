@@ -56,11 +56,19 @@ func (t Text) eachStyleRun(offset uint64,
 	return err
 }
 
+var voidIter = func(yield func(StyleChange, io.Reader) bool) {}
+
 // StyleRanges is an iterator over the style runs of a styled text.
 // It returns [StyleChange]s and [io.Reader]s for each run.
 func (t Text) StyleRanges() iter.Seq2[StyleChange, io.Reader] {
+	if t.IsVoid() {
+		return voidIter
+	}
 	if t.isUnstyled() {
-		return nil
+		return func(yield func(StyleChange, io.Reader) bool) {
+			rnge := StyleChange{Style: nil, Position: 0, Length: t.text.Len()}
+			yield(rnge, t.text.Reader())
+		}
 	}
 	var offset uint64
 	return func(yield func(StyleChange, io.Reader) bool) {
@@ -85,7 +93,7 @@ func (t Text) StyleRanges() iter.Seq2[StyleChange, io.Reader] {
 // they should use one of the iterators.
 func (text *Text) StyleRuns() []StyleChange {
 	if text == nil {
-		return nil
+		return []StyleChange{}
 	}
 	var runs []StyleChange
 	for run, _ := range text.StyleRanges() {

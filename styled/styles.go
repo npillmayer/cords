@@ -9,6 +9,12 @@ import (
 
 // --- Styled Text -----------------------------------------------------------
 
+// IsVoid returns true if the text is empty.
+// Even if a text is non-empty, it may have no styles.
+func (t Text) IsVoid() bool {
+	return t.text.IsVoid()
+}
+
 // TextFromString creates a stylable text from a string.
 func TextFromString(s string) Text {
 	t := Text{
@@ -100,7 +106,7 @@ func merge(runs1, runs2 []Run) []Run {
 	}
 	l1 := runs1[len(runs1)-1]
 	l2 := runs2[0]
-	tracer().Debugf("l1 = %v, l2 = %v", l1, l2)
+	//tracer().Debugf("l1 = %v, l2 = %v", l1, l2)
 	if equals(l1.style, l2.style) {
 		r := l1
 		r.length += l2.length
