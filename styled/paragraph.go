@@ -102,6 +102,11 @@ func (text *Paragraph) Reader() io.Reader {
 }
 
 // WrapAt splits off a front segment (usually a “line”) from a paragraph.
+// The returned text is the front segment, and the paragraph is updated to
+// contain the remaining text.
+//
+// Style runs and Bidi levels are handled correctly in the returned text, as
+// well as for the remaining text in the paragraph.
 func (para *Paragraph) WrapAt(pos uint64) (*Text, *bidi.Ordering, error) {
 	if para == nil || para.text == nil {
 		return nil, nil, ErrIllegalArguments

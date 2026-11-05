@@ -33,18 +33,16 @@ func TestParagraphWrapAtKeepsRunsInSync(t *testing.T) {
 	if got := para.Raw().String(); got != "Dxy" {
 		t.Fatalf("remaining raw mismatch: got=%q want=%q", got, "Dxy")
 	}
-
-	// TODO
-	// lineRuns := line.StyleRuns()
-	// if len(lineRuns) != 2 {
-	// 	t.Fatalf("line style runs mismatch: got=%d want=2", len(lineRuns))
-	// }
-	// if lineRuns[0].Position != 0 || lineRuns[0].Length != 2 || !equals(lineRuns[0].Style, nil) {
-	// 	t.Fatalf("line run[0] mismatch: %+v", lineRuns[0])
-	// }
-	// if lineRuns[1].Position != 2 || lineRuns[1].Length != 1 || !equals(lineRuns[1].Style, bold) {
-	// 	t.Fatalf("line run[1] mismatch: %+v", lineRuns[1])
-	// }
+	lineRuns := line.StyleRuns()
+	if len(lineRuns) != 2 {
+		t.Fatalf("line style runs mismatch: got=%d want=2", len(lineRuns))
+	}
+	if lineRuns[0].Position != 0 || lineRuns[0].Length != 2 || !equals(lineRuns[0].Style, nil) {
+		t.Fatalf("line run[0] mismatch: %+v", lineRuns[0])
+	}
+	if lineRuns[1].Position != 2 || lineRuns[1].Length != 1 || !equals(lineRuns[1].Style, bold) {
+		t.Fatalf("line run[1] mismatch: %+v", lineRuns[1])
+	}
 
 	st, off, err := para.StyleAt(0)
 	if err != nil {
@@ -71,17 +69,16 @@ func TestParagraphWrapAtKeepsRunsInSync(t *testing.T) {
 	if para.Raw().Len() != 0 {
 		t.Fatalf("expected paragraph to be consumed, got len=%d", para.Raw().Len())
 	}
-	// TODO
-	// line2Runs := line2.StyleRuns()
-	// if len(line2Runs) != 2 {
-	// 	t.Fatalf("line2 style runs mismatch: got=%d want=2", len(line2Runs))
-	// }
-	// if line2Runs[0].Position != 0 || line2Runs[0].Length != 1 || !equals(line2Runs[0].Style, bold) {
-	// 	t.Fatalf("line2 run[0] mismatch: %+v", line2Runs[0])
-	// }
-	// if line2Runs[1].Position != 1 || line2Runs[1].Length != 2 || !equals(line2Runs[1].Style, nil) {
-	// 	t.Fatalf("line2 run[1] mismatch: %+v", line2Runs[1])
-	// }
+	line2Runs := line2.StyleRuns()
+	if len(line2Runs) != 2 {
+		t.Fatalf("line2 style runs mismatch: got=%d want=2", len(line2Runs))
+	}
+	if line2Runs[0].Position != 0 || line2Runs[0].Length != 1 || !equals(line2Runs[0].Style, bold) {
+		t.Fatalf("line2 run[0] mismatch: %+v", line2Runs[0])
+	}
+	if line2Runs[1].Position != 1 || line2Runs[1].Length != 2 || !equals(line2Runs[1].Style, nil) {
+		t.Fatalf("line2 run[1] mismatch: %+v", line2Runs[1])
+	}
 }
 
 func TestParagraphWrapAtUnstyledText(t *testing.T) {
@@ -103,10 +100,9 @@ func TestParagraphWrapAtUnstyledText(t *testing.T) {
 	if got := para.Raw().String(); got != "def" {
 		t.Fatalf("remaining raw mismatch: got=%q want=%q", got, "def")
 	}
-	// TODO
-	// if runs := line.StyleRuns(); runs != nil {
-	// 	t.Fatalf("expected nil style runs for unstyled line, got=%+v", runs)
-	// }
+	if runs := line.StyleRuns(); len(runs) != 1 {
+		t.Fatalf("expected one nil-style run for unstyled line, got=%+v", runs)
+	}
 }
 
 func TestParagraphWrapAtInvalidInputs(t *testing.T) {
@@ -128,4 +124,16 @@ func TestParagraphWrapAtInvalidInputs(t *testing.T) {
 	if _, _, err := para.WrapAt(2); !errors.Is(err, ErrIndexOutOfBounds) {
 		t.Fatalf("expected ErrIndexOutOfBounds for backward wrap position, got %v", err)
 	}
+}
+
+func TestParagraphBidiLevels(t *testing.T) {
+	teardown := gotestingadapter.QuickConfig(t, "styles")
+	defer teardown()
+
+	text := TextFromString("Look out: זה כיף סתם לשמוע איך תנצח קרפד עץ טוב בגן")
+	para, err := ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+	if err != nil {
+		t.Fatalf("ParagraphFromText failed: %v", err)
+	}
+	t.Logf("bidi levels: %v", para.BidiLevels())
 }

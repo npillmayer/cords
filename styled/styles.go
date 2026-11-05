@@ -158,7 +158,10 @@ func initialStyle(textlen uint64, sty Style, from, to uint64) (Runs, error) {
 		return runs, err
 	}
 	spn := toSpan(from, to).contained(textlen)
-	if spn.void() || textlen == 0 {
+	tracer().Debugf("initial style has span %v", spn)
+	if spn.void() {
+		return runs, ErrIllegalArguments
+	} else if textlen == 0 {
 		return runs, nil
 	}
 	if spn.covers(textlen) {
@@ -249,9 +252,9 @@ type span struct {
 }
 
 func toSpan(from, to uint64) span {
-	if from > to {
-		from, to = to, from
-	}
+	// if from > to {
+	// 	from, to = to, from
+	// }
 	return span{from, to}
 }
 

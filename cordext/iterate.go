@@ -109,40 +109,43 @@ func (cord CordEx[E]) ByteRangeBounded(from, to uint64) iter.Seq2[int, byte] {
 		return noIterator
 	}
 	cursor := byteCursor(cord)
-	startItemInx, acc, err := cursor.Seek(from)
+	// Seek returns the chunk whose cumulative end reaches the target. Seek
+	// one byte past the inclusive start to handle zero and exact chunk edges.
+	startItemInx, startEnd, err := cursor.Seek(from + 1)
 	if err != nil {
 		return noIterator
 	}
-	tracer().Debugf("cordext: cursor acc = %d at item %d", acc, startItemInx)
+	tracer().Debugf("cordext: cursor acc = %d at item %d", startEnd, startItemInx)
 	chnk, err := cord.tree.At(startItemInx)
 	if err != nil {
 		return noIterator
 	}
-	endItemInx, acc, err := cursor.Seek(to)
+	endItemInx, _, err := cursor.Seek(to)
 	if err != nil {
 		return noIterator
 	}
-	tracer().Debugf("cordext: cursor acc = %d at item %d", acc, endItemInx)
-	left := int(acc - uint64(chnk.Len()) + from)
-	right := int(acc - uint64(chnk.Len()) + to)
-	inx := int(acc - uint64(chnk.Len()))
-	buf := make([]byte, 0, chunk.MaxBase)
+	startByte := startEnd - uint64(chnk.Len())
 	return func(yield func(int, byte) bool) {
+		// Keep absolute byte coordinates distinct from chunk indices, and
+		// allocate iteration state per traversal so the sequence is reusable.
+		inx := startByte
+		buf := make([]byte, 0, chunk.MaxBase)
 		for j, chnk := range cord.ChunkRangeBounded(startItemInx, endItemInx+1) {
 			tracer().Debugf("cordext: chunk %d at %d", j, inx)
 			buf = chnk.Bytes(buf)
 			for i, b := range buf {
-				if inx+i < left {
+				at := inx + uint64(i)
+				if at < from {
 					continue
 				}
-				if inx+i >= right {
+				if at >= to {
 					return
 				}
-				if !yield(inx+i, b) {
+				if !yield(int(at), b) {
 					return
 				}
 			}
-			inx += chnk.Len()
+			inx += uint64(chnk.Len())
 		}
 	}
 }
@@ -156,11 +159,11 @@ func (cord CordEx[E]) ByteRangeBounded(from, to uint64) iter.Seq2[int, byte] {
 
 func (cord CordEx[E]) BoundedReader(from, to uint64) io.Reader {
 	if cord.tree == nil {
-		return nil
+		return zeroReader{}
 	}
 	from, to = max(0, from), min(to, cord.Len())
 	if to <= from {
-		return nil
+		return zeroReader{}
 	}
 	return &boundedReader[E]{
 		iterator: cord.ByteRangeBounded(from, to),
@@ -174,26 +177,32 @@ type boundedReader[E any] struct {
 }
 
 func (r *boundedReader[E]) Read(p []byte) (n int, err error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if r.next == nil {
 		r.next, r.stop = iter.Pull2(r.iterator)
 	}
-	for n = range len(p) {
+	for n < len(p) {
 		_, b, ok := r.next()
 		if !ok {
-			err = io.EOF
-			defer r.stop()
-			return
+			r.stop()
+			return n, io.EOF
 		}
 		p[n] = b
+		n++
 	}
-	return
+	return n, nil
 }
 
 // --- Reader for whole cord -------------------------------------------------
 
 type zeroReader struct{}
 
-func (z zeroReader) Read([]byte) (int, error) {
+func (z zeroReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	return 0, io.EOF
 }
 

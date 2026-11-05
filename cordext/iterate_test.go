@@ -109,8 +109,8 @@ func TestByteBoundedReader(t *testing.T) {
 		t.Fatalf("Read failed: %v", err)
 	}
 	t.Logf("cords.cordext reader got %q", buf)
-	if n != 9 {
-		t.Fatalf("expected 9 bytes, got %d", n)
+	if n != 10 {
+		t.Fatalf("expected 10 bytes, got %d", n)
 	}
 	if string(buf) != text[:10] {
 		t.Fatalf("expected %q, got %q", text[:10], buf)

@@ -107,6 +107,7 @@ type where[I any] struct {
 	acc      int64               // item count to the left of current leaf, variable
 	from, to int64               // const
 	fn       func(int64, I) bool // const
+	stopped  bool                // yield returned false; propagate through all ancestors
 }
 
 func (t *Tree[I, S, E]) forEachItemRange(fn func(int64, I) bool, from, to int64) (int64, error) {
@@ -129,7 +130,7 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 	//
 	assert(n != nil, "traverseItems called with nil node")
 	assert(height > 0, "traverseItems called with non-positive height")
-	if w.acc >= w.to {
+	if w.stopped || w.acc >= w.to {
 		return w.acc, nil // we are done
 	}
 	if height == 1 { // we are in a leaf node
@@ -143,7 +144,11 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 					break // past range
 				}
 				// now: from <= acc + i < to
-				w.fn(w.acc+int64(i), leaf.items[i]) // may be `yield(…)`
+				if !w.fn(w.acc+int64(i), leaf.items[i]) { // may be yield
+					w.acc += int64(i) + 1
+					w.stopped = true
+					return w.acc, nil
+				}
 			}
 		}
 		w.acc += int64(leaf.n) // jump past leaf
@@ -155,7 +160,7 @@ func (t *Tree[I, S, E]) traverseItems(n treeNode[I, S, E], w *where[I], height i
 		//itemcnt := t.countItems(child)
 		itemcnt := child.Weight()
 		if w.acc+itemcnt >= w.from { // child contains items in range
-			if n, err := t.traverseItems(child, w, height-1); err != nil {
+			if n, err := t.traverseItems(child, w, height-1); err != nil || w.stopped {
 				return n, err
 			}
 		} else {

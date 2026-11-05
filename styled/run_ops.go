@@ -284,7 +284,9 @@ func (runs Runs) InsertAt(pos, n uint64, sty Style) (Runs, error) {
 // and returns the unified style set (in btree format).
 func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error) {
 	spn := toSpan(from, to).contained(textlen)
-	if spn.void() || textlen == 0 {
+	if spn.void() {
+		return runs, ErrIllegalArguments
+	} else if textlen == 0 {
 		return runs, nil
 	}
 	if runs.tree == nil || runs.tree.IsEmpty() {

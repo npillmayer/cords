@@ -2,10 +2,12 @@ module github.com/npillmayer/cords
 
 go 1.25.6
 
+replace github.com/npillmayer/uax => /Users/npi/prg/go/uax
+
 require (
 	github.com/fatih/color v1.10.0
 	github.com/npillmayer/schuko v0.2.0-alpha.3.0.20211209143531-2d524c4964ff
-	github.com/npillmayer/uax v0.1.0
+	github.com/npillmayer/uax v0.3.0-alpha1
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 )
