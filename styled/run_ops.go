@@ -331,7 +331,7 @@ func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error)
 	rightCanMerge := spn.r == rightEnd
 	insertCount := int64(len(repl))
 	leftMerged := false
-	if leftCanMerge {
+	if leftCanMerge && iL > 0 {
 		if tree, leftMerged, err = mergeAdjacentRuns(tree, iL-1); err != nil {
 			return runs, err
 		}
@@ -341,8 +341,10 @@ func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error)
 		if leftMerged {
 			rightPairLeft--
 		}
-		if tree, _, err = mergeAdjacentRuns(tree, rightPairLeft); err != nil {
-			return runs, err
+		if rightPairLeft+1 < tree.Len() {
+			if tree, _, err = mergeAdjacentRuns(tree, rightPairLeft); err != nil {
+				return runs, err
+			}
 		}
 	}
 	assert(tree.Summary().length() == textlen, "internal inconsistency")
