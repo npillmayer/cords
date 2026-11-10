@@ -62,32 +62,38 @@ func TestVTE(t *testing.T) {
 	//t.Errorf("TODO: RTL does not work")
 }
 
-// Example for bi-directional text and line-breaking according to the Unicode
-// Bidi algorithm. We set up an unusual console format to make newlines visible
-// in the Godoc documentation. Then we configure for a line length of 40 'en's,
-// which will ensure a line-break between the two words in hebrew script.
-//
-// Please note that this is in a sense a contrieved example, as it has to work
-// from godoc in the browser. The browser will do the right thing with Bidi anyway.
-// However, the example shows a typical use case and has a chance to work on
-// different terminals with varying support for bidi text.
+// Exercise fixed-width output with explicit device settings, independent of
+// TERM, VTE_VERSION, stdout, and the host terminal's bidi capabilities.
 func TestConsoleFixedWidth(t *testing.T) {
-	//func ExampleConsoleFixedWidth() {
-	teardown := gotestingadapter.QuickConfig(t, "cords.styles")
-	defer teardown()
-	//
-	console := NewLocalConsoleFormat()
-	console.Codes.Newline = []byte("<nl>\n") // just to please godoc
-	config := &Config{LineWidth: 40}         // format into narrow lines
-	//
-	text := styled.TextFromString("The quick brown fox jumps over the כלב עצלן!")
-	para, _ := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
-	console.Print(para, config)
-	// Output:
-	// The quick brown fox jumps over the כלב <nl>
-	// עצלן!<nl>
-	//
-	t.Fail()
+	const source = "The quick brown fox jumps over the כלב עצלן!"
+	for _, tc := range []struct {
+		name  string
+		width int
+		want  string
+	}{
+		{"wrap between Hebrew words", 40, "The quick brown fox jumps over the כלב <nl>\nעצלן!<nl>\n"},
+		{"wide line", 80, source + "<nl>\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Output consumes the paragraph via WrapAt, so each case needs a fresh one.
+			text := styled.TextFromString(source)
+			para, err := styled.ParagraphFromText(&text, 0, text.Raw().Len(), bidi.LeftToRight, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// ReorderNone leaves Hebrew in logical order for a bidi-capable device.
+			// A local codes value avoids mutating the package-wide defaults.
+			codes := ControlCodes{Newline: []byte("<nl>\n")}
+			console := NewConsoleFixedWidthFormat(&codes, nil, ReorderNone)
+			var out bytes.Buffer
+			if err := Output(para, &out, &Config{LineWidth: tc.width}, console); err != nil {
+				t.Fatal(err)
+			}
+			if got := out.String(); got != tc.want {
+				t.Fatalf("width %d: output = %q, want %q", tc.width, got, tc.want)
+			}
+		})
+	}
 }
 
 func TestHTML1(t *testing.T) {

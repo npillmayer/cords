@@ -64,17 +64,20 @@ func (t *Text) StyleAt(pos uint64) (Style, uint64, error) {
 	return run.style, pos - runStart, nil
 }
 
-// Style styles a run of text, given the start and end position.
+// Style applies sty to the half-open UTF-8 byte range [from,to).
+// An empty range [p,p), with p <= Raw().Len(), is a no-op returning the
+// unchanged text, including its existing style runs, and nil error. This also
+// applies to nil styles and empty text. No rune-boundary check is needed for a
+// no-op. Reversed ranges, starts beyond the text, and nonempty ranges that
+// become empty when the end is clamped return ErrIllegalArguments unchanged.
+// For a nonempty range, to is clamped to the text length.
 func (t Text) Style(sty Style, from, to uint64) (Text, error) {
-	var err error
-	if t.runs.tree == nil || t.runs.tree.IsEmpty() {
-		t.runs, err = initialStyle(t.text.Len(), sty, from, to)
-		assert(t.runs.tree != nil, "runs.tree should not be nil (initial styling)")
+	runs, err := t.runs.Style(t.text.Len(), sty, from, to)
+	if err != nil {
 		return t, err
 	}
-	t.runs, err = t.runs.Style(t.text.Len(), sty, from, to)
-	assert(t.runs.tree != nil, "runs.tree should not be nil (styling)")
-	return t, err
+	t.runs = runs
+	return t, nil
 }
 
 // Section copies a piece of styled text, delimited by parameters from and to.
@@ -147,11 +150,12 @@ type Style interface {
 	String() string          // return some kind of identifying string
 }
 
-// initialStyle applies a style to a range [from,to) of characters. Returns a style set.
-// Given range boundaries will silently be restricted to valid text positions without
-// flagging an error. This may result in the style not being applied due to an invalid
-// range.
+// initialStyle creates style runs using the same byte-range contract as Text.Style.
+// Valid empty ranges leave the style tree unallocated.
 func initialStyle(textlen uint64, sty Style, from, to uint64) (Runs, error) {
+	if from == to && from <= textlen {
+		return Runs{}, nil
+	}
 	runs, err := newRuns()
 	if err != nil {
 		tracer().Errorf("styled runs: failed to create new runs")

@@ -282,7 +282,12 @@ func (runs Runs) InsertAt(pos, n uint64, sty Style) (Runs, error) {
 
 // Style adds a style to (possibly already existing) styles for a given range
 // and returns the unified style set (in btree format).
+// It uses the byte-range contract of Text.Style; a valid empty range returns
+// the original Runs without allocating or splitting runs.
 func (runs Runs) Style(textlen uint64, sty Style, from, to uint64) (Runs, error) {
+	if from == to && from <= textlen {
+		return runs, nil
+	}
 	spn := toSpan(from, to).contained(textlen)
 	if spn.void() {
 		return runs, ErrIllegalArguments
